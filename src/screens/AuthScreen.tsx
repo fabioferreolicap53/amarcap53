@@ -149,7 +149,7 @@ export function AuthScreen() {
           {authState === 'forgot_password' && 'Recuperar Senha'}
         </h2>
         <p className="mt-2 text-center text-sm text-on-surface/60">
-          AMARCAP 53
+          AMAR - ACOMPANHAMENTO DA MULHER NAS AÇÕES DE RASTREIO
         </p>
       </div>
 

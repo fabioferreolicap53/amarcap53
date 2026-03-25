@@ -1,17 +1,90 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from '../components/Header';
-import { X } from 'lucide-react';
+import { X, Search } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { pb } from '../lib/pocketbase';
+
+interface Paciente {
+  id: string;
+  nome: string;
+  cns: string;
+  data_nascimento: string;
+  idade?: number;
+  siscan?: string;
+  cadastro_lab?: string;
+  coleta_v2?: string;
+  dna_hpv_pront?: string;
+  dna_hpv_gal?: string;
+  dna_hpv_pep?: string;
+  alertas?: string;
+}
 
 export const PatientsScreen = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { user } = useAuth();
+  const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPacientes = async () => {
+      if (!user) return;
+      try {
+        setIsLoading(true);
+        // Busca os pacientes filtrando pela unidade, equipe e microárea do usuário logado
+        const records = await pb.collection('amarcap53_pacientes').getFullList({
+          filter: `unidade = "${user.unidade_saude}" && equipe = "${user.equipe}" && microarea = "${user.microarea}"`,
+          sort: 'nome',
+        });
+        
+        // Mapeia os dados do banco para a interface
+        const pacientesFormatados = records.map(record => ({
+          id: record.id,
+          nome: record.nome || '--',
+          cns: record.cns || '--',
+          data_nascimento: record.data_nascimento || '--',
+          idade: calcularIdade(record.data_nascimento),
+          siscan: record.siscan || '--',
+          cadastro_lab: record.cadastro_lab || '--',
+          coleta_v2: record.coleta_v2 || '--',
+          dna_hpv_pront: record.dna_hpv_pront || '--',
+          dna_hpv_gal: record.dna_hpv_gal || '--',
+          dna_hpv_pep: record.dna_hpv_pep || '--',
+          alertas: record.alertas || '--',
+        }));
+
+        setPacientes(pacientesFormatados);
+      } catch (error) {
+        console.error("Erro ao buscar pacientes:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPacientes();
+  }, [user]);
+
+  const calcularIdade = (dataNascimento: string) => {
+    if (!dataNascimento) return 0;
+    // Tenta interpretar DD/MM/YYYY ou YYYY-MM-DD
+    let dataFormatada = dataNascimento;
+    if (dataNascimento.includes('/')) {
+      const [dia, mes, ano] = dataNascimento.split('/');
+      dataFormatada = `${ano}-${mes}-${dia}`;
+    }
+    
+    const hoje = new Date();
+    const nascimento = new Date(dataFormatada);
+    let idade = hoje.getFullYear() - nascimento.getFullYear();
+    const m = hoje.getMonth() - nascimento.getMonth();
+    if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) {
+      idade--;
+    }
+    return isNaN(idade) ? 0 : idade;
+  };
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-surface">
-      <Header 
-        title="AMAR - ACOMPANHAMENTO DA MULHER NAS AÇÕES DE RASTREIO" 
-        pageTitle="Meus Pacientes"
-        subtitle="Unidade de Saúde: SMS RJ" 
-      />
+      <Header title="Meus Pacientes" pageTitle="Meus Pacientes" />
       
       <div className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar">
         <div className="max-w-7xl mx-auto">
@@ -64,102 +137,55 @@ export const PatientsScreen = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
-                  <tr className="hover:bg-surface-container-low transition-colors group">
-                    <td className="px-6 py-4 font-bold text-primary whitespace-nowrap">ANA CAROLINA SILVA</td>
-                    <td className="px-6 py-4 text-xs font-medium whitespace-nowrap">702 4056 8922 0001</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">12/05/1985</td>
-                    <td className="px-6 py-4 text-xs">38</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">10/01/24</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">11/01/24</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">08/01/24</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">05/01/24</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">07/01/24</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed text-[10px] font-bold">NEGATIVO</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-full bg-error-container text-on-error-container text-[10px] font-bold">ASC-US</span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <button 
-                        onClick={() => setIsModalOpen(true)}
-                        className="bg-gradient-to-r from-primary to-primary-container text-white px-4 py-1.5 rounded-md text-xs font-bold shadow-md hover:scale-95 transition-transform"
-                      >
-                        Acompanhar
-                      </button>
-                    </td>
-                  </tr>
-                  <tr className="bg-surface-container-low hover:bg-surface-container-high transition-colors group">
-                    <td className="px-6 py-4 font-bold text-primary whitespace-nowrap">BEATRIZ OLIVEIRA SANTOS</td>
-                    <td className="px-6 py-4 text-xs font-medium whitespace-nowrap">898 3321 0098 4452</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">22/11/1972</td>
-                    <td className="px-6 py-4 text-xs">51</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">15/02/24</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">16/02/24</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">14/02/24</td>
-                    <td className="px-6 py-4 text-xs">--</td>
-                    <td className="px-6 py-4 text-xs">--</td>
-                    <td className="px-6 py-4 text-xs text-outline italic whitespace-nowrap">Pendente</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-[10px] font-bold">NORMAL</span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <button 
-                        onClick={() => setIsModalOpen(true)}
-                        className="bg-gradient-to-r from-primary to-primary-container text-white px-4 py-1.5 rounded-md text-xs font-bold shadow-md hover:scale-95 transition-transform"
-                      >
-                        Acompanhar
-                      </button>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-surface-container-low transition-colors group">
-                    <td className="px-6 py-4 font-bold text-primary whitespace-nowrap">CARLA MENDES PEREIRA</td>
-                    <td className="px-6 py-4 text-xs font-medium whitespace-nowrap">921 5567 1234 8876</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">05/03/1992</td>
-                    <td className="px-6 py-4 text-xs">31</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">02/03/24</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">03/03/24</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">01/03/24</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">28/02/24</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">02/03/24</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-full bg-error-container text-on-error-container text-[10px] font-bold">POSITIVO</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-full bg-error-container text-on-error-container text-[10px] font-bold">LSIL</span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <button 
-                        onClick={() => setIsModalOpen(true)}
-                        className="bg-gradient-to-r from-primary to-primary-container text-white px-4 py-1.5 rounded-md text-xs font-bold shadow-md hover:scale-95 transition-transform"
-                      >
-                        Acompanhar
-                      </button>
-                    </td>
-                  </tr>
-                  <tr className="bg-surface-container-low hover:bg-surface-container-high transition-colors group">
-                    <td className="px-6 py-4 font-bold text-primary whitespace-nowrap">DANIELA COSTA</td>
-                    <td className="px-6 py-4 text-xs font-medium whitespace-nowrap">700 8890 1233 4412</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">18/07/1968</td>
-                    <td className="px-6 py-4 text-xs">55</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">20/02/24</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">21/02/24</td>
-                    <td className="px-6 py-4 text-xs whitespace-nowrap">19/02/24</td>
-                    <td className="px-6 py-4 text-xs">--</td>
-                    <td className="px-6 py-4 text-xs">--</td>
-                    <td className="px-6 py-4 text-xs text-outline italic whitespace-nowrap">Pendente</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-full bg-error-container text-on-error-container text-[10px] font-bold">NIC III</span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <button 
-                        onClick={() => setIsModalOpen(true)}
-                        className="bg-gradient-to-r from-primary to-primary-container text-white px-4 py-1.5 rounded-md text-xs font-bold shadow-md hover:scale-95 transition-transform"
-                      >
-                        Acompanhar
-                      </button>
-                    </td>
-                  </tr>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={12} className="px-6 py-8 text-center text-on-surface-variant">
+                        Carregando pacientes...
+                      </td>
+                    </tr>
+                  ) : pacientes.length === 0 ? (
+                    <tr>
+                      <td colSpan={12} className="px-6 py-8 text-center text-on-surface-variant">
+                        Nenhum paciente encontrado para sua Unidade/Equipe/Microárea.
+                      </td>
+                    </tr>
+                  ) : (
+                    pacientes.map((paciente) => (
+                      <tr key={paciente.id} className="hover:bg-surface-container-low transition-colors group">
+                        <td className="px-6 py-4 font-bold text-primary whitespace-nowrap">{paciente.nome}</td>
+                        <td className="px-6 py-4 text-xs font-medium whitespace-nowrap">{paciente.cns}</td>
+                        <td className="px-6 py-4 text-xs whitespace-nowrap">{paciente.data_nascimento}</td>
+                        <td className="px-6 py-4 text-xs">{paciente.idade}</td>
+                        <td className="px-6 py-4 text-xs whitespace-nowrap">{paciente.siscan}</td>
+                        <td className="px-6 py-4 text-xs whitespace-nowrap">{paciente.cadastro_lab}</td>
+                        <td className="px-6 py-4 text-xs whitespace-nowrap">{paciente.coleta_v2}</td>
+                        <td className="px-6 py-4 text-xs whitespace-nowrap">{paciente.dna_hpv_pront}</td>
+                        <td className="px-6 py-4 text-xs whitespace-nowrap">{paciente.dna_hpv_gal}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {paciente.dna_hpv_pep === 'NEGATIVO' ? (
+                            <span className="px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed text-[10px] font-bold">NEGATIVO</span>
+                          ) : (
+                            <span className="text-xs text-outline italic">Pendente</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {paciente.alertas !== '--' ? (
+                            <span className="px-2 py-0.5 rounded-full bg-error-container text-on-error-container text-[10px] font-bold">{paciente.alertas}</span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-[10px] font-bold">NORMAL</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button 
+                            onClick={() => setIsModalOpen(true)}
+                            className="bg-gradient-to-r from-primary to-primary-container text-white px-4 py-1.5 rounded-md text-xs font-bold shadow-md hover:scale-95 transition-transform"
+                          >
+                            Acompanhar
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

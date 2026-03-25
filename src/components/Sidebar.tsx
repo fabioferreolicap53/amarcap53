@@ -30,10 +30,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     <aside className={`fixed left-0 top-0 h-full w-64 z-50 bg-[#f2f4f6] dark:bg-slate-950 flex flex-col p-4 border-r border-transparent transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
       <div className="flex justify-between items-center mb-8 px-4">
         <div>
-          <h1 className="font-black text-[#051934] dark:text-white tracking-tight text-sm leading-tight">
-            AMAR - ACOMPANHAMENTO DA MULHER NAS AÇÕES DE RASTREIO
+          <h1 className="font-black text-[#051934] dark:text-white tracking-tighter text-2xl leading-none">
+            AMAR
           </h1>
-          <p className="text-xs tracking-wide font-medium font-body text-slate-500 mt-1">Rastreio de Saúde SUS</p>
+          <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.05em] leading-tight mt-1.5 border-l-2 border-[#051934] pl-2">
+            Acompanhamento da Mulher nas Ações de Rastreio
+          </p>
         </div>
         <button 
           onClick={closeSidebar}
