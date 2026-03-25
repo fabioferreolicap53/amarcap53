@@ -1,0 +1,179 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-inverse-on-surface: #eff1f3;
+  --color-on-secondary-fixed: #151c27;
+  --color-primary-fixed-dim: #b5c7ea;
+  --color-on-primary-container: #8496b7;
+  --color-on-background: #191c1e;
+  --color-on-error: #ffffff;
+  --color-on-tertiary: #ffffff;
+  --color-primary-fixed: #d6e3ff;
+  --color-surface-container-low: #f2f4f6;
+  --color-surface-container-lowest: #ffffff;
+  --color-secondary-container: #dadff0;
+  --color-primary: #051934;
+  --color-background: #f7f9fb;
+  --color-on-error-container: #93000a;
+  --color-outline: #75777e;
+  --color-secondary: #585e6c;
+  --color-tertiary: #241600;
+  --color-surface: #f7f9fb;
+  --color-on-surface-variant: #44474d;
+  --color-on-tertiary-fixed-variant: #5a4318;
+  --color-secondary-fixed: #dde2f2;
+  --color-error-container: #ffdad6;
+  --color-tertiary-container: #3e2a02;
+  --color-surface-container-high: #e6e8ea;
+  --color-on-secondary-container: #5c6370;
+  --color-surface-container: #eceef0;
+  --color-tertiary-fixed-dim: #e3c28b;
+  --color-on-tertiary-container: #af915e;
+  --color-surface-bright: #f7f9fb;
+  --color-on-surface: #191c1e;
+  --color-inverse-surface: #2d3133;
+  --color-tertiary-fixed: #ffdeaa;
+  --color-outline-variant: #c5c6ce;
+  --color-inverse-primary: #b5c7ea;
+  --color-on-primary-fixed: #071c37;
+  --color-secondary-fixed-dim: #c0c6d6;
+  --color-on-tertiary-fixed: #271900;
+  --color-on-secondary-fixed-variant: #414754;
+  --color-on-primary-fixed-variant: #364765;
+  --color-surface-dim: #d8dadc;
+  --color-on-primary: #ffffff;
+  --color-on-secondary: #ffffff;
+  --color-error: #ba1a1a;
+  --color-surface-tint: #4d5f7e;
+  --color-surface-container-highest: #e0e3e5;
+  --color-surface-variant: #e0e3e5;
+  --color-primary-container: #1c2e4a;
+
+  --font-headline: "Inter", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-label: "Inter", sans-serif;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Mobile e Tablet Responsividade */
+@media (max-width: 1024px) {
+  .sidebar-mobile-hidden {
+    transform: translateX(-100%)!important;
+  }
+  
+  .sidebar-mobile-visible {
+    transform: translateX(0)!important;
+  }
+  
+  .header-mobile-padding {
+    padding-left: 1rem!important;
+    padding-right: 1rem!important;
+  }
+  
+  .content-mobile-padding {
+    padding: 1rem!important;
+  }
+  
+  .mobile-hidden {
+    display: none!important;
+  }
+  
+  .mobile-visible {
+    display: block!important;
+  }
+}
+
+@media (max-width: 768px) {
+  .tablet-hidden {
+    display: none!important;
+  }
+  
+  .tablet-visible {
+    display: block!important;
+  }
+  
+  .content-mobile-padding {
+    padding: 0.75rem!important;
+  }
+  
+  .mobile-padding {
+    padding: 0.75rem!important;
+  }
+}
+
+/* Animações de transição */
+.sidebar-transition {
+  transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+
+/* Overlay para mobile */
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 40;
+  backdrop-filter: blur(4px);
+}
+
+/* Botão hamburger aprimorado */
+.hamburger-button {
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.hamburger-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
+}
+
+/* Container principal para mobile */
+.main-container {
+  min-height: 100vh;
+}
+
+.main-container.sidebar-open {
+}
+
+.main-container.sidebar-closed {
+}
+
+/* Sidebar mobile */
+.sidebar-mobile {
+  width: 16rem;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 50;
+  overflow-y: auto;
+}
+
+/* Botão de fechar no mobile */
+.close-button-mobile {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.close-button-mobile:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
+}
