@@ -49,7 +49,7 @@ export const PatientsScreen = () => {
           dna_hpv_pront: record.dna_hpv_pront || '--',
           dna_hpv_gal: record.dna_hpv_gal || '--',
           dna_hpv_pep: record.dna_hpv_pep || '--',
-          alertas: record.alertas || '--',
+          alertas: record.alertas || 'NORMAL',
         }));
 
         setPacientes(pacientesFormatados);
@@ -119,69 +119,89 @@ export const PatientsScreen = () => {
 
           <div className="bg-surface-container-lowest rounded-xl overflow-hidden shadow-[0px_12px_32px_rgba(25,28,30,0.06)]">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[1000px]">
+              <table className="w-full text-left border-collapse table-auto">
                 <thead>
                   <tr className="bg-primary text-white">
-                    <th className="px-6 py-4 text-[0.6875rem] font-bold uppercase tracking-wider whitespace-nowrap">NOME</th>
-                    <th className="px-6 py-4 text-[0.6875rem] font-bold uppercase tracking-wider whitespace-nowrap">CNS</th>
-                    <th className="px-6 py-4 text-[0.6875rem] font-bold uppercase tracking-wider whitespace-nowrap">NASCIMENTO</th>
-                    <th className="px-6 py-4 text-[0.6875rem] font-bold uppercase tracking-wider whitespace-nowrap">IDADE</th>
-                    <th className="px-6 py-4 text-[0.6875rem] font-bold uppercase tracking-wider whitespace-nowrap">SISCAN</th>
-                    <th className="px-6 py-4 text-[0.6875rem] font-bold uppercase tracking-wider whitespace-nowrap">CADASTRO LAB</th>
-                    <th className="px-6 py-4 text-[0.6875rem] font-bold uppercase tracking-wider whitespace-nowrap">COLETA V2</th>
-                    <th className="px-6 py-4 text-[0.6875rem] font-bold uppercase tracking-wider whitespace-nowrap">DNA HPV (PRONT)</th>
-                    <th className="px-6 py-4 text-[0.6875rem] font-bold uppercase tracking-wider whitespace-nowrap">DNA HPV (GAL)</th>
-                    <th className="px-6 py-4 text-[0.6875rem] font-bold uppercase tracking-wider whitespace-nowrap">DNA HPV (PEP)</th>
-                    <th className="px-6 py-4 text-[0.6875rem] font-bold uppercase tracking-wider whitespace-nowrap">ALERTAS</th>
-                    <th className="px-6 py-4 text-[0.6875rem] font-bold uppercase tracking-wider whitespace-nowrap text-center">AÇÃO</th>
+                    <th className="px-3 py-4 text-[0.65rem] font-bold uppercase tracking-wider whitespace-nowrap text-center">AÇÃO</th>
+                    <th className="px-3 py-4 text-[0.65rem] font-bold uppercase tracking-wider whitespace-nowrap text-center">ALERTAS</th>
+                    <th className="px-3 py-4 text-[0.65rem] font-bold uppercase tracking-wider whitespace-nowrap">NOME</th>
+                    <th className="px-3 py-4 text-[0.65rem] font-bold uppercase tracking-wider whitespace-nowrap">CNS</th>
+                    <th className="px-3 py-4 text-[0.65rem] font-bold uppercase tracking-wider whitespace-nowrap">NASCIMENTO</th>
+                    <th className="px-3 py-4 text-[0.65rem] font-bold uppercase tracking-wider whitespace-nowrap text-center">IDADE</th>
+                    <th className="px-3 py-4 text-[0.65rem] font-bold uppercase tracking-wider whitespace-nowrap">SISCAN</th>
+                    <th className="px-3 py-4 text-[0.65rem] font-bold uppercase tracking-wider whitespace-nowrap text-center">CADASTRO LAB</th>
+                    <th className="px-3 py-4 text-[0.65rem] font-bold uppercase tracking-wider whitespace-nowrap text-center">COLETA V2</th>
+                    <th className="px-3 py-4 text-[0.65rem] font-bold uppercase tracking-wider whitespace-nowrap">DNA HPV (PRONT)</th>
+                    <th className="px-3 py-4 text-[0.65rem] font-bold uppercase tracking-wider whitespace-nowrap text-center">DNA HPV (GAL)</th>
+                    <th className="px-3 py-4 text-[0.65rem] font-bold uppercase tracking-wider whitespace-nowrap text-center">DNA HPV (PEP)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={12} className="px-6 py-8 text-center text-on-surface-variant">
+                      <td colSpan={12} className="px-6 py-8 text-center text-on-surface-variant text-xs">
                         Carregando pacientes...
                       </td>
                     </tr>
                   ) : pacientes.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="px-6 py-8 text-center text-on-surface-variant">
+                      <td colSpan={12} className="px-6 py-8 text-center text-on-surface-variant text-xs">
                         Nenhum paciente encontrado para sua Unidade/Equipe/Microárea.
                       </td>
                     </tr>
                   ) : (
                     pacientes.map((paciente) => (
                       <tr key={paciente.id} className="hover:bg-surface-container-low transition-colors group">
-                        <td className="px-6 py-4 font-bold text-primary whitespace-nowrap">{paciente.nome}</td>
-                        <td className="px-6 py-4 text-xs font-medium whitespace-nowrap">{paciente.cns}</td>
-                        <td className="px-6 py-4 text-xs whitespace-nowrap">{paciente.data_nascimento}</td>
-                        <td className="px-6 py-4 text-xs">{paciente.idade}</td>
-                        <td className="px-6 py-4 text-xs whitespace-nowrap">{paciente.siscan}</td>
-                        <td className="px-6 py-4 text-xs whitespace-nowrap">{paciente.cadastro_lab}</td>
-                        <td className="px-6 py-4 text-xs whitespace-nowrap">{paciente.coleta_v2}</td>
-                        <td className="px-6 py-4 text-xs whitespace-nowrap">{paciente.dna_hpv_pront}</td>
-                        <td className="px-6 py-4 text-xs whitespace-nowrap">{paciente.dna_hpv_gal}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {paciente.dna_hpv_pep === 'NEGATIVO' ? (
-                            <span className="px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed text-[10px] font-bold">NEGATIVO</span>
-                          ) : (
-                            <span className="text-xs text-outline italic">Pendente</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {paciente.alertas !== '--' ? (
-                            <span className="px-2 py-0.5 rounded-full bg-error-container text-on-error-container text-[10px] font-bold">{paciente.alertas}</span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-[10px] font-bold">NORMAL</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-3 py-3 text-center">
                           <button 
                             onClick={() => setIsModalOpen(true)}
-                            className="bg-gradient-to-r from-primary to-primary-container text-white px-4 py-1.5 rounded-md text-xs font-bold shadow-md hover:scale-95 transition-transform"
+                            className="relative overflow-hidden group bg-surface-container-lowest border border-primary/20 hover:border-primary/50 text-primary px-2 py-1 rounded-md text-[10px] font-bold shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5"
                           >
-                            Acompanhar
+                            <span className="relative z-10">Acompanhar</span>
+                            <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out"></div>
                           </button>
+                        </td>
+                        <td className="px-3 py-3 text-center whitespace-nowrap">
+                          {paciente.alertas && paciente.alertas !== 'NORMAL' ? (
+                            <div className="relative group/alert cursor-help">
+                              <div className="flex items-center justify-center px-2.5 py-1 rounded-md bg-error text-white shadow-[0_2px_8px_rgba(185,28,28,0.4)] transition-transform group-hover/alert:scale-105">
+                                <AlertTriangle className="w-3 h-3 mr-1.5 animate-bounce" />
+                                <span className="text-[10px] font-black uppercase tracking-tight">{paciente.alertas}</span>
+                              </div>
+                              {/* Tooltip premium para detalhes */}
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-neutral-900 text-white text-[10px] rounded-lg opacity-0 group-hover/alert:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-xl border border-white/10">
+                                <p className="font-bold text-error mb-0.5">ALERTA CRÍTICO</p>
+                                <p className="opacity-80 text-[9px]">Ação imediata recomendada para este caso.</p>
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-neutral-900"></div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center px-2.5 py-1 rounded-md bg-surface-container-high border border-outline-variant/30 opacity-60 hover:opacity-100 transition-opacity">
+                              <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-widest italic">Sem Alertas</span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 font-bold text-primary text-[11px] whitespace-nowrap truncate max-w-[120px]" title={paciente.nome}>{paciente.nome}</td>
+                        <td className="px-3 py-3 text-[10px] font-medium whitespace-nowrap">{paciente.cns}</td>
+                        <td className="px-3 py-3 text-[10px] whitespace-nowrap">{paciente.data_nascimento}</td>
+                        <td className="px-3 py-3 text-[10px] text-center">{paciente.idade}</td>
+                        <td className="px-3 py-3 text-[10px] whitespace-nowrap">
+                          {paciente.siscan !== '--' ? paciente.siscan : <span className="text-outline italic opacity-50">--</span>}
+                        </td>
+                        <td className="px-3 py-3 text-[10px] text-center">
+                          {paciente.cadastro_lab !== '--' ? paciente.cadastro_lab : <span className="text-outline italic opacity-50">--</span>}
+                        </td>
+                        <td className="px-3 py-3 text-[10px] text-center">
+                          {paciente.coleta_v2 !== '--' ? paciente.coleta_v2 : <span className="text-outline italic opacity-50">--</span>}
+                        </td>
+                        <td className="px-3 py-3 text-[10px] whitespace-nowrap">
+                          {paciente.dna_hpv_pront !== '--' ? paciente.dna_hpv_pront : <span className="text-outline italic opacity-50">--</span>}
+                        </td>
+                        <td className="px-3 py-3 text-[10px] text-center">
+                          {paciente.dna_hpv_gal !== '--' ? paciente.dna_hpv_gal : <span className="text-outline italic opacity-50">--</span>}
+                        </td>
+                        <td className="px-3 py-3 text-[10px] text-center whitespace-nowrap">
+                          {paciente.dna_hpv_pep !== '--' ? paciente.dna_hpv_pep : <span className="text-outline italic opacity-50">--</span>}
                         </td>
                       </tr>
                     ))
@@ -215,10 +235,10 @@ export const PatientsScreen = () => {
               <div className="col-span-1">
                 <label className="block text-[0.6875rem] font-bold text-primary uppercase tracking-wider mb-2">TIPO DE CONTATO</label>
                 <select className="w-full bg-surface-container-high border-none rounded-md text-sm focus:ring-2 focus:ring-primary/20 p-3">
-                  <option>Opção 1 - Telefônico</option>
-                  <option>Opção 2 - Visita Domiciliar</option>
-                  <option>Opção 3 - Digital (WhatsApp)</option>
-                  <option>Opção 4 - Correspondência</option>
+                  <option value="" disabled selected>Selecione uma opção</option>
+                  <option>Contato direto</option>
+                  <option>Contato indireto (mensagem)</option>
+                  <option>Não houve contato (não localizada, ligação não atendida...)</option>
                 </select>
               </div>
               <div className="col-span-2">
