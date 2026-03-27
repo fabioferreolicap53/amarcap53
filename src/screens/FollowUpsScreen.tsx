@@ -1,8 +1,53 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from '../components/Header';
-import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2 } from 'lucide-react';
+import { pb } from '../lib/pocketbase';
+import { useAuth } from '../contexts/AuthContext';
 
 export const FollowUpsScreen = () => {
+  const { user } = useAuth();
+  const [acompanhamentos, setAcompanhamentos] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAcompanhamentos = async () => {
+      if (!user) return;
+      try {
+        setIsLoading(true);
+        // Expandimos o paciente para pegar o nome e cns
+        const records = await pb.collection('amarcap53_acompanhamentos').getFullList({
+          sort: '-created',
+          expand: 'paciente',
+          filter: `profissional = "${user.id}"`
+        });
+        setAcompanhamentos(records);
+      } catch (error) {
+        console.error('Erro ao buscar acompanhamentos:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAcompanhamentos();
+  }, [user]);
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir este registro?')) {
+      try {
+        await pb.collection('amarcap53_acompanhamentos').delete(id);
+        setAcompanhamentos(prev => prev.filter(item => item.id !== id));
+      } catch (error) {
+        console.error('Erro ao excluir:', error);
+        alert('Erro ao excluir registro.');
+      }
+    }
+  };
+
+  const handleEdit = (id: string) => {
+    alert('Funcionalidade de edição em desenvolvimento.');
+    // Aqui você implementaria a lógica para abrir um modal de edição
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-surface">
       <Header 
@@ -79,139 +124,96 @@ export const FollowUpsScreen = () => {
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[800px]">
+            <div className="overflow-x-auto custom-scrollbar-horizontal">
+              <table className="w-full text-left border-collapse min-w-[900px] lg:min-w-full">
                 <thead>
                   <tr className="bg-surface-container-low/50">
-                    <th className="px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Paciente</th>
-                    <th className="px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Data da Ação</th>
-                    <th className="px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Tipo de Contato</th>
-                    <th className="px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Desfecho</th>
-                    <th className="px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest text-right">Ações</th>
+                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Paciente</th>
+                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Data da Ação</th>
+                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Tipo de Contato</th>
+                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Desfecho</th>
+                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
-                  <tr className="hover:bg-surface-container-low/30 transition-colors">
-                    <td className="px-8 py-5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-primary font-bold text-xs">MA</div>
-                        <div>
-                          <p className="text-sm font-bold text-primary">Maria Aparecida Silva</p>
-                          <p className="text-xs text-on-surface-variant">SUS: 890 1234 5678 0001</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-5 text-sm font-medium text-on-surface">14 Out 2023, 09:30</td>
-                    <td className="px-8 py-5">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-fixed text-on-primary-fixed text-[0.75rem] font-semibold">
-                        <Phone className="w-4 h-4" />
-                        Telefônico
-                      </span>
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-800 text-[0.75rem] font-semibold">
-                        Consulta Agendada
-                      </span>
-                    </td>
-                    <td className="px-8 py-5 text-right">
-                      <button className="text-primary hover:bg-primary/5 p-2 rounded-full transition-colors">
-                        <Eye className="w-5 h-5" />
-                      </button>
-                    </td>
-                  </tr>
-                  
-                  <tr className="bg-surface-container-low/20 hover:bg-surface-container-low/30 transition-colors">
-                    <td className="px-8 py-5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-primary font-bold text-xs">JS</div>
-                        <div>
-                          <p className="text-sm font-bold text-primary">João Soares Pereira</p>
-                          <p className="text-xs text-on-surface-variant">SUS: 231 9901 4452 1109</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-5 text-sm font-medium text-on-surface">14 Out 2023, 11:15</td>
-                    <td className="px-8 py-5">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary-container text-on-secondary-container text-[0.75rem] font-semibold">
-                        <Home className="w-4 h-4" />
-                        Visita Domiciliar
-                      </span>
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-800 text-[0.75rem] font-semibold">
-                        Medicação Entregue
-                      </span>
-                    </td>
-                    <td className="px-8 py-5 text-right">
-                      <button className="text-primary hover:bg-primary/5 p-2 rounded-full transition-colors">
-                        <Eye className="w-5 h-5" />
-                      </button>
-                    </td>
-                  </tr>
-                  
-                  <tr className="hover:bg-surface-container-low/30 transition-colors">
-                    <td className="px-8 py-5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-primary font-bold text-xs">RL</div>
-                        <div>
-                          <p className="text-sm font-bold text-primary">Ricardo Lemos</p>
-                          <p className="text-xs text-on-surface-variant">SUS: 450 7821 0092 3341</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-5 text-sm font-medium text-on-surface">13 Out 2023, 16:45</td>
-                    <td className="px-8 py-5">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-fixed text-on-primary-fixed text-[0.75rem] font-semibold">
-                        <Phone className="w-4 h-4" />
-                        Telefônico
-                      </span>
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-error-container text-on-error-container text-[0.75rem] font-semibold">
-                        Sem Contato (3ª Tentativa)
-                      </span>
-                    </td>
-                    <td className="px-8 py-5 text-right">
-                      <button className="text-primary hover:bg-primary/5 p-2 rounded-full transition-colors">
-                        <Eye className="w-5 h-5" />
-                      </button>
-                    </td>
-                  </tr>
-                  
-                  <tr className="bg-surface-container-low/20 hover:bg-surface-container-low/30 transition-colors">
-                    <td className="px-8 py-5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-primary font-bold text-xs">BT</div>
-                        <div>
-                          <p className="text-sm font-bold text-primary">Beatriz Taveira</p>
-                          <p className="text-xs text-on-surface-variant">SUS: 102 3345 8890 2217</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-5 text-sm font-medium text-on-surface">13 Out 2023, 14:00</td>
-                    <td className="px-8 py-5">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed text-[0.75rem] font-semibold">
-                        <FileText className="w-4 h-4" />
-                        UBS (Presencial)
-                      </span>
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-800 text-[0.75rem] font-semibold">
-                        Check-up Concluído
-                      </span>
-                    </td>
-                    <td className="px-8 py-5 text-right">
-                      <button className="text-primary hover:bg-primary/5 p-2 rounded-full transition-colors">
-                        <Eye className="w-5 h-5" />
-                      </button>
-                    </td>
-                  </tr>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-on-surface-variant text-sm">
+                        Carregando acompanhamentos...
+                      </td>
+                    </tr>
+                  ) : acompanhamentos.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-on-surface-variant text-sm">
+                        Nenhum acompanhamento registrado ainda.
+                      </td>
+                    </tr>
+                  ) : (
+                    acompanhamentos.map((acomp) => {
+                      const pacienteNome = acomp.expand?.paciente?.nome || 'Paciente Desconhecido';
+                      const pacienteIniciais = pacienteNome.substring(0, 2).toUpperCase();
+                      const cns = acomp.expand?.paciente?.cns || '--';
+                      
+                      // Formatando a data
+                      const dataFormatada = acomp.data_busca 
+                        ? new Date(acomp.data_busca).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : '--';
+
+                      return (
+                        <tr key={acomp.id} className="hover:bg-surface-container-low/30 transition-colors group">
+                          <td className="px-4 md:px-8 py-5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-primary font-bold text-xs flex-shrink-0">
+                                {pacienteIniciais}
+                              </div>
+                              <div className="min-w-[120px]">
+                                <p className="text-sm font-bold text-primary truncate" title={pacienteNome}>{pacienteNome}</p>
+                                <p className="text-[10px] text-on-surface-variant">CNS: {cns}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 md:px-8 py-5 text-sm font-medium text-on-surface whitespace-nowrap">
+                            {dataFormatada}
+                          </td>
+                          <td className="px-4 md:px-8 py-5 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-fixed text-on-primary-fixed text-[0.75rem] font-semibold">
+                              <Phone className="w-4 h-4" />
+                              {acomp.tipo_contato || '--'}
+                            </span>
+                          </td>
+                          <td className="px-4 md:px-8 py-5 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-800 text-[0.75rem] font-semibold">
+                              {acomp.situacao_pos_busca || '--'}
+                            </span>
+                          </td>
+                          <td className="px-4 md:px-8 py-5 text-right">
+                            <div className="flex items-center justify-end gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={() => handleEdit(acomp.id)}
+                                className="text-primary hover:bg-primary/10 p-2 rounded-full transition-colors"
+                                title="Editar"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleDelete(acomp.id)}
+                                className="text-error hover:bg-error/10 p-2 rounded-full transition-colors"
+                                title="Excluir"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
 
             <div className="px-8 py-4 border-t border-outline-variant/10 flex items-center justify-between">
-              <p className="text-xs text-on-surface-variant">Mostrando 1-10 de 1.284 registros</p>
+              <p className="text-xs text-on-surface-variant">Mostrando {acompanhamentos.length} registros</p>
               <div className="flex items-center gap-1">
                 <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-low text-primary disabled:opacity-30" disabled>
                   <ChevronLeft className="w-5 h-5" />
