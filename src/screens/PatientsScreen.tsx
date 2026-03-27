@@ -144,17 +144,21 @@ export const PatientsScreen = () => {
               <div>
                 <p className="text-[10px] md:text-xs font-bold text-primary/60 uppercase tracking-widest mb-1">Total sob sua responsabilidade</p>
                 <p className="text-3xl md:text-[2.5rem] font-black text-primary leading-none">
-                  124 <span className="text-sm font-medium text-on-surface-variant ml-1 md:ml-2 tracking-normal">Pacientes Ativos</span>
+                  {pacientes.length} <span className="text-sm font-medium text-on-surface-variant ml-1 md:ml-2 tracking-normal">Pacientes Ativos</span>
                 </p>
               </div>
               <div className="flex gap-4 w-full sm:w-auto justify-between sm:justify-end">
                 <div className="text-right">
                   <p className="text-[10px] md:text-xs text-on-surface-variant font-medium">Urgentes</p>
-                  <p className="text-lg md:text-xl font-bold text-error">12</p>
+                  <p className="text-lg md:text-xl font-bold text-error">
+                    {pacientes.filter(p => p.alertas && p.alertas.toUpperCase().includes('URGENTE')).length}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] md:text-xs text-on-surface-variant font-medium">Aguardando Coleta</p>
-                  <p className="text-lg md:text-xl font-bold text-tertiary-container">45</p>
+                  <p className="text-lg md:text-xl font-bold text-tertiary-container">
+                    {pacientes.filter(p => p.alertas && p.alertas.toUpperCase().includes('AGUARDANDO COLETA')).length}
+                  </p>
                 </div>
               </div>
             </div>

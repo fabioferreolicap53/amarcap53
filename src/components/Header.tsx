@@ -35,17 +35,17 @@ export const Header: React.FC<HeaderProps> = ({ title, pageTitle, subtitle, show
       {user && (
         <div className="flex lg:hidden flex-1 flex-col items-center justify-center px-2 overflow-hidden">
           <div className="flex items-center gap-1.5 w-full justify-center">
-            <Building className="w-2.5 h-2.5 text-white/40" />
-            <span className="text-[10px] font-bold text-white leading-none truncate max-w-[140px] text-center">
+            <Building className="w-3.5 h-3.5 text-white/50" />
+            <span className="text-[12px] font-bold text-white leading-none truncate max-w-[160px] text-center">
               {user.unidade_saude}
             </span>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-[9px] font-medium text-white/60 leading-none truncate max-w-[100px]">
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="text-[11px] font-medium text-white/70 leading-none truncate max-w-[120px]">
               {user.equipe}
             </span>
-            <div className="w-0.5 h-0.5 rounded-full bg-white/20"></div>
-            <span className="text-[9px] font-medium text-white/60 leading-none">
+            <div className="w-1 h-1 rounded-full bg-white/30"></div>
+            <span className="text-[11px] font-medium text-white/70 leading-none">
               MA: {user.microarea}
             </span>
           </div>

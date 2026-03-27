@@ -1,10 +1,57 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, Activity, HeartPulse } from 'lucide-react';
 import { Header } from '../components/Header';
 import { useAuth } from '../contexts/AuthContext';
+import { pb } from '../lib/pocketbase';
 
 export const DashboardScreen = () => {
   const { user } = useAuth();
+  const [stats, setStats] = useState({
+    totalPacientes: 0,
+    coletasAtrasadas: 0,
+    examesEmDia: 0,
+    resultadosAlterados: 0,
+    coberturaPercent: 0
+  });
+
+  const [ultimosExames, setUltimosExames] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!user) return;
+      try {
+        const records = await pb.collection('amarcap53_pacientes').getFullList({
+          filter: `unidade = "${user.unidade_saude}" && equipe = "${user.equipe}" && microarea = "${user.microarea}"`,
+          sort: '-created'
+        });
+
+        const total = records.length;
+        const atrasadas = records.filter(p => p.alertas && p.alertas.toUpperCase().includes('AGUARDANDO COLETA')).length;
+        const alterados = records.filter(p => p.alertas && p.alertas.toUpperCase().includes('URGENTE')).length;
+        // Lógica simplificada: se não tá atrasado e não tá alterado (urgente), consideramos "em dia" ou acompanhado
+        const emDia = total - atrasadas - alterados;
+        const cobertura = total > 0 ? Math.round((emDia / total) * 100) : 0;
+
+        setStats({
+          totalPacientes: total,
+          coletasAtrasadas: atrasadas,
+          examesEmDia: emDia,
+          resultadosAlterados: alterados,
+          coberturaPercent: cobertura
+        });
+
+        // Pegar os 5 últimos exames/pacientes (simulando os últimos laudos baseado na lista de pacientes)
+        // Idealmente isso viria de uma coleção de exames, mas usaremos os dados da planilha importada
+        const pacientesComData = records.filter(p => p.coleta_v2 && p.coleta_v2 !== '--');
+        setUltimosExames(pacientesComData.slice(0, 5));
+      } catch (error) {
+        console.error('Erro ao buscar estatísticas:', error);
+      }
+    };
+
+    fetchStats();
+  }, [user]);
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-surface">
       <Header title="Resumo" pageTitle="Resumo" />
@@ -30,9 +77,9 @@ export const DashboardScreen = () => {
                 </div>
               </div>
               <div className="relative z-10">
-                <div className="text-4xl md:text-[3.5rem] font-black text-primary leading-none tracking-tighter">1.240</div>
+                <div className="text-4xl md:text-[3.5rem] font-black text-primary leading-none tracking-tighter">{stats.totalPacientes}</div>
                 <div className="text-[0.625rem] md:text-[0.6875rem] text-primary/70 font-bold mt-1 flex items-center gap-1">
-                  <span className="text-tertiary-container">+12</span> novos cadastros
+                  Pacientes ativas no sistema
                 </div>
               </div>
             </div>
@@ -46,7 +93,9 @@ export const DashboardScreen = () => {
                 </div>
               </div>
               <div className="relative z-10">
-                <div className="text-4xl md:text-[3.5rem] font-black text-tertiary leading-none tracking-tighter">48</div>
+                <div className="text-4xl md:text-[3.5rem] font-black text-tertiary leading-none tracking-tighter">
+                  {stats.coletasAtrasadas < 10 && stats.coletasAtrasadas > 0 ? `0${stats.coletasAtrasadas}` : stats.coletasAtrasadas}
+                </div>
                 <div className="text-[0.625rem] md:text-[0.6875rem] text-tertiary/70 font-bold mt-1">Busca ativa necessária</div>
               </div>
             </div>
@@ -60,7 +109,7 @@ export const DashboardScreen = () => {
                 </div>
               </div>
               <div className="relative z-10">
-                <div className="text-4xl md:text-[3.5rem] font-black text-secondary leading-none tracking-tighter">89%</div>
+                <div className="text-4xl md:text-[3.5rem] font-black text-secondary leading-none tracking-tighter">{stats.coberturaPercent}%</div>
                 <div className="text-[0.625rem] md:text-[0.6875rem] text-secondary/70 font-bold mt-1">Cobertura da equipe</div>
               </div>
             </div>
@@ -74,7 +123,9 @@ export const DashboardScreen = () => {
                 </div>
               </div>
               <div className="relative z-10">
-                <div className="text-4xl md:text-[3.5rem] font-black text-error leading-none tracking-tighter">03</div>
+                <div className="text-4xl md:text-[3.5rem] font-black text-error leading-none tracking-tighter">
+                  {stats.resultadosAlterados < 10 && stats.resultadosAlterados > 0 ? `0${stats.resultadosAlterados}` : stats.resultadosAlterados}
+                </div>
                 <div className="text-[0.625rem] md:text-[0.6875rem] text-error/80 font-bold mt-1 flex items-center gap-1">
                   <Activity className="w-3 h-3" /> Requer encaminhamento
                 </div>
@@ -105,38 +156,45 @@ export const DashboardScreen = () => {
                     </tr>
                   </thead>
                   <tbody className="text-sm divide-y divide-outline-variant/10">
-                    <tr className="hover:bg-surface-container-low/50 transition-colors group">
-                      <td className="py-4 px-6 font-bold text-primary">Ana Maria Oliveira</td>
-                      <td className="py-4 px-6 text-on-surface-variant font-medium">42 anos</td>
-                      <td className="py-4 px-6 text-on-surface-variant font-medium">10/10/2024</td>
-                      <td className="py-4 px-6">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">NEGATIVO</span>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-surface-container-low/50 transition-colors group">
-                      <td className="py-4 px-6 font-bold text-primary">Juliana Costa</td>
-                      <td className="py-4 px-6 text-on-surface-variant font-medium">35 anos</td>
-                      <td className="py-4 px-6 text-on-surface-variant font-medium">08/10/2024</td>
-                      <td className="py-4 px-6">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold bg-error/10 text-error border border-error/20">ASC-US</span>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-surface-container-low/50 transition-colors group">
-                      <td className="py-4 px-6 font-bold text-primary">Marta Pereira Souza</td>
-                      <td className="py-4 px-6 text-on-surface-variant font-medium">55 anos</td>
-                      <td className="py-4 px-6 text-on-surface-variant font-medium">05/10/2024</td>
-                      <td className="py-4 px-6">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">NEGATIVO</span>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-surface-container-low/50 transition-colors group">
-                      <td className="py-4 px-6 font-bold text-primary">Beatriz Silva</td>
-                      <td className="py-4 px-6 text-on-surface-variant font-medium">28 anos</td>
-                      <td className="py-4 px-6 text-on-surface-variant font-medium">01/10/2024</td>
-                      <td className="py-4 px-6">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold bg-surface-container-highest text-on-surface-variant border border-outline-variant/30">AGUARDANDO LAUDO</span>
-                      </td>
-                    </tr>
+                    {ultimosExames.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-8 px-6 text-center text-on-surface-variant font-medium">Nenhum exame recente registrado.</td>
+                      </tr>
+                    ) : (
+                      ultimosExames.map((exame, index) => {
+                        // Calcula a idade de forma simplificada a partir da data_nascimento
+                        let idade = '--';
+                        if (exame.data_nascimento) {
+                          const parts = exame.data_nascimento.includes('/') ? exame.data_nascimento.split('/') : null;
+                          if (parts && parts.length === 3) {
+                            const nascimento = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                            const hoje = new Date();
+                            let age = hoje.getFullYear() - nascimento.getFullYear();
+                            if (hoje.getMonth() < nascimento.getMonth() || (hoje.getMonth() === nascimento.getMonth() && hoje.getDate() < nascimento.getDate())) {
+                              age--;
+                            }
+                            idade = `${age} anos`;
+                          }
+                        }
+
+                        return (
+                          <tr key={exame.id || index} className="hover:bg-surface-container-low/50 transition-colors group">
+                            <td className="py-4 px-6 font-bold text-primary truncate max-w-[200px]">{exame.nome}</td>
+                            <td className="py-4 px-6 text-on-surface-variant font-medium">{idade}</td>
+                            <td className="py-4 px-6 text-on-surface-variant font-medium">{exame.coleta_v2}</td>
+                            <td className="py-4 px-6">
+                              <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold ${
+                                exame.alertas && exame.alertas.toUpperCase().includes('URGENTE') 
+                                  ? 'bg-error/10 text-error border border-error/20' 
+                                  : 'bg-primary/10 text-primary border border-primary/20'
+                              }`}>
+                                {exame.alertas && exame.alertas.toUpperCase().includes('URGENTE') ? 'ALTERADO' : 'NEGATIVO'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
