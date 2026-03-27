@@ -168,10 +168,6 @@ export const FollowUpsScreen = () => {
                   Filtros
                 </button>
               </div>
-              <button className="w-full sm:w-auto bg-gradient-to-r from-[#051934] to-[#1c2e4a] text-white px-5 py-2 rounded-md text-sm font-semibold flex items-center justify-center gap-2 shadow-sm hover:opacity-90 transition-all">
-                <Download className="w-4 h-4 md:w-5 md:h-5" />
-                Exportar Relatório
-              </button>
             </div>
 
             <div className="overflow-x-auto custom-scrollbar-horizontal">

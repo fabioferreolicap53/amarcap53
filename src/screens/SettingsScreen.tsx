@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Header } from '../components/Header';
-import { Edit2, ShieldCheck, MapPin, Moon, AlignJustify, Mail, AlertOctagon, Shield, Terminal, UploadCloud, CheckCircle, AlertTriangle, FileText, History, BarChart3, ChevronRight, Info } from 'lucide-react';
+import { Edit2, ShieldCheck, MapPin, Moon, AlignJustify, Mail, AlertOctagon, Shield, Terminal, UploadCloud, CheckCircle, AlertTriangle, FileText, History, BarChart3, ChevronRight, Info, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Papa from 'papaparse';
 import { pb } from '../lib/pocketbase';
@@ -48,6 +48,20 @@ export const SettingsScreen = () => {
       console.error('Erro ao buscar histórico:', err);
     } finally {
       setIsLoadingHistory(false);
+    }
+  };
+
+  const handleDeleteImport = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este registro de importação? Esta ação não afetará os dados dos pacientes, apenas o registro histórico.')) {
+      return;
+    }
+
+    try {
+      await pb.collection('amarcap53_importacoes').delete(id);
+      setImportHistory(prev => prev.filter(log => log.id !== id));
+    } catch (err) {
+      console.error('Erro ao excluir histórico:', err);
+      alert('Falha ao excluir o registro de importação.');
     }
   };
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
@@ -426,8 +440,17 @@ export const SettingsScreen = () => {
                                 <p className="text-[9px] text-error uppercase font-black mb-1">Erros</p>
                                 <p className="text-sm font-bold text-error">{log.error_count}</p>
                               </div>
-                              <div className="flex items-center justify-center bg-surface-container-high p-1.5 rounded-full group-hover:bg-primary/10 transition-colors">
-                                <ChevronRight className="w-4 h-4 text-on-surface-variant group-hover:text-primary" />
+                              <div className="flex items-center gap-2">
+                                <button 
+                                  onClick={() => handleDeleteImport(log.id)}
+                                  className="flex items-center justify-center bg-error/5 p-1.5 rounded-full text-error hover:bg-error/10 transition-colors"
+                                  title="Excluir Histórico"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                                <div className="flex items-center justify-center bg-surface-container-high p-1.5 rounded-full group-hover:bg-primary/10 transition-colors">
+                                  <ChevronRight className="w-4 h-4 text-on-surface-variant group-hover:text-primary" />
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -490,72 +513,6 @@ export const SettingsScreen = () => {
                   <div>
                     <p className="text-sm font-bold text-primary">{user?.unidade_saude}</p>
                     <p className="text-[10px] md:text-xs text-on-surface-variant">Unidade de Saúde Vinculada</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold text-primary">Preferências de Visualização</h3>
-              
-              <div className="bg-surface-container-low rounded-xl overflow-hidden">
-                <div className="p-4 md:p-5 flex items-center justify-between hover:bg-white/40 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-4">
-                    <Moon className="w-5 h-5 md:w-6 md:h-6 text-on-surface-variant" />
-                    <div>
-                      <p className="text-sm font-semibold">Modo Escuro</p>
-                      <p className="text-[10px] text-on-surface-variant">Reduz a fadiga ocular em turnos noturnos</p>
-                    </div>
-                  </div>
-                  <div className="w-10 h-5 bg-outline-variant rounded-full relative">
-                    <div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full"></div>
-                  </div>
-                </div>
-                
-                <div className="p-5 flex items-center justify-between border-t border-outline-variant/10 hover:bg-white/40 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-4">
-                    <AlignJustify className="w-6 h-6 text-on-surface-variant" />
-                    <div>
-                      <p className="text-sm font-semibold">Alta Densidade de Dados</p>
-                      <p className="text-[10px] text-on-surface-variant">Exibe mais informações em tabelas de prontuário</p>
-                    </div>
-                  </div>
-                  <div className="w-10 h-5 bg-primary rounded-full relative">
-                    <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold text-primary">Notificações e Alertas</h3>
-              
-              <div className="bg-surface-container-low rounded-xl overflow-hidden">
-                <div className="p-5 flex items-center justify-between hover:bg-white/40 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-4">
-                    <Mail className="w-6 h-6 text-on-surface-variant" />
-                    <div>
-                      <p className="text-sm font-semibold">Alertas de Microárea</p>
-                      <p className="text-[10px] text-on-surface-variant">Novas pendências de rastreio na sua área</p>
-                    </div>
-                  </div>
-                  <div className="w-10 h-5 bg-primary rounded-full relative">
-                    <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div>
-                  </div>
-                </div>
-                
-                <div className="p-5 flex items-center justify-between border-t border-outline-variant/10 hover:bg-white/40 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-4">
-                    <AlertOctagon className="w-6 h-6 text-error" />
-                    <div>
-                      <p className="text-sm font-semibold">Casos Críticos</p>
-                      <p className="text-[10px] text-on-surface-variant">Notificar imediatamente sobre indicadores vermelhos</p>
-                    </div>
-                  </div>
-                  <div className="w-10 h-5 bg-primary rounded-full relative">
-                    <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div>
                   </div>
                 </div>
               </div>
