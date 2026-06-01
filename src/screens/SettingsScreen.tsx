@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Header } from '../components/Header';
-import { Edit2, ShieldCheck, MapPin, Moon, AlignJustify, Mail, AlertOctagon, Shield, Terminal, UploadCloud, CheckCircle, AlertTriangle, FileText, History, BarChart3, ChevronRight, Info, Trash2, Database, Activity, RefreshCw, Loader2, Search, Users } from 'lucide-react';
+import { Edit2, ShieldCheck, MapPin, Moon, AlignJustify, Mail, AlertOctagon, Shield, Terminal, UploadCloud, CheckCircle, AlertTriangle, FileText, History, BarChart3, ChevronRight, Info, Trash2, Database, Activity, Loader2, Search, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Papa from 'papaparse';
 import { pb } from '../lib/pocketbase';
@@ -218,10 +218,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
               const unidade = row['UNIDADE']?.trim();
               const equipe = row['EQUIPE']?.trim();
-              const microarea = row['MICROÁREA']?.trim() || row['MICROAREA']?.trim();
+              const microarea = row['MICROÁREA']?.trim() || row['MICROAREA']?.trim() || row['MICRO']?.trim();
               const cns = row['CNS']?.trim();
               const nome = row['NOME']?.trim();
-              const dataNascimento = row['DATA DE NASCIMENTO']?.trim() || row['DATA NASCIMENTO']?.trim() || row['NASCIMENTO']?.trim();
+              const dataNascimento = row['NASC.']?.trim() || row['DATA DE NASCIMENTO']?.trim() || row['DATA NASCIMENTO']?.trim() || row['NASCIMENTO']?.trim();
               const idade = row['IDADE']?.trim();
               const grupo = row['GRUPO']?.trim() || row['FAIXA ETÁRIA']?.trim() || row['FAIXA ETARIA']?.trim() || '';
 
@@ -240,13 +240,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                   grupo: grupo || '--',
                 };
 
-                const citoLab = parseCSVDate(row['RESULTADO DE CITO LABORATÓRIO']);
+                const citoLab = parseCSVDate(row['CITO LAB'] || row['RESULTADO DE CITO LABORATÓRIO']);
                 if (citoLab) record.cito_lab = citoLab;
 
-                const citoPep = parseCSVDate(row['RESULTADO DE CITO REGISTRADO NO PEP']);
+                const citoPep = parseCSVDate(row['CITO PEP'] || row['RESULTADO DE CITO REGISTRADO NO PEP']);
                 if (citoPep) record.cito_pep = citoPep;
 
-                const dnaHpv = parseCSVDate(row['TESTE MOLECULAR DNA-HPV']);
+                const dnaHpv = parseCSVDate(row['DNA-HPV'] || row['TESTE MOLECULAR DNA-HPV']);
                 if (dnaHpv) record.dna_hpv = dnaHpv;
 
                 const alertas = row['ALERTAS RASTREAMENTO']?.trim();
@@ -257,11 +257,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
               return null;
             }).filter(Boolean);
 
-            const promises = processedRows.map(async (pacienteData) => {
+            const promises = processedRows.map(async (pacienteData, idx) => {
               try {
                 await pb.collection('amarcap53_pacientes').create(pacienteData!, { $autoCancel: false });
+                if (i === 0 && idx === 0) {
+                  console.log('[IMPORT] Primeiro registro criado com sucesso:', pacienteData);
+                }
                 return true;
-              } catch (e) {
+              } catch (e: any) {
+                if (i === 0 && idx < 3) {
+                  console.error(`[IMPORT] Erro detalhado no registro ${idx}:`, {
+                    status: e?.status,
+                    message: e?.message,
+                    data: e?.data,
+                    record: pacienteData
+                  });
+                }
+                const errMsg = e?.message || JSON.stringify(e?.data) || 'Erro desconhecido';
+                errorDetails.push(`${pacienteData?.cns || '?'}: ${errMsg}`);
                 return false;
               }
             });
@@ -338,14 +351,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                       </div>
                     </div>
                     
-                    <button 
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/15 text-white rounded-2xl transition-all border border-white/10 font-bold text-sm group/btn disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-4 h-4 text-blue-400 group-hover/btn:rotate-180 transition-transform duration-700 ${isUploading ? 'animate-spin' : ''}`} />
-                      Sincronizar Base
-                    </button>
+
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
