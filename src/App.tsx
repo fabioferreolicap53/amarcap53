@@ -57,11 +57,11 @@ function AppContent() {
 
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
-      <main className={`flex-1 flex flex-col h-screen overflow-hidden transition-all duration-300 lg:ml-64`}>
-        {activeTab === 'resumo' && <DashboardScreen />}
-        {activeTab === 'pacientes' && <PatientsScreen />}
-        {activeTab === 'acompanhamentos' && <FollowUpsScreen />}
-        {activeTab === 'configuracoes' && <SettingsScreen />}
+      <main className={`flex-1 flex flex-col h-screen overflow-hidden transition-all duration-300`}>
+        {activeTab === 'resumo' && <DashboardScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
+        {activeTab === 'pacientes' && <PatientsScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
+        {activeTab === 'acompanhamentos' && <FollowUpsScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
+        {activeTab === 'configuracoes' && <SettingsScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
       </main>
     </div>
   );

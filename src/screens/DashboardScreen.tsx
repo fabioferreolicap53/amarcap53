@@ -4,8 +4,13 @@ import { Header } from '../components/Header';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 
-export const DashboardScreen = () => {
-  const { user } = useAuth();
+interface DashboardScreenProps {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+}
+
+export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, setActiveTab }) => {
+  const { user, isAdmin } = useAuth();
   const [stats, setStats] = useState({
     totalPacientes: 0,
     coletasAtrasadas: 0,
@@ -21,14 +26,14 @@ export const DashboardScreen = () => {
       if (!user) return;
       try {
         const records = await pb.collection('amarcap53_pacientes').getFullList({
-          filter: `unidade = "${user.unidade_saude}" && equipe = "${user.equipe}" && microarea = "${user.microarea}"`,
-          sort: '-created'
+          filter: isAdmin ? '' : `unidade = "${user?.unidade_saude}" && equipe = "${user?.equipe}" && microarea = "${user?.microarea}"`,
+          sort: '-created',
+          requestKey: null // Desativa auto-cancelamento para evitar erro 0 no log se houver concorrência leve
         });
 
         const total = records.length;
-        const atrasadas = records.filter(p => p.alertas && p.alertas.toUpperCase().includes('AGUARDANDO COLETA')).length;
-        const alterados = records.filter(p => p.alertas && p.alertas.toUpperCase().includes('URGENTE')).length;
-        // Lógica simplificada: se não tá atrasado e não tá alterado (urgente), consideramos "em dia" ou acompanhado
+        const atrasadas = records.filter(p => p.alertas_rastreamento && p.alertas_rastreamento.toUpperCase().includes('NÃO IDENTIFICADO')).length;
+        const alterados = records.filter(p => p.alertas_rastreamento && p.alertas_rastreamento.toUpperCase().includes('IDENTIFICADO')).length;
         const emDia = total - atrasadas - alterados;
         const cobertura = total > 0 ? Math.round((emDia / total) * 100) : 0;
 
@@ -40,11 +45,14 @@ export const DashboardScreen = () => {
           coberturaPercent: cobertura
         });
 
-        // Pegar os 5 últimos exames/pacientes (simulando os últimos laudos baseado na lista de pacientes)
-        // Idealmente isso viria de uma coleção de exames, mas usaremos os dados da planilha importada
-        const pacientesComData = records.filter(p => p.coleta_v2 && p.coleta_v2 !== '--');
-        setUltimosExames(pacientesComData.slice(0, 5));
-      } catch (error) {
+        // Pegar os 5 últimos exames (usando campos reais do PocketBase)
+        const pacientesComData = records
+          .filter(p => p.cito_lab || p.cito_pep || p.dna_hpv)
+          .slice(0, 5);
+        setUltimosExames(pacientesComData);
+      } catch (error: any) {
+        // Silencia erro 0 (auto-cancelamento do PocketBase)
+        if (error?.isAbort) return;
         console.error('Erro ao buscar estatísticas:', error);
       }
     };
@@ -54,7 +62,12 @@ export const DashboardScreen = () => {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-surface">
-      <Header title="Resumo" pageTitle="Resumo" />
+      <Header 
+        title="Resumo" 
+        pageTitle="Resumo" 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+      />
       
       <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-11 no-scrollbar relative">
         <div className="max-w-7xl mx-auto space-y-6 md:space-y-11">
@@ -161,40 +174,35 @@ export const DashboardScreen = () => {
                         <td colSpan={4} className="py-8 px-6 text-center text-on-surface-variant font-medium">Nenhum exame recente registrado.</td>
                       </tr>
                     ) : (
-                      ultimosExames.map((exame, index) => {
-                        // Calcula a idade de forma simplificada a partir da data_nascimento
-                        let idade = '--';
-                        if (exame.data_nascimento) {
-                          const parts = exame.data_nascimento.includes('/') ? exame.data_nascimento.split('/') : null;
-                          if (parts && parts.length === 3) {
-                            const nascimento = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                            const hoje = new Date();
-                            let age = hoje.getFullYear() - nascimento.getFullYear();
-                            if (hoje.getMonth() < nascimento.getMonth() || (hoje.getMonth() === nascimento.getMonth() && hoje.getDate() < nascimento.getDate())) {
-                              age--;
-                            }
-                            idade = `${age} anos`;
-                          }
-                        }
-
-                        return (
+                      ultimosExames.map((exame, index) => (
                           <tr key={exame.id || index} className="hover:bg-surface-container-low/50 transition-colors group">
                             <td className="py-4 px-6 font-bold text-primary truncate max-w-[200px]">{exame.nome}</td>
-                            <td className="py-4 px-6 text-on-surface-variant font-medium">{idade}</td>
-                            <td className="py-4 px-6 text-on-surface-variant font-medium">{exame.coleta_v2}</td>
+                            <td className="py-4 px-6 text-on-surface-variant font-medium">{exame.idade} anos</td>
+                            <td className="py-4 px-6 text-on-surface-variant font-medium">
+                              {(() => {
+                                const dataRaw = exame.cito_lab || exame.cito_pep || exame.dna_hpv || '--';
+                                if (dataRaw === '--') return '--';
+                                // Formata de YYYY-MM-DD para DD/MM/YYYY
+                                const datePart = dataRaw.split(' ')[0].split('T')[0];
+                                if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+                                  const [y, m, d] = datePart.split('-');
+                                  return `${d}/${m}/${y}`;
+                                }
+                                return datePart;
+                              })()}
+                            </td>
                             <td className="py-4 px-6">
                               <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold ${
-                                exame.alertas && exame.alertas.toUpperCase().includes('URGENTE') 
-                                  ? 'bg-error/10 text-error border border-error/20' 
-                                  : 'bg-primary/10 text-primary border border-primary/20'
+                                exame.alertas_rastreamento && exame.alertas_rastreamento.toUpperCase().includes('IDENTIFICADO') 
+                                  ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' 
+                                  : 'bg-rose-100 text-rose-700 border border-rose-200'
                               }`}>
-                                {exame.alertas && exame.alertas.toUpperCase().includes('URGENTE') ? 'ALTERADO' : 'NEGATIVO'}
+                                {exame.alertas_rastreamento && exame.alertas_rastreamento.toUpperCase().includes('IDENTIFICADO') ? 'REALIZADO' : 'PENDENTE'}
                               </span>
                             </td>
                           </tr>
-                        );
-                      })
-                    )}
+                        ))
+                      )}
                   </tbody>
                 </table>
               </div>

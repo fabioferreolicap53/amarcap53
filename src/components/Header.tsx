@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, Settings, Menu, X, Building, Users, MapPin } from 'lucide-react';
+import { Bell, Settings, Menu, X, Building, Users, MapPin, LayoutDashboard, ClipboardCheck, LogOut } from 'lucide-react';
 import { useSidebar } from '../contexts/SidebarContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -8,14 +8,40 @@ interface HeaderProps {
   pageTitle?: string;
   subtitle?: string;
   showAvatarDetails?: boolean;
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ title, pageTitle, subtitle, showAvatarDetails = true }) => {
+export const Header: React.FC<HeaderProps> = ({ 
+  title, 
+  pageTitle, 
+  subtitle, 
+  showAvatarDetails = true,
+  activeTab,
+  setActiveTab
+}) => {
   const { toggleSidebar, isOpen } = useSidebar();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+
+  const navItems = [
+    { id: 'resumo', label: 'Resumo', icon: LayoutDashboard },
+    { id: 'pacientes', label: 'Meus Pacientes', icon: Users },
+    { id: 'acompanhamentos', label: 'Acompanhamentos', icon: ClipboardCheck },
+    { id: 'configuracoes', label: 'Configurações', icon: Settings },
+  ];
 
   return (
-    <header className="bg-gradient-to-r from-[#1c2e4a] to-[#253c61] backdrop-blur-xl shadow-[0px_8px_32px_rgba(0,0,0,0.15)] flex items-center w-full px-4 md:px-8 h-[72px] sticky top-0 z-40 border-b border-white/5">
+    <header className="bg-gradient-to-r from-[#001b3d] to-[#002b5c] backdrop-blur-md shadow-[0px_8px_32px_rgba(0,0,0,0.3)] flex items-center w-full px-4 md:px-8 h-[80px] sticky top-0 z-40 border-b border-white/10">
+      {/* Logo Desktop */}
+      <div className="hidden lg:flex flex-col mr-8">
+        <h1 className="font-black text-white tracking-tighter text-2xl leading-none">
+          AMAR
+        </h1>
+        <p className="text-[8px] font-bold text-white/60 uppercase tracking-[0.1em] mt-1 border-l border-white/30 pl-2 max-w-[150px] leading-tight">
+          Acompanhamento da Mulher nas Ações de Rastreio
+        </p>
+      </div>
+
       {/* Botão de Menu (Mobile) */}
       <div className="flex lg:hidden items-center">
         <button 
@@ -52,63 +78,74 @@ export const Header: React.FC<HeaderProps> = ({ title, pageTitle, subtitle, show
         </div>
       )}
 
-      {/* Estrutura Desktop (Original mantida e aprimorada) */}
-      <div className="hidden lg:flex items-center gap-4 h-full flex-1">
-        <div className="flex flex-col lg:flex-row lg:items-center h-full">
+      {/* Estrutura Desktop */}
+      <div className="hidden lg:flex items-center gap-6 h-full flex-1">
+        {/* Navegação */}
+        <nav className="flex items-center gap-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab?.(item.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 whitespace-nowrap group ${
+                  isActive 
+                    ? 'bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.1)] border border-white/20' 
+                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Icon className={`w-4 h-4 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
+                <span className="text-xs font-bold tracking-wide uppercase">{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="w-px h-8 bg-white/10 mx-2"></div>
+
+        {/* Informações do Usuário */}
+        <div className="flex items-center gap-6">
           {user && (
-            <div className="flex items-center gap-8 xl:gap-12 ml-4 xl:ml-6 h-full">
-              <div className="flex items-center gap-3 group transition-all duration-300 cursor-default hover:bg-white/5 px-4 py-2 rounded-xl">
-                <div className="flex items-center justify-center bg-white/10 p-2.5 rounded-lg group-hover:bg-white/20 transition-all shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]">
-                  <Building className="w-5 h-5 text-white/90 group-hover:text-white transition-colors duration-300" strokeWidth={2} />
-                </div>
-                <div className="flex flex-col justify-center">
-                  <span className="text-[9px] xl:text-[10px] uppercase tracking-[0.2em] text-white/50 font-black mb-0.5 group-hover:text-white/70 transition-colors">Unidade</span>
-                  <span className="text-sm xl:text-[15px] font-bold text-white leading-none tracking-tight">{user.unidade_saude}</span>
-                </div>
+            <>
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-[0.15em] text-white/40 font-black leading-none mb-1">Unidade</span>
+                <span className="text-[13px] font-bold text-white/90 leading-none">{user.unidade_saude}</span>
               </div>
-
-              <div className="w-px h-12 bg-gradient-to-b from-transparent via-white/10 to-transparent"></div>
-
-              <div className="flex items-center gap-3 group transition-all duration-300 cursor-default hover:bg-white/5 px-4 py-2 rounded-xl">
-                <div className="flex items-center justify-center bg-white/10 p-2.5 rounded-lg group-hover:bg-white/20 transition-all shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]">
-                  <Users className="w-5 h-5 text-white/90 group-hover:text-white transition-colors duration-300" strokeWidth={2} />
-                </div>
-                <div className="flex flex-col justify-center">
-                  <span className="text-[9px] xl:text-[10px] uppercase tracking-[0.2em] text-white/50 font-black mb-0.5 group-hover:text-white/70 transition-colors">Equipe</span>
-                  <span className="text-sm xl:text-[15px] font-bold text-white leading-none tracking-tight">{user.equipe}</span>
-                </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-[0.15em] text-white/40 font-black leading-none mb-1">Equipe</span>
+                <span className="text-[13px] font-bold text-white/90 leading-none">{user.equipe}</span>
               </div>
-
-              <div className="w-px h-12 bg-gradient-to-b from-transparent via-white/10 to-transparent"></div>
-
-              <div className="flex items-center gap-3 group transition-all duration-300 cursor-default hover:bg-white/5 px-4 py-2 rounded-xl">
-                <div className="flex items-center justify-center bg-white/10 p-2.5 rounded-lg group-hover:bg-white/20 transition-all shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]">
-                  <MapPin className="w-5 h-5 text-white/90 group-hover:text-white transition-colors duration-300" strokeWidth={2} />
-                </div>
-                <div className="flex flex-col justify-center">
-                  <span className="text-[9px] xl:text-[10px] uppercase tracking-[0.2em] text-white/50 font-black mb-0.5 group-hover:text-white/70 transition-colors">Microárea</span>
-                  <span className="text-sm xl:text-[15px] font-bold text-white leading-none tracking-tight">{user.microarea}</span>
-                </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-[0.15em] text-white/40 font-black leading-none mb-1">Microárea</span>
+                <span className="text-[13px] font-bold text-white/90 leading-none">{user.microarea}</span>
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>
       
-      {/* Lado Direito: Perfil (Mobile e Desktop) */}
-      <div className="flex items-center h-full py-3">
-        <div className="flex items-center gap-3 pl-4 border-l border-white/10 h-full hover:bg-white/5 px-3 rounded-xl transition-all cursor-pointer group">
-          {showAvatarDetails && user && (
-            <div className="text-right hidden md:flex flex-col justify-center">
-              <p className="text-sm font-bold text-white leading-tight truncate max-w-[140px] group-hover:text-primary-container transition-colors">
-                {user.name || user.email}
-              </p>
-            </div>
-          )}
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-container to-primary flex items-center justify-center text-on-primary-container font-black text-sm ring-2 ring-white/10 group-hover:ring-white/30 shadow-lg transition-all duration-300 group-hover:scale-105">
+      {/* Lado Direito */}
+      <div className="flex items-center gap-4 h-full">
+        <div className="flex items-center gap-3 pl-4 border-l border-white/10 h-full">
+          <div className="text-right hidden xl:flex flex-col justify-center">
+            <p className="text-sm font-bold text-white leading-tight">
+              {user?.name || user?.email}
+            </p>
+            <p className="text-[10px] text-white/50 font-medium">Profissional de Saúde</p>
+          </div>
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-white/20 to-white/5 flex items-center justify-center text-white font-black text-sm ring-1 ring-white/20 shadow-lg">
             {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
           </div>
         </div>
+
+        <button 
+          onClick={logout}
+          className="p-2.5 hover:bg-red-500/20 rounded-xl transition-all duration-300 text-white/60 hover:text-red-400 group border border-transparent hover:border-red-500/30"
+          title="Sair"
+        >
+          <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform" />
+        </button>
       </div>
     </header>
   );

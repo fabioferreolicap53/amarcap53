@@ -4,9 +4,14 @@ import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText
 import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
 
-export const FollowUpsScreen = () => {
+interface FollowUpsScreenProps {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+}
+
+export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, setActiveTab }) => {
   const { user } = useAuth();
-  const [acompanhamentos, setAcompanhamentos] = useState<any[]>([]);
+  const [acompanhamentos, setAcompanhamentos] = useState<Acompanhamento[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Modal de edição state
@@ -77,11 +82,12 @@ export const FollowUpsScreen = () => {
     const formData = new FormData(e.currentTarget);
     
     const data = {
+      teste_molecular: formData.get('teste_molecular') || '',
+      tipo_busca: formData.get('tipo_busca') || '',
       data_busca: formData.get('data_busca') || '',
       tipo_contato: formData.get('tipo_contato') || '',
       situacao_pos_busca: formData.get('situacao_pos_busca') || '',
-      identificacao_rede: formData.get('identificacao_rede') || '',
-      principais_entraves: formData.get('principais_entraves') || '',
+      entraves_identificados: formData.get('entraves_identificados') || '',
       observacoes: formData.get('observacoes') || '',
     };
 
@@ -112,6 +118,8 @@ export const FollowUpsScreen = () => {
         title="AMAR - ACOMPANHAMENTO DA MULHER NAS AÇÕES DE RASTREIO" 
         pageTitle="Acompanhamentos"
         subtitle={user ? `Unidade de Saúde: ${user.unidade_saude}` : 'Carregando...'} 
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
       />
       
       <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 no-scrollbar">
@@ -133,21 +141,21 @@ export const FollowUpsScreen = () => {
             <div className="bg-surface-container-lowest p-5 md:p-6 rounded-xl shadow-sm">
               <p className="text-[10px] md:text-[0.6875rem] font-medium text-on-surface-variant uppercase tracking-wider mb-1">Contatos Realizados</p>
               <p className="text-xl md:text-2xl font-bold text-primary">
-                {acompanhamentos.filter(a => a.tipo_contato && a.tipo_contato !== 'Não houve contato (não localizada, ligação não atendida...)').length}
+                {acompanhamentos.filter(a => a.tipo_contato && !a.tipo_contato.includes('Não houve contato')).length}
               </p>
             </div>
             
             <div className="bg-surface-container-lowest p-5 md:p-6 rounded-xl shadow-sm">
               <p className="text-[10px] md:text-[0.6875rem] font-medium text-on-surface-variant uppercase tracking-wider mb-1">Buscas sem Sucesso</p>
               <p className="text-xl md:text-2xl font-bold text-primary">
-                {acompanhamentos.filter(a => a.tipo_contato === 'Não houve contato (não localizada, ligação não atendida...)').length}
+                {acompanhamentos.filter(a => a.tipo_contato && a.tipo_contato.includes('Não houve contato')).length}
               </p>
             </div>
             
             <div className="bg-surface-container-lowest p-5 md:p-6 rounded-xl shadow-sm">
               <p className="text-[10px] md:text-[0.6875rem] font-medium text-on-surface-variant uppercase tracking-wider mb-1">Sucesso no Agendamento</p>
               <p className="text-xl md:text-2xl font-bold text-primary">
-                {acompanhamentos.filter(a => a.situacao_pos_busca === 'Sucesso no agendamento').length}
+                {acompanhamentos.filter(a => a.situacao_pos_busca && a.situacao_pos_busca.includes('1- Agendamento')).length}
               </p>
             </div>
           </div>
@@ -171,14 +179,14 @@ export const FollowUpsScreen = () => {
             </div>
 
             <div className="overflow-x-auto custom-scrollbar-horizontal">
-              <table className="w-full text-left border-collapse min-w-[900px] lg:min-w-full">
+              <table className="w-full text-center border-collapse min-w-[900px] lg:min-w-full">
                 <thead>
                   <tr className="bg-surface-container-low/50">
-                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Paciente</th>
-                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Data da Ação</th>
-                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Tipo de Contato</th>
-                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Desfecho</th>
-                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest text-right">Ações</th>
+                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest text-center">Paciente</th>
+                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest text-center">Data da Ação</th>
+                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest text-center">Tipo de Contato</th>
+                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest text-center">Desfecho</th>
+                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest text-center">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
@@ -208,32 +216,32 @@ export const FollowUpsScreen = () => {
                       return (
                         <tr key={acomp.id} className="hover:bg-surface-container-low/30 transition-colors group">
                           <td className="px-4 md:px-8 py-5">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center gap-3">
                               <div className="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-primary font-bold text-xs flex-shrink-0">
                                 {pacienteIniciais}
                               </div>
-                              <div className="min-w-[120px]">
+                              <div className="min-w-[120px] text-left">
                                 <p className="text-sm font-bold text-primary truncate" title={pacienteNome}>{pacienteNome}</p>
                                 <p className="text-[10px] text-on-surface-variant">CNS: {cns}</p>
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 md:px-8 py-5 text-sm font-medium text-on-surface whitespace-nowrap">
+                          <td className="px-4 md:px-8 py-5 text-sm font-medium text-on-surface whitespace-nowrap text-center">
                             {dataFormatada}
                           </td>
-                          <td className="px-4 md:px-8 py-5 whitespace-nowrap">
+                          <td className="px-4 md:px-8 py-5 whitespace-nowrap text-center">
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-fixed text-on-primary-fixed text-[0.75rem] font-semibold">
                               <Phone className="w-4 h-4" />
                               {acomp.tipo_contato || '--'}
                             </span>
                           </td>
-                          <td className="px-4 md:px-8 py-5 whitespace-nowrap">
+                          <td className="px-4 md:px-8 py-5 whitespace-nowrap text-center">
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-800 text-[0.75rem] font-semibold">
                               {acomp.situacao_pos_busca || '--'}
                             </span>
                           </td>
-                          <td className="px-4 md:px-8 py-5 text-right">
-                            <div className="flex items-center justify-end gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                          <td className="px-4 md:px-8 py-5 text-center">
+                            <div className="flex items-center justify-center gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                               <button 
                                 onClick={() => handleEdit(acomp.id)}
                                 className="text-primary hover:bg-primary/10 p-2 rounded-full transition-colors"
@@ -310,6 +318,31 @@ export const FollowUpsScreen = () => {
             <div className="overflow-y-auto custom-scrollbar-modal flex-1 p-5 sm:p-8 md:p-10">
               <form id="edit-acompanhamento-form" onSubmit={handleSaveEdit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5 sm:gap-y-6">
+                {/* Teste Molecular DNA-HPV */}
+                <div className="space-y-2 group/field">
+                  <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
+                    <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
+                      <FileText className="w-3.5 h-3.5" />
+                    </div>
+                    Teste Molecular DNA-HPV
+                  </label>
+                  <div className="relative">
+                    <select 
+                      name="teste_molecular" 
+                      defaultValue={selectedAcompanhamento.teste_molecular}
+                      required 
+                      className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40"
+                    >
+                      <option value="" disabled>Selecione</option>
+                      <option value="SIM">SIM</option>
+                      <option value="NÃO">NÃO</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-on-surface-variant">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Data da Busca */}
                 <div className="space-y-2 group/field">
                   <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
@@ -329,6 +362,32 @@ export const FollowUpsScreen = () => {
                   </div>
                 </div>
 
+                {/* Tipo de Busca */}
+                <div className="space-y-2 group/field">
+                  <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
+                    <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
+                      <Search className="w-3.5 h-3.5" />
+                    </div>
+                    Tipo de Busca
+                  </label>
+                  <div className="relative">
+                    <select 
+                      name="tipo_busca" 
+                      defaultValue={selectedAcompanhamento.tipo_busca}
+                      required 
+                      className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40"
+                    >
+                      <option value="" disabled>Selecione</option>
+                      <option value="1 - Busca ativa- Visita domiciliar registrada em prontuário">1 - Busca ativa- Visita domiciliar registrada em prontuário</option>
+                      <option value="2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário">2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário</option>
+                      <option value="3 - Busca ativa - Mensagem registrada em prontuário">3 - Busca ativa - Mensagem registrada em prontuário</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-on-surface-variant">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Tipo de Contato */}
                 <div className="space-y-2 group/field">
                   <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
@@ -345,9 +404,9 @@ export const FollowUpsScreen = () => {
                       className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40"
                     >
                       <option value="" disabled>Selecione uma modalidade</option>
-                      <option value="Contato direto">Contato direto</option>
+                      <option value="Contato direto (conversa)">Contato direto (conversa)</option>
                       <option value="Contato indireto (mensagem)">Contato indireto (mensagem)</option>
-                      <option value="Não houve contato (não localizada, ligação não atendida...)">Não houve contato (não localizada, ligação não atendida...)</option>
+                      <option value="Não houve contato ( não localizada, ligação não atendida...)">Não houve contato ( não localizada, ligação não atendida...)</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-on-surface-variant">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -371,16 +430,16 @@ export const FollowUpsScreen = () => {
                       className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40"
                     >
                       <option value="" disabled>Selecione o desfecho da busca</option>
-                      <option value="Sucesso no agendamento">Sucesso no agendamento</option>
-                      <option value="Recusa do procedimento">Recusa do procedimento</option>
-                      <option value="Não localizada">Não localizada</option>
-                      <option value="Óbito">Óbito</option>
-                      <option value="Mudança de endereço">Mudança de endereço</option>
-                      <option value="Em tratamento particular">Em tratamento particular</option>
-                      <option value="Aguardando retorno da rede">Aguardando retorno da rede</option>
-                      <option value="Falha de comunicação">Falha de comunicação</option>
-                      <option value="Reagendado">Reagendado</option>
-                      <option value="Outros">Outros</option>
+                      <option value="1- Agendamento após contato direto">1- Agendamento após contato direto</option>
+                      <option value="2 - Convite para demanda livre">2 - Convite para demanda livre</option>
+                      <option value="3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP">3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP</option>
+                      <option value="4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP">4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP</option>
+                      <option value="5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP">5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP</option>
+                      <option value="6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP">6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP</option>
+                      <option value="7 - Mudança de território (situação atualizada no PEP)">7 - Mudança de território (situação atualizada no PEP)</option>
+                      <option value="8 - Óbito (situação atualizada no PEP)">8 - Óbito (situação atualizada no PEP)</option>
+                      <option value="9 - Não localizada">9 - Não localizada</option>
+                      <option value="10 - Recusa">10 - Recusa</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-on-surface-variant">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -388,38 +447,34 @@ export const FollowUpsScreen = () => {
                   </div>
                 </div>
 
-                {/* Identificação da Rede */}
-                <div className="space-y-2 group/field">
-                  <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
-                    <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
-                      <Building className="w-3.5 h-3.5" />
-                    </div>
-                    Identificação da Rede
-                  </label>
-                  <input 
-                    name="identificacao_rede"
-                    defaultValue={selectedAcompanhamento.identificacao_rede}
-                    className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none placeholder:text-outline-variant/60 shadow-sm hover:border-primary/40" 
-                    placeholder="Ex: Hospital Souza Aguiar" 
-                    type="text" 
-                  />
-                </div>
-
-                {/* Principais Entraves */}
-                <div className="space-y-2 group/field">
+                {/* Entraves Identificados */}
+                <div className="col-span-1 md:col-span-2 space-y-2 group/field">
                   <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
                     <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
                       <AlertTriangle className="w-3.5 h-3.5" />
                     </div>
-                    Principais Entraves
+                    Entraves Identificados
                   </label>
-                  <input 
-                    name="principais_entraves"
-                    defaultValue={selectedAcompanhamento.principais_entraves}
-                    className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none placeholder:text-outline-variant/60 shadow-sm hover:border-primary/40" 
-                    placeholder="Ex: Falta de transporte, mudança de telefone" 
-                    type="text" 
-                  />
+                  <div className="relative">
+                    <select 
+                      name="entraves_identificados" 
+                      defaultValue={selectedAcompanhamento.entraves_identificados}
+                      className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40"
+                    >
+                      <option value="" disabled>Selecione (Opcional)</option>
+                      <option value="1 - Horários incompatíveis com a rotina de trabalho">1 - Horários incompatíveis com a rotina de trabalho</option>
+                      <option value="2 - Vergonha ou constrangimento durante o exame">2 - Vergonha ou constrangimento durante o exame</option>
+                      <option value="3 - Ideia equivocada sobre a necessidade de fazer exame">3 - Ideia equivocada sobre a necessidade de fazer exame</option>
+                      <option value="4 - Faz o rastreamento pela rede privada">4 - Faz o rastreamento pela rede privada</option>
+                      <option value="5 - Dificuldade de locomoção ( ex: acamada)">5 - Dificuldade de locomoção ( ex: acamada)</option>
+                      <option value="6 - Distância da Unidade">6 - Distância da Unidade</option>
+                      <option value="7 - Se recusa a fazer o exame com o profissional da equipe">7 - Se recusa a fazer o exame com o profissional da equipe</option>
+                      <option value="8 - Esquece a data do agendamento">8 - Esquece a data do agendamento</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-on-surface-variant">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Observações */}

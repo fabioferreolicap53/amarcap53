@@ -27,7 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
   };
 
   return (
-    <aside className={`fixed left-0 top-0 h-full w-64 z-50 bg-[#f2f4f6] dark:bg-slate-950 flex flex-col p-4 border-r border-transparent transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+    <aside className={`fixed left-0 top-0 h-full w-64 z-50 bg-[#f2f4f6] dark:bg-slate-950 flex flex-col p-4 border-r border-transparent transition-transform duration-300 ease-in-out lg:hidden ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex justify-between items-center mb-8 px-4">
         <div>
           <h1 className="font-black text-[#051934] dark:text-white tracking-tighter text-2xl leading-none">
