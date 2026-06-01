@@ -152,8 +152,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     setUploadStatus({ stage: 'reading', message: 'Lendo arquivo...', current: 0, total: 0, fileName: file.name });
 
     // Função auxiliar para converter DD/MM/YYYY para ISO YYYY-MM-DD
-    const parseCSVDate = (dateStr: string | undefined): string => {
-      if (!dateStr || dateStr === '--' || dateStr.trim() === '') return '';
+    const parseCSVDate = (dateStr: string | undefined): string | null => {
+      if (!dateStr || dateStr === '--' || dateStr.trim() === '') return null;
       
       const trimmed = dateStr.trim();
       
@@ -169,7 +169,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
       }
       
-      return '';
+      return null;
     };
 
     Papa.parse(file, {
@@ -226,20 +226,33 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
               const grupo = row['GRUPO']?.trim() || row['FAIXA ETÁRIA']?.trim() || row['FAIXA ETARIA']?.trim() || '';
 
               if (unidade && equipe && cns && nome && dataNascimento) {
-                return {
+                const parsedDate = parseCSVDate(dataNascimento);
+                if (!parsedDate) return null;
+
+                const record: Record<string, any> = {
                   unidade, 
                   equipe, 
                   microarea: parseInt(microarea) || 0,
                   cns: cns.replace(/\D/g, '').padStart(15, '0').slice(-15),
                   nome, 
-                  data_nascimento: parseCSVDate(dataNascimento),
+                  data_nascimento: parsedDate,
                   idade: parseInt(idade) || 0,
                   grupo: grupo || '--',
-                  cito_lab: parseCSVDate(row['RESULTADO DE CITO LABORATÓRIO']),
-                  cito_pep: parseCSVDate(row['RESULTADO DE CITO REGISTRADO NO PEP']),
-                  dna_hpv: parseCSVDate(row['TESTE MOLECULAR DNA-HPV']),
-                  alertas_rastreamento: row['ALERTAS RASTREAMENTO']?.trim() || '',
                 };
+
+                const citoLab = parseCSVDate(row['RESULTADO DE CITO LABORATÓRIO']);
+                if (citoLab) record.cito_lab = citoLab;
+
+                const citoPep = parseCSVDate(row['RESULTADO DE CITO REGISTRADO NO PEP']);
+                if (citoPep) record.cito_pep = citoPep;
+
+                const dnaHpv = parseCSVDate(row['TESTE MOLECULAR DNA-HPV']);
+                if (dnaHpv) record.dna_hpv = dnaHpv;
+
+                const alertas = row['ALERTAS RASTREAMENTO']?.trim();
+                if (alertas) record.alertas_rastreamento = alertas;
+
+                return record;
               }
               return null;
             }).filter(Boolean);
