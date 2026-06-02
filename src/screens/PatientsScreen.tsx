@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from '../components/Header';
 import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,6 +17,7 @@ interface Paciente {
   cito_lab?: string; // Data
   cito_pep?: string; // Data
   dna_hpv?: string;  // Data
+  teste_dna_hpv?: string; // SIM ou NÃO
   alertas_rastreamento?: string;
   alertas?: string; 
 }
@@ -26,40 +27,184 @@ interface PatientsScreenProps {
   setActiveTab: (tab: string) => void;
 }
 
+export const DatePickerPTBR: React.FC<{ value: string; onChange: (val: string) => void }> = ({ value, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const daysOfWeek = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+  const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
+
+  const days = [];
+  const totalDays = getDaysInMonth(currentMonth.getFullYear(), currentMonth.getMonth());
+  const firstDay = getFirstDayOfMonth(currentMonth.getFullYear(), currentMonth.getMonth());
+
+  for (let i = 0; i < firstDay; i++) days.push(null);
+  for (let i = 1; i <= totalDays; i++) days.push(i);
+
+  const handleDateSelect = (day: number) => {
+    const selected = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const d = String(selected.getDate()).padStart(2, '0');
+    const m = String(selected.getMonth() + 1).padStart(2, '0');
+    const y = selected.getFullYear();
+    onChange(`${d}/${m}/${y}`);
+    setIsOpen(false);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.replace(/\D/g, '');
+    if (val.length > 8) val = val.slice(0, 8);
+    
+    if (val.length > 4) {
+      val = `${val.slice(0, 2)}/${val.slice(2, 4)}/${val.slice(4)}`;
+    } else if (val.length > 2) {
+      val = `${val.slice(0, 2)}/${val.slice(2)}`;
+    }
+    
+    onChange(val);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      if (value === '' || value === '--' || value.length === 10) {
+        setIsOpen(false);
+        (e.target as HTMLInputElement).blur();
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    // Força salvamento ao sair do campo se a data for válida ou vazia
+    if (value === '' || value === '--' || value.length === 10) {
+      onChange(value);
+    }
+  };
+
+  const setQuickDate = (offset: number | null) => {
+    if (offset === null) {
+      onChange('');
+    } else {
+      const date = new Date();
+      date.setDate(date.getDate() + offset);
+      const d = String(date.getDate()).padStart(2, '0');
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const y = date.getFullYear();
+      onChange(`${d}/${m}/${y}`);
+    }
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="relative inline-block w-full max-w-[140px]" ref={containerRef}>
+      <div 
+        className="bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-[10px] font-bold text-primary flex items-center justify-between gap-1 hover:border-primary/40 transition-all focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary"
+      >
+        <input
+          type="text"
+          value={value === '--' ? '' : value}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
+          placeholder="DD/MM/YYYY"
+          className="bg-transparent border-none outline-none w-full text-primary placeholder:text-slate-300"
+          onFocus={() => setIsOpen(true)}
+        />
+        <Calendar 
+          className="w-3 h-3 text-slate-400 cursor-pointer hover:text-primary transition-colors" 
+          onClick={() => setIsOpen(!isOpen)}
+        />
+      </div>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-[100] p-3 w-[220px]">
+          <div className="grid grid-cols-2 gap-2 mb-3 border-b border-slate-100 pb-2">
+            <button 
+              onClick={() => setQuickDate(0)}
+              className="py-1 px-2 bg-primary/5 hover:bg-primary/10 text-primary text-[8px] font-black uppercase rounded-lg transition-colors"
+            >
+              Hoje
+            </button>
+            <button 
+              onClick={() => setQuickDate(null)}
+              className="py-1 px-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[8px] font-black uppercase rounded-lg transition-colors"
+            >
+              Limpar
+            </button>
+          </div>
+          <div className="flex items-center justify-between mb-3">
+            <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-1 hover:bg-slate-100 rounded-lg"><ChevronLeft className="w-3.5 h-3.5" /></button>
+            <span className="text-[10px] font-black uppercase text-primary">{months[currentMonth.getMonth()]} {currentMonth.getFullYear()}</span>
+            <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-1 hover:bg-slate-100 rounded-lg"><ChevronRight className="w-3.5 h-3.5" /></button>
+          </div>
+          <div className="grid grid-cols-7 gap-1 mb-1">
+            {daysOfWeek.map(d => <div key={d} className="text-[8px] font-black text-slate-400 uppercase text-center">{d}</div>)}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {days.map((day, i) => (
+              <div 
+                key={i} 
+                onClick={() => day && handleDateSelect(day)}
+                className={`
+                  text-[9px] font-bold h-6 flex items-center justify-center rounded-lg transition-all
+                  ${day ? 'cursor-pointer hover:bg-primary hover:text-white' : ''}
+                  ${day && value === `${String(day).padStart(2, '0')}/${String(currentMonth.getMonth() + 1).padStart(2, '0')}/${currentMonth.getFullYear()}` ? 'bg-primary text-white' : 'text-slate-600'}
+                `}
+              >
+                {day}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ALERT_CONFIGS: Record<string, { label: string; icon: any; color: string; bg: string; description: string }> = {
   'PEP_MOLECULAR': {
-    label: 'RESULTADO PEP MOLECULAR',
+    label: 'IDENTIFICADO REGISTRO DE RESULTADO NO PEP DE TESTE MOLECULAR.',
     icon: TestTube,
-    color: 'text-blue-600',
-    bg: 'bg-blue-50 border-blue-200',
+    color: 'text-white',
+    bg: 'bg-blue-600 border-blue-700 shadow-md shadow-blue-600/20',
     description: 'Identificado registro de resultado no PEP de teste molecular.'
   },
   'COLETA_MOLECULAR': {
-    label: 'COLETA MOLECULAR',
+    label: 'IDENTIFICADO COLETA/RESULTADO DE TESTE MOLECULAR.',
     icon: TestTube,
-    color: 'text-indigo-600',
-    bg: 'bg-indigo-50 border-indigo-200',
+    color: 'text-white',
+    bg: 'bg-orange-500 border-orange-600 shadow-md shadow-orange-500/20',
     description: 'Identificado coleta/resultado de teste molecular.'
   },
   'PEP_CITO': {
-    label: 'RESULTADO PEP CITO',
+    label: 'IDENTIFICADO REGISTRO DE RESULTADO NO PEP DE CITO.',
     icon: Microscope,
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50 border-emerald-200',
+    color: 'text-white',
+    bg: 'bg-emerald-600 border-emerald-700 shadow-md shadow-emerald-600/20',
     description: 'Identificado registro de resultado no PEP de cito.'
   },
   'COLETA_CITO': {
-    label: 'COLETA CITO',
+    label: 'IDENTIFICADO COLETA/ RESULTADO DE CITO.',
     icon: Microscope,
-    color: 'text-teal-600',
-    bg: 'bg-teal-50 border-teal-200',
+    color: 'text-white',
+    bg: 'bg-yellow-500 border-yellow-600 shadow-md shadow-yellow-500/20',
     description: 'Identificado coleta/resultado de cito.'
   },
   'NAO_IDENTIFICADO': {
-    label: 'SEM REGISTRO',
+    label: 'NÃO IDENTIFICADO COLETA OU RESULTADO DE EXAME DE RASTREAMENTO.',
     icon: SearchX,
-    color: 'text-rose-600',
-    bg: 'bg-rose-50 border-rose-200',
+    color: 'text-white',
+    bg: 'bg-red-600 border-red-700 shadow-md shadow-red-600/20',
     description: 'Não identificado coleta ou resultado de exame de rastreamento.'
   },
   'URGENTE': {
@@ -69,6 +214,39 @@ const ALERT_CONFIGS: Record<string, { label: string; icon: any; color: string; b
     bg: 'bg-error shadow-[0_2px_8px_rgba(185,28,28,0.4)]',
     description: 'Ação imediata recomendada para este caso.'
   }
+};
+
+const calcularIdade = (dataNascimento: string) => {
+  if (!dataNascimento) return 0;
+  let dataFormatada = dataNascimento;
+  if (dataNascimento.includes('/')) {
+    const [dia, mes, ano] = dataNascimento.split('/');
+    dataFormatada = `${ano}-${mes}-${dia}`;
+  }
+  
+  const hoje = new Date();
+  const nascimento = new Date(dataFormatada);
+  let idade = hoje.getFullYear() - nascimento.getFullYear();
+  const m = hoje.getMonth() - nascimento.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) {
+    idade--;
+  }
+  return isNaN(idade) ? 0 : idade;
+};
+
+const formatarData = (dataStr: string | undefined) => {
+  if (!dataStr || dataStr === '--') return '--';
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr)) return dataStr;
+  
+  let dateOnly = dataStr;
+  if (dateOnly.includes(' ')) dateOnly = dateOnly.split(' ')[0];
+  if (dateOnly.includes('T')) dateOnly = dateOnly.split('T')[0];
+  
+  if (/^\d{4}-\d{2}-\d{2}/.test(dateOnly)) {
+    const [ano, mes, dia] = dateOnly.split('-');
+    return `${dia}/${mes}/${ano}`;
+  }
+  return dateOnly;
 };
 
 export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setActiveTab }) => {
@@ -82,6 +260,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const pageSize = 10;
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [patientForDetails, setPatientDetails] = useState<Paciente | null>(null);
+  const [selectedDate, setSelectedDate] = useState('');
 
   const handleOpenDetails = (paciente: Paciente) => {
     setPatientDetails(paciente);
@@ -115,7 +294,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     const data = {
       paciente: selectedPaciente.id,
       profissional: user.id,
-      teste_molecular: formData.get('teste_molecular') || '',
       data_busca: formData.get('data_busca') || '',
       tipo_busca: formData.get('tipo_busca') || '',
       tipo_contato: formData.get('tipo_contato') || '',
@@ -140,21 +318,19 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     // Ordem de prioridade baseada na eficiência da identificação
     if (p.alertas_rastreamento?.toUpperCase().includes('URGENTE')) return 'URGENTE';
     
-    // Teste Molecular DNA-HPV
-    if (p.dna_hpv && p.dna_hpv !== '--') return 'COLETA_MOLECULAR';
+    // 1. RESULTADO DNA-HPV NO PRONTUÁRIO (dna_hpv)
+    if (p.dna_hpv && p.dna_hpv !== '--') return 'PEP_MOLECULAR';
     
-    // Cito registrado no PEP
-    if (p.cito_pep && p.cito_pep !== '--') return 'PEP_CITO';
+    // 2. TESTE MOLECULAR DNA-HPV (cito_pep)
+    if (p.cito_pep && p.cito_pep !== '--') return 'COLETA_MOLECULAR';
     
-    // Cito Laboratório
-    if (p.cito_lab && p.cito_lab !== '--') return 'COLETA_CITO';
+    // 3. RESULTADO DE CITO NO PEP (cito_lab)
+    if (p.cito_lab && p.cito_lab !== '--') return 'PEP_CITO';
     
-    // Se não houver nenhum registro identificado em nenhum dos campos de data
-    if ((!p.dna_hpv || p.dna_hpv === '--') && 
-        (!p.cito_pep || p.cito_pep === '--') && 
-        (!p.cito_lab || p.cito_lab === '--')) return 'NAO_IDENTIFICADO';
-        
-    return p.alertas_rastreamento || 'NORMAL';
+    // 4. RESULTADO DE CITO LABORATÓRIO (teste_dna_hpv)
+    if (p.teste_dna_hpv && p.teste_dna_hpv !== '--' && p.teste_dna_hpv !== '') return 'COLETA_CITO';
+    
+    return 'NAO_IDENTIFICADO';
   };
 
   useEffect(() => {
@@ -183,6 +359,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             cito_lab: record.cito_lab || '--',
             cito_pep: record.cito_pep || '--',
             dna_hpv: record.dna_hpv || '--',
+            teste_dna_hpv: formatarData(record.teste_dna_hpv) || '--',
             alertas_rastreamento: record.alertas_rastreamento || '--',
           };
           
@@ -259,19 +436,12 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 no-scrollbar">
         <div className="max-w-[1600px] mx-auto">
           
-          <div className="mb-8 md:mb-12">
-            <h2 className="text-2xl md:text-[2rem] font-black text-primary mb-3 tracking-tight">Meus Pacientes</h2>
-            <p className="text-on-surface-variant text-base md:text-lg font-medium max-w-3xl leading-relaxed">
-              Gerencie o fluxo de acompanhamento e rastreio citopatológico. Utilize as ações para registrar novas interações e buscas ativas.
-            </p>
-          </div>
-
           <div className="grid grid-cols-1 gap-4 md:gap-6 mb-8 md:mb-10">
             <div className="bg-surface-container-lowest p-6 md:p-8 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between border-l-[6px] border-primary gap-4">
               <div>
                 <p className="text-xs md:text-sm font-black text-primary/60 uppercase tracking-[0.2em] mb-2">Total sob sua responsabilidade</p>
                 <p className="text-4xl md:text-[3.5rem] font-black text-primary leading-none">
-                  {pacientes.length} <span className="text-lg font-bold text-on-surface-variant ml-2 tracking-normal">Pacientes Ativos</span>
+                  {totalItems} <span className="text-lg font-bold text-on-surface-variant ml-2 tracking-normal">Pacientes Ativos</span>
                 </p>
               </div>
             </div>
@@ -279,24 +449,38 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
           <div className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-[0px_20px_50px_rgba(0,0,0,0.06)] border border-outline-variant/15">
             <div className="w-full overflow-x-auto no-scrollbar">
-              <table className="w-full text-center border-collapse table-auto min-w-[900px]">
+              <table className="w-full text-center border-collapse">
                 <thead>
-                  <tr className="bg-[#001b3d] text-white">
-                    <th className="px-4 py-6 text-xs font-black uppercase tracking-widest text-center sticky left-0 z-20 bg-[#001b3d]">AÇÃO</th>
-                    <th className="px-4 py-6 text-xs font-black uppercase tracking-widest text-center">UNIDADE/EQUIPE</th>
-                    <th className="px-4 py-6 text-xs font-black uppercase tracking-widest text-center">PACIENTE</th>
-                    <th className="px-4 py-6 text-xs font-black uppercase tracking-widest text-center">IDADE</th>
-                    <th className="px-4 py-6 text-xs font-black uppercase tracking-widest text-center">GRUPO</th>
-                    <th className="px-4 py-6 text-xs font-black uppercase tracking-widest text-center">STATUS</th>
-                    <th className="px-4 py-6 text-xs font-black uppercase tracking-widest text-center">CITO LAB</th>
-                    <th className="px-4 py-6 text-xs font-black uppercase tracking-widest text-center">CITO PEP</th>
-                    <th className="px-4 py-6 text-xs font-black uppercase tracking-widest text-center">DNA-HPV</th>
+                  <tr className="bg-[#001b3d] border-b border-white/10">
+                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[100px]">VER DETALHES</th>
+                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[160px]">
+                      RESULTADO DE CITO LABORATÓRIO<br/>
+                      <span className="text-[8px] font-bold text-white/60 normal-case tracking-normal">(DATA DO CADASTRO)</span>
+                    </th>
+                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center sticky left-0 z-20 bg-[#001b3d] w-[120px]">AÇÃO</th>
+                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[140px]">STATUS</th>
+                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[180px]">UNIDADE/EQUIPE</th>
+                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[200px]">PACIENTE</th>
+                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[60px]">IDADE</th>
+                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[100px]">GRUPO</th>
+                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[200px]">
+                      RESULTADO DE CITO NO PEP<br/>
+                      <span className="text-[8px] font-bold text-white/60 normal-case tracking-normal">(DATA DA COLETA)</span>
+                    </th>
+                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[200px]">
+                      TESTE MOLECULAR DNA-HPV<br/>
+                      <span className="text-[8px] font-bold text-white/60 normal-case tracking-normal">(DATA DA SOLICITAÇÃO)</span>
+                    </th>
+                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[200px]">
+                      RESULTADO DNA-HPV NO PRONTUÁRIO<br/>
+                      <span className="text-[8px] font-bold text-white/60 normal-case tracking-normal">(DATA DO REGISTRO)</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={9} className="px-6 py-20 text-center text-on-surface-variant text-base font-medium italic">
+                      <td colSpan={10} className="px-6 py-20 text-center text-on-surface-variant text-base font-medium italic">
                         <div className="flex flex-col items-center gap-4">
                           <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
                           <span className="text-xs font-black uppercase tracking-widest text-primary/40 mt-2">Sincronizando pacientes...</span>
@@ -305,7 +489,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     </tr>
                   ) : pacientes.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-6 py-20 text-center">
+                      <td colSpan={10} className="px-6 py-20 text-center">
                         <div className="flex flex-col items-center opacity-30">
                           <SearchX className="w-16 h-16 mb-4" />
                           <p className="text-sm font-black uppercase tracking-widest">Nenhum registro encontrado</p>
@@ -315,24 +499,68 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   ) : (
                     pacientes.map((paciente) => (
                       <tr key={paciente.id} className="hover:bg-primary/[0.03] transition-all group">
-                        <td className="px-8 py-6 text-center sticky left-0 z-10 bg-surface-container-lowest group-hover:bg-slate-50 transition-colors shadow-[4px_0_10px_rgba(0,0,0,0.03)]">
-                          <div className="flex items-center justify-center gap-4">
+                        <td className="px-4 py-6 text-center">
+                          <button 
+                            onClick={() => handleOpenDetails(paciente)}
+                            className="w-9 h-9 mx-auto flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                            title="Ver Detalhes"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </td>
+                        <td className="px-4 py-6 text-center">
+                          <DatePickerPTBR
+                            value={paciente.teste_dna_hpv || ''}
+                            onChange={async (displayDate) => {
+                              // Atualização local imediata com recalculo de status
+                              setPacientes(prev => prev.map(p => {
+                                if (p.id === paciente.id) {
+                                  const updated = { ...p, teste_dna_hpv: displayDate === '' ? '--' : displayDate };
+                                  updated.alertas = determinarAlerta(updated);
+                                  return updated;
+                                }
+                                return p;
+                              }));
+                              
+                              // Salva no banco apenas se estiver completo ou vazio
+                              if (displayDate === '' || displayDate === '--' || displayDate.length === 10) {
+                                try {
+                                  let valueToSave = displayDate === '--' ? '' : displayDate;
+                                  await pb.collection('amarcap53_pacientes').update(paciente.id, { teste_dna_hpv: valueToSave });
+                                } catch (err) {
+                                  console.error('Erro ao atualizar data:', err);
+                                }
+                              }
+                            }}
+                          />
+                        </td>
+
+                        <td className="px-6 py-6 text-center sticky left-0 z-10 bg-surface-container-lowest group-hover:bg-slate-50/80 transition-colors shadow-[4px_0_12px_rgba(0,0,0,0.04)]">
+                          <div className="flex items-center justify-center">
                             <button 
                               onClick={() => handleOpenModal(paciente)}
-                              className="h-10 px-5 bg-[#001b3d] text-white hover:bg-[#002b5c] rounded-[14px] text-[10px] font-black uppercase tracking-[0.15em] shadow-lg shadow-blue-900/20 transition-all active:scale-95 flex items-center gap-2 border border-white/10 group/acomp"
+                              className="h-9 px-4 bg-[#001b3d] hover:bg-[#002b5c] text-white rounded-xl text-[9px] font-black uppercase tracking-[0.12em] shadow-md shadow-blue-900/15 transition-all duration-300 active:scale-95 flex items-center gap-1.5 border border-white/10 hover:shadow-lg hover:shadow-blue-900/20 hover:-translate-y-0.5"
                             >
-                              <ClipboardList className="w-4 h-4 text-blue-400 group-hover/acomp:scale-110 transition-transform" />
+                              <ClipboardList className="w-3.5 h-3.5 text-blue-300" />
                               <span>Acomp.</span>
                             </button>
-                            
-                            <button 
-                              onClick={() => handleOpenDetails(paciente)}
-                              className="w-10 h-10 flex items-center justify-center rounded-[14px] bg-white border-2 border-slate-100 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50/50 transition-all shadow-sm group/eye"
-                              title="Ver Detalhes"
-                            >
-                              <Eye className="w-4.5 h-4.5 group-hover/eye:scale-110 transition-transform" />
-                            </button>
                           </div>
+                        </td>
+
+                        <td className="px-4 py-6 text-center">
+                          {paciente.alertas && ALERT_CONFIGS[paciente.alertas] ? (
+                            <div className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-white/10 shadow-lg min-h-[48px] max-w-[280px] ${ALERT_CONFIGS[paciente.alertas].bg}`}>
+                              {(() => {
+                                const Icon = ALERT_CONFIGS[paciente.alertas].icon;
+                                return <Icon className={`w-4 h-4 shrink-0 ${ALERT_CONFIGS[paciente.alertas].color}`} />;
+                              })()}
+                              <span className={`text-[9px] font-black uppercase leading-tight tracking-normal text-left ${ALERT_CONFIGS[paciente.alertas].color}`}>
+                                {ALERT_CONFIGS[paciente.alertas].label}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 italic text-[10px] font-black uppercase tracking-tight">--</span>
+                          )}
                         </td>
 
                         <td className="px-4 py-6 text-center">
@@ -341,7 +569,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                               {paciente.unidade}
                             </p>
                             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
-                              {paciente.equipe} • MA: {paciente.microarea}
+                              {paciente.equipe}
+                            </p>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
+                              MA: {paciente.microarea}
                             </p>
                           </div>
                         </td>
@@ -370,22 +601,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           </span>
                         </td>
 
-                        <td className="px-4 py-6 text-center">
-                          {paciente.alertas && ALERT_CONFIGS[paciente.alertas] ? (
-                            <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border shadow-sm ${ALERT_CONFIGS[paciente.alertas].bg}`}>
-                              {(() => {
-                                const Icon = ALERT_CONFIGS[paciente.alertas].icon;
-                                return <Icon className={`w-3.5 h-3.5 ${ALERT_CONFIGS[paciente.alertas].color}`} />;
-                              })()}
-                              <span className={`text-[10px] font-black uppercase tracking-tight ${ALERT_CONFIGS[paciente.alertas].color}`}>
-                                {ALERT_CONFIGS[paciente.alertas].label}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-300 italic text-[10px] font-black uppercase tracking-tight">--</span>
-                          )}
-                        </td>
-                        
                         <td className="px-4 py-6 text-center">
                           <span className={`inline-block px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight shadow-sm ${paciente.cito_lab !== '--' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'text-slate-300 italic'}`}>
                             {formatarData(paciente.cito_lab)}
@@ -503,26 +718,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             <div className="overflow-y-auto custom-scrollbar-modal flex-1 p-5 sm:p-8 md:p-10">
               <form id="registro-acompanhamento-form" onSubmit={handleSaveFollowUp}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5 sm:gap-y-6">
-                {/* Teste Molecular DNA-HPV */}
-                <div className="space-y-2 group/field">
-                  <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
-                    <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
-                      <TestTube className="w-3.5 h-3.5" />
-                    </div>
-                    Teste Molecular DNA-HPV
-                  </label>
-                  <div className="relative">
-                    <select name="teste_molecular" required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40">
-                      <option value="" disabled selected>Selecione</option>
-                      <option value="SIM">SIM</option>
-                      <option value="NÃO">NÃO</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-on-surface-variant">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Data da Busca */}
                 <div className="space-y-2 group/field">
                   <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
@@ -532,11 +727,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     Data da Busca
                   </label>
                   <div className="relative">
-                    <input 
-                      name="data_busca"
-                      required
-                      className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none shadow-sm hover:border-primary/40" 
-                      type="date" 
+                    <input type="hidden" name="data_busca" value={selectedDate} />
+                    <DatePickerPTBR 
+                      value={selectedDate} 
+                      onChange={(val) => setSelectedDate(val)} 
                     />
                   </div>
                 </div>

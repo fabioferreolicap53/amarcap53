@@ -3,6 +3,7 @@ import { Header } from '../components/Header';
 import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
+import { DatePickerPTBR } from './PatientsScreen';
 
 interface FollowUpsScreenProps {
   activeTab: string;
@@ -56,10 +57,15 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const handleEdit = (id: string) => {
     const acompToEdit = acompanhamentos.find(item => item.id === id);
     if (acompToEdit) {
-      // Ajuste de data para o input type="date" (YYYY-MM-DD)
-      const dataBuscaFormatada = acompToEdit.data_busca 
-        ? new Date(acompToEdit.data_busca).toISOString().split('T')[0]
-        : '';
+      // Ajuste de data para o DatePickerPTBR (DD/MM/YYYY)
+      let dataBuscaFormatada = '';
+      if (acompToEdit.data_busca) {
+        const date = new Date(acompToEdit.data_busca);
+        const d = String(date.getDate()).padStart(2, '0');
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const y = date.getFullYear();
+        dataBuscaFormatada = `${d}/${m}/${y}`;
+      }
 
       setSelectedAcompanhamento({
         ...acompToEdit,
@@ -352,12 +358,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     Data da Busca
                   </label>
                   <div className="relative">
-                    <input 
-                      name="data_busca"
-                      defaultValue={selectedAcompanhamento.data_busca_formatada}
-                      required
-                      className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none shadow-sm hover:border-primary/40" 
-                      type="date" 
+                    <input type="hidden" name="data_busca" value={selectedAcompanhamento.data_busca_formatada} />
+                    <DatePickerPTBR 
+                      value={selectedAcompanhamento.data_busca_formatada}
+                      onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, data_busca_formatada: val})}
                     />
                   </div>
                 </div>

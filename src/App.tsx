@@ -15,9 +15,15 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthScreen } from './screens/AuthScreen';
 
 function AppContent() {
-  const [activeTab, setActiveTab] = useState('resumo');
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('activeTab') || 'resumo';
+  });
   const { isOpen, closeSidebar, isMobile, setIsMobile } = useSidebar();
   const { user, isLoading } = useAuth();
+
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     const handleResize = () => {
