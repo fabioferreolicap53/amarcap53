@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, ClipboardCheck, Settings, HelpCircle, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardCheck, Settings, HelpCircle, LogOut, X, Building, MapPin } from 'lucide-react';
 import { useSidebar } from '../contexts/SidebarContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -10,7 +10,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const { isOpen, closeSidebar } = useSidebar();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   
   const navItems = [
     { id: 'resumo', label: 'Resumo', icon: LayoutDashboard },
@@ -67,13 +67,57 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
         })}
       </nav>
       
-      <div className="mt-auto pt-4 border-t border-outline-variant/20 space-y-1">
+      <div className="mt-auto pt-4 space-y-4">
+        {/* Perfil do Usuário Mobile */}
+        {user && (
+          <div className="px-2">
+            <div className="bg-white/50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#051934] to-[#1c2e4a] flex items-center justify-center text-white font-black text-sm shadow-md ring-1 ring-white/20">
+                  {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-black text-[#051934] dark:text-white leading-none truncate">
+                    {user.name || user.email}
+                  </p>
+                  <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">
+                    Profissional
+                  </p>
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/10 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Building className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase truncate">
+                    {user.unidade_saude}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-3.5 h-3.5 text-purple-500" />
+                    <span className="text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase">
+                      {user.equipe}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-500" />
+                    <span className="text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase">
+                      MA: {user.microarea}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <button 
           onClick={logout}
-          className="w-full flex items-center gap-3 text-error px-4 py-3 hover:bg-slate-200/50 rounded-md transition-all text-left"
+          className="w-full flex items-center gap-3 text-error px-4 py-3.5 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all text-left border border-transparent hover:border-red-100 dark:hover:border-red-500/20 group"
         >
-          <LogOut className="w-5 h-5" />
-          <span className="text-sm tracking-wide font-medium font-body">Sair</span>
+          <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform" />
+          <span className="text-sm tracking-widest font-black uppercase">Sair do Sistema</span>
         </button>
       </div>
     </aside>

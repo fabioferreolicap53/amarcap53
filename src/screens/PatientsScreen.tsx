@@ -268,6 +268,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterGrupo, setFilterGrupo] = useState('ALL');
   const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   const handleOpenDetails = (paciente: Paciente) => {
     setPatientDetails(paciente);
@@ -493,57 +494,87 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         <div className="max-w-[1600px] mx-auto">
           
           <div className="grid grid-cols-1 gap-4 md:gap-6 mb-8 md:mb-10">
-            <div className="bg-surface-container-lowest p-6 md:p-8 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between border-l-[6px] border-primary gap-4">
-              <div className="flex-1">
-                <p className="text-xs md:text-sm font-black text-primary/60 uppercase tracking-[0.2em] mb-2">Total sob sua responsabilidade</p>
-                <p className="text-4xl md:text-[3.5rem] font-black text-primary leading-none">
-                  {totalItems} <span className="text-lg font-bold text-on-surface-variant ml-2 tracking-normal">Pacientes Ativos</span>
-                </p>
+            <div className="bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-8 md:p-10 rounded-[2rem] shadow-2xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group">
+              {/* Efeito de luz no fundo */}
+              <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all duration-700"></div>
+              <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all duration-700"></div>
+
+              <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 w-full md:w-auto">
+                <div className="w-20 h-20 rounded-3xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
+                  <Users className="w-10 h-10 text-white" />
+                </div>
+                <div className="text-center md:text-left">
+                  <p className="text-xs md:text-sm font-black text-white/40 uppercase tracking-[0.3em] mb-2">Painel de Controle</p>
+                  <p className="text-4xl md:text-[3.5rem] font-black text-white leading-none tracking-tighter">
+                    {totalItems} <span className="text-lg font-bold text-white/60 ml-2 tracking-normal uppercase">Pacientes Ativos</span>
+                  </p>
+                </div>
               </div>
 
-              {/* Sistema de Busca e Filtros */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                <div className="relative group min-w-[280px]">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/50 group-focus-within:text-primary transition-colors" />
-                  <input 
-                    type="text" 
-                    placeholder="Buscar por nome ou CNS..." 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm font-bold text-on-surface focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-on-surface-variant/40"
-                  />
-                </div>
-                
+              {/* Botões de Ação Criativos */}
+              <div className="relative z-10 flex items-center gap-4 w-full md:w-auto justify-center md:justify-end">
+                <button 
+                  onClick={() => setIsSearchVisible(!isSearchVisible)}
+                  className={`w-14 h-14 flex items-center justify-center rounded-2xl transition-all duration-500 border ${
+                    isSearchVisible 
+                      ? 'bg-white text-primary border-white shadow-[0_0_20px_rgba(255,255,255,0.3)]' 
+                      : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+                  }`}
+                  title="Ativar Busca"
+                >
+                  <Search className={`w-6 h-6 transition-transform duration-500 ${isSearchVisible ? 'scale-110' : ''}`} />
+                </button>
+
                 <button 
                   onClick={() => setIsFilterVisible(!isFilterVisible)}
-                  className={`flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all border ${
+                  className={`flex items-center gap-3 px-8 h-14 rounded-2xl text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
                     isFilterVisible || filterStatus !== 'ALL' || filterGrupo !== 'ALL'
-                      ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
-                      : 'bg-white text-on-surface-variant border-outline-variant/30 hover:border-primary/40 hover:text-primary'
+                      ? 'bg-primary text-white border-primary shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]' 
+                      : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
                   }`}
                 >
-                  <Filter className="w-4 h-4" />
-                  Filtros
+                  <Filter className="w-5 h-5" />
+                  <span>Filtros</span>
                   {(filterStatus !== 'ALL' || filterGrupo !== 'ALL') && (
-                    <span className="w-5 h-5 flex items-center justify-center bg-white text-primary text-[10px] rounded-full ml-1">
+                    <div className="w-6 h-6 flex items-center justify-center bg-white text-primary text-[10px] rounded-full font-black animate-pulse">
                       {(filterStatus !== 'ALL' ? 1 : 0) + (filterGrupo !== 'ALL' ? 1 : 0)}
-                    </span>
+                    </div>
                   )}
                 </button>
               </div>
             </div>
 
+            {/* Barra de Busca Animada */}
+            {isSearchVisible && (
+              <div className="bg-white p-6 rounded-3xl shadow-xl border border-primary/5 animate-in slide-in-from-top-6 fade-in duration-500">
+                <div className="relative group">
+                  <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/30 group-focus-within:text-primary transition-colors" />
+                  <input 
+                    type="text" 
+                    placeholder="Quem você está procurando hoje? Digite nome ou CNS..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-14 pr-6 py-5 bg-surface-container-low border-2 border-transparent rounded-2xl text-base font-bold text-on-surface focus:border-primary/20 outline-none transition-all placeholder:text-on-surface-variant/30"
+                    autoFocus
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Painel de Filtros Avançados */}
             {isFilterVisible && (
-              <div className="bg-white p-6 rounded-2xl shadow-xl border border-primary/10 animate-in slide-in-from-top-4 duration-300">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-8 rounded-3xl shadow-2xl border border-primary/5 animate-in slide-in-from-top-6 fade-in duration-500">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   {/* Filtro de Status */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-primary/60 uppercase tracking-widest">Status de Rastreamento</label>
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                      <Info className="w-3.5 h-3.5" />
+                      Status de Rastreamento
+                    </label>
                     <select 
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value)}
-                      className="w-full p-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm font-bold text-on-surface outline-none focus:border-primary transition-all appearance-none cursor-pointer"
+                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
                     >
                       <option value="ALL">Todos os Status</option>
                       {Object.entries(ALERT_CONFIGS).map(([key, config]) => (
@@ -553,12 +584,15 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   </div>
 
                   {/* Filtro de Grupo */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-primary/60 uppercase tracking-widest">Grupo de Idade</label>
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                      <Users className="w-3.5 h-3.5" />
+                      Grupo de Idade
+                    </label>
                     <select 
                       value={filterGrupo}
                       onChange={(e) => setFilterGrupo(e.target.value)}
-                      className="w-full p-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm font-bold text-on-surface outline-none focus:border-primary transition-all appearance-none cursor-pointer"
+                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
                     >
                       <option value="ALL">Todos os Grupos</option>
                       <option value="25 a 64 anos">25 a 64 anos</option>
@@ -567,19 +601,19 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   </div>
 
                   {/* Botões de Ação */}
-                  <div className="flex items-end gap-3">
+                  <div className="flex items-end gap-4">
                     <button 
                       onClick={resetFilters}
-                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-surface-container-high text-on-surface-variant text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-surface-container-highest transition-all"
+                      className="flex-1 flex items-center justify-center gap-2 py-4 bg-surface-container-high text-on-surface-variant text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-surface-container-highest transition-all duration-300"
                     >
                       <RotateCcw className="w-4 h-4" />
-                      Limpar Filtros
+                      Resetar
                     </button>
                     <button 
                       onClick={() => setIsFilterVisible(false)}
-                      className="flex-1 py-3 bg-primary/5 text-primary text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-primary/10 transition-all"
+                      className="flex-1 py-4 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all duration-300 shadow-lg shadow-primary/20"
                     >
-                      Fechar
+                      Aplicar
                     </button>
                   </div>
                 </div>
@@ -591,35 +625,73 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             <div className="w-full overflow-x-auto custom-scrollbar-horizontal">
               <table className="w-full text-center border-collapse">
                 <thead>
-                  <tr className="bg-[#001b3d] border-b border-white/10">
-                    <th className="px-2 py-6 text-[11px] md:text-[13px] font-black uppercase tracking-wider text-white text-center w-[60px]">VER</th>
-                    <th className="px-4 py-6 text-[11px] md:text-[13px] font-black uppercase tracking-wider text-white text-center w-[200px]">PACIENTE</th>
-                    {isAdmin && <th className="px-4 py-6 text-[11px] md:text-[13px] font-black uppercase tracking-wider text-white text-center w-[180px]">UNIDADE/EQUIPE</th>}
-                    <th className="px-4 py-6 text-[11px] md:text-[13px] font-black uppercase tracking-wider text-white text-center w-[120px]">STATUS</th>
-                    <th className="px-4 py-6 text-[11px] md:text-[13px] font-black uppercase tracking-wider text-white text-center w-[80px]">AÇÃO</th>
-                    <th className="px-4 py-6 text-[11px] md:text-[13px] font-black uppercase tracking-wider text-white text-center w-[160px]">
-                      RESULTADO DE DNA- HPV REGISTRADO EM PRONTUÁRIO<br/>
-                      <span className="text-[9px] md:text-[10px] font-bold text-white/60 normal-case tracking-normal">(DATA DO REGISTRO)</span>
+                  <tr className="bg-[#001b3d] border-b border-white/10 shadow-sm">
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[200px] border-r border-white/5">
+                      <div className="flex flex-col items-center gap-1">
+                        <Users className="w-4 h-4 text-blue-400/60" />
+                        <span>Paciente</span>
+                      </div>
                     </th>
-                    <th className="px-4 py-6 text-[11px] md:text-[13px] font-black uppercase tracking-wider text-white text-center w-[100px]">IDADE / GRUPO</th>
-                    <th className="px-4 py-6 text-[11px] md:text-[13px] font-black uppercase tracking-wider text-white text-center w-[200px]">
-                      RESULTADO DE CITO LABORATÓRIO<br/>
-                      <span className="text-[9px] md:text-[10px] font-bold text-white/60 normal-case tracking-normal">(DATA DO CADASTRO)</span>
+                    {isAdmin && (
+                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
+                        <div className="flex flex-col items-center gap-1">
+                          <Building className="w-4 h-4 text-blue-400/60" />
+                          <span>Unidade/Equipe</span>
+                        </div>
+                      </th>
+                    )}
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[120px] border-r border-white/5">
+                      <div className="flex flex-col items-center gap-1">
+                        <Info className="w-4 h-4 text-blue-400/60" />
+                        <span>Status</span>
+                      </div>
                     </th>
-                    <th className="px-4 py-6 text-[11px] md:text-[13px] font-black uppercase tracking-wider text-white text-center w-[200px]">
-                      RESULTADO DE CITO REGISTRADO NO PEP<br/>
-                      <span className="text-[9px] md:text-[10px] font-bold text-white/60 normal-case tracking-normal">(DATA DA COLETA)</span>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[110px] border-r border-white/5">
+                      <div className="flex flex-col items-center gap-1">
+                        <RotateCcw className="w-4 h-4 text-blue-400/60" />
+                        <span>Ação</span>
+                      </div>
                     </th>
-                    <th className="px-4 py-6 text-[11px] md:text-[13px] font-black uppercase tracking-wider text-white text-center w-[200px]">
-                      TESTE MOLECULAR DNA-HPV<br/>
-                      <span className="text-[9px] md:text-[10px] font-bold text-white/60 normal-case tracking-normal">(DATA DA SOLICITAÇÃO)</span>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
+                      <div className="flex flex-col items-center gap-1">
+                        <TestTube className="w-4 h-4 text-blue-400/60" />
+                        <span>DNA-HPV (PEP)</span>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Registro)</span>
+                      </div>
+                    </th>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[110px] border-r border-white/5">
+                      <div className="flex flex-col items-center gap-1">
+                        <Calendar className="w-4 h-4 text-blue-400/60" />
+                        <span>Idade/Grupo</span>
+                      </div>
+                    </th>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
+                      <div className="flex flex-col items-center gap-1">
+                        <Microscope className="w-4 h-4 text-blue-400/60" />
+                        <span>Cito (Lab)</span>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Cadastro)</span>
+                      </div>
+                    </th>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
+                      <div className="flex flex-col items-center gap-1">
+                        <FileText className="w-4 h-4 text-blue-400/60" />
+                        <span>Cito (PEP)</span>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Coleta)</span>
+                      </div>
+                    </th>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px]">
+                      <div className="flex flex-col items-center gap-1">
+                        <TestTube className="w-4 h-4 text-blue-400/60" />
+                        <span>DNA-HPV (Solic.)</span>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Solicitação)</span>
+                      </div>
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={isAdmin ? 11 : 10} className="px-6 py-20 text-center text-on-surface-variant text-base font-medium italic">
+                      <td colSpan={isAdmin ? 10 : 9} className="px-6 py-20 text-center text-on-surface-variant text-base font-medium italic">
                         <div className="flex flex-col items-center gap-4">
                           <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
                           <span className="text-xs font-black uppercase tracking-widest text-primary/40 mt-2">Sincronizando pacientes...</span>
@@ -628,7 +700,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     </tr>
                   ) : pacientes.length === 0 ? (
                     <tr>
-                      <td colSpan={isAdmin ? 11 : 10} className="px-6 py-20 text-center">
+                      <td colSpan={isAdmin ? 10 : 9} className="px-6 py-20 text-center">
                         <div className="flex flex-col items-center opacity-30">
                           <SearchX className="w-16 h-16 mb-4" />
                           <p className="text-sm font-black uppercase tracking-widest">Nenhum registro encontrado</p>
@@ -638,18 +710,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   ) : (
                     pacientes.map((paciente) => (
                       <tr key={paciente.id} className="hover:bg-primary/[0.03] transition-all group">
-                        {/* 1. VER DETALHES */}
-                        <td className="px-2 py-6 text-center">
-                          <button 
-                            onClick={() => handleOpenDetails(paciente)}
-                            className="w-10 h-10 mx-auto flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
-                            title="Ver Detalhes"
-                          >
-                            <Eye className="w-5 h-5" />
-                          </button>
-                        </td>
-
-                        {/* 2. PACIENTE */}
+                        {/* 1. PACIENTE */}
                         <td className="px-4 py-6 text-center">
                           <div className="flex flex-col items-center gap-0.5">
                             <p className="text-[11px] md:text-[13px] font-black text-primary uppercase leading-tight break-words" title={paciente.nome}>
@@ -664,7 +725,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           </div>
                         </td>
 
-                        {/* 3. UNIDADE/EQUIPE (Admin Only) */}
+                        {/* 2. UNIDADE/EQUIPE (Admin Only) */}
                         {isAdmin && (
                           <td className="px-4 py-6 text-center">
                             <div className="flex flex-col items-center gap-1.5">
@@ -681,7 +742,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           </td>
                         )}
 
-                        {/* 4. STATUS */}
+                        {/* 3. STATUS */}
                         <td className="px-2 py-6 text-center">
                           {paciente.alertas && ALERT_CONFIGS[paciente.alertas] ? (
                             <div className={`inline-flex flex-col items-center justify-center px-2 py-2 rounded-lg border border-white/10 shadow-lg min-h-[50px] w-full max-w-[140px] mx-auto ${ALERT_CONFIGS[paciente.alertas].bg}`}>
@@ -694,17 +755,27 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           )}
                         </td>
 
-                        {/* 5. AÇÃO */}
-                        <td className="px-2 py-6 text-center">
-                          <div className="flex items-center justify-center relative">
+                        {/* 4. AÇÃO */}
+                        <td className="px-2 py-4 text-center">
+                          <div className="flex flex-col items-center justify-center gap-1.5">
+                            <button 
+                              onClick={() => handleOpenDetails(paciente)}
+                              className="h-10 w-24 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 rounded-lg text-[8px] md:text-[9px] font-black uppercase tracking-tight shadow-sm transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 hover:shadow-md"
+                              title="Ver Detalhes"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Detalhes</span>
+                            </button>
+
                             <button 
                               onClick={() => handleOpenModal(paciente)}
-                              className="h-14 w-16 bg-[#001b3d] hover:bg-[#002b5c] text-white rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-[0.05em] shadow-md shadow-blue-900/15 transition-all duration-300 active:scale-95 flex flex-col items-center justify-center gap-1 border border-white/10 hover:shadow-lg hover:shadow-blue-900/20 hover:-translate-y-0.5"
+                              className="h-10 w-24 bg-[#001b3d] hover:bg-[#002b5c] text-white rounded-lg text-[8px] md:text-[9px] font-black uppercase tracking-tight shadow-md shadow-blue-900/15 transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 border border-white/10 hover:shadow-lg hover:shadow-blue-900/20 hover:-translate-y-0.5 relative"
+                              title="Acompanhamento"
                             >
-                              <ClipboardList className="w-5 h-5 text-blue-300" />
+                              <ClipboardList className="w-3.5 h-3.5 text-blue-300" />
                               <span>Acomp.</span>
                               {paciente.total_acompanhamentos !== undefined && paciente.total_acompanhamentos > 0 && (
-                                <span className="absolute top-0 right-0 min-w-[18px] h-5 px-1.5 flex items-center justify-center bg-blue-500 text-white text-[9px] md:text-[11px] font-black rounded-full border-2 border-[#001b3d] shadow-sm">
+                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-5 px-1 flex items-center justify-center bg-blue-500 text-white text-[9px] font-black rounded-full border-2 border-[#001b3d] shadow-md z-10">
                                   {paciente.total_acompanhamentos}
                                 </span>
                               )}

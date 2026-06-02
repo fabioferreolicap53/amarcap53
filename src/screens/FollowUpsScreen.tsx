@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from '../components/Header';
-import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2, RotateCcw, Users } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
 import { DatePickerPTBR } from './PatientsScreen';
@@ -19,6 +19,12 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedAcompanhamento, setSelectedAcompanhamento] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Estados para Busca e Filtros
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [filterTipoBusca, setFilterTipoBusca] = useState('ALL');
 
   useEffect(() => {
     const fetchAcompanhamentos = async () => {
@@ -131,162 +137,302 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 no-scrollbar">
         <div className="max-w-7xl mx-auto">
           
-          <div className="mb-6 md:mb-12">
-            <h2 className="text-xl md:text-2xl font-bold font-headline text-primary mb-2">Acompanhamentos Realizados</h2>
-            <p className="text-sm text-on-surface-variant max-w-2xl">
-              Histórico detalhado das interações clínicas e ações preventivas executadas pela equipe de rastreio de saúde.
-            </p>
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <div className="bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-10 rounded-[2.5rem] shadow-2xl col-span-1 md:col-span-2 lg:col-span-4 flex flex-col md:flex-row items-center justify-between gap-10 relative overflow-hidden group">
+              {/* Efeitos de luz no fundo */}
+              <div className="absolute -top-24 -right-24 w-80 h-80 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all duration-1000"></div>
+              <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all duration-1000"></div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-12">
-            <div className="bg-surface-container-lowest p-5 md:p-6 rounded-xl border-l-4 border-primary shadow-sm">
-              <p className="text-[10px] md:text-[0.6875rem] font-medium text-on-surface-variant uppercase tracking-wider mb-1">Total este mês</p>
-              <p className="text-xl md:text-2xl font-bold text-primary">{acompanhamentos.length}</p>
+              <div className="relative z-10 flex flex-col md:flex-row items-center gap-10 w-full md:w-auto">
+                <div className="w-24 h-24 rounded-[2rem] bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
+                  <ClipboardList className="w-12 h-12 text-white" />
+                </div>
+                <div className="text-center md:text-left">
+                  <p className="text-xs md:text-sm font-black text-white/40 uppercase tracking-[0.4em] mb-3">Histórico de Ações</p>
+                  <p className="text-4xl md:text-[3.5rem] font-black text-white leading-none tracking-tighter">
+                    {acompanhamentos.length} <span className="text-lg font-bold text-white/60 ml-2 tracking-normal uppercase">Registros</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Botões de Ação Criativos */}
+              <div className="relative z-10 flex items-center gap-4 w-full md:w-auto justify-center md:justify-end">
+                <button 
+                  onClick={() => setIsSearchVisible(!isSearchVisible)}
+                  className={`w-16 h-16 flex items-center justify-center rounded-[1.5rem] transition-all duration-500 border ${
+                    isSearchVisible 
+                      ? 'bg-white text-primary border-white shadow-[0_0_25px_rgba(255,255,255,0.4)]' 
+                      : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+                  }`}
+                  title="Ativar Busca"
+                >
+                  <Search className={`w-7 h-7 transition-transform duration-500 ${isSearchVisible ? 'scale-110' : ''}`} />
+                </button>
+
+                <button 
+                  onClick={() => setIsFilterVisible(!isFilterVisible)}
+                  className={`flex items-center gap-4 px-10 h-16 rounded-[1.5rem] text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
+                    isFilterVisible || filterTipoBusca !== 'ALL'
+                      ? 'bg-primary text-white border-primary shadow-[0_0_25px_rgba(var(--primary-rgb),0.4)]' 
+                      : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+                  }`}
+                >
+                  <Filter className="w-6 h-6" />
+                  <span>Filtros</span>
+                  {filterTipoBusca !== 'ALL' && (
+                    <div className="w-7 h-7 flex items-center justify-center bg-white text-primary text-[11px] rounded-full font-black animate-pulse">
+                      1
+                    </div>
+                  )}
+                </button>
+              </div>
             </div>
-            
-            <div className="bg-surface-container-lowest p-5 md:p-6 rounded-xl shadow-sm">
-              <p className="text-[10px] md:text-[0.6875rem] font-medium text-on-surface-variant uppercase tracking-wider mb-1">Contatos Realizados</p>
-              <p className="text-xl md:text-2xl font-bold text-primary">
+
+            {/* Cards de Resumo Estilizados */}
+            <div className="bg-white p-8 rounded-[2rem] shadow-xl border border-primary/5 hover:border-primary/20 transition-all duration-300">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+                  <BadgeCheck className="w-6 h-6 text-emerald-500" />
+                </div>
+                <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest leading-none">Contatos<br/>Realizados</p>
+              </div>
+              <p className="text-3xl font-black text-primary">
                 {acompanhamentos.filter(a => a.tipo_contato && !a.tipo_contato.includes('Não houve contato')).length}
               </p>
             </div>
             
-            <div className="bg-surface-container-lowest p-5 md:p-6 rounded-xl shadow-sm">
-              <p className="text-[10px] md:text-[0.6875rem] font-medium text-on-surface-variant uppercase tracking-wider mb-1">Buscas sem Sucesso</p>
-              <p className="text-xl md:text-2xl font-bold text-primary">
+            <div className="bg-white p-8 rounded-[2rem] shadow-xl border border-primary/5 hover:border-primary/20 transition-all duration-300">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-rose-500/10 flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-rose-500" />
+                </div>
+                <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest leading-none">Buscas sem<br/>Sucesso</p>
+              </div>
+              <p className="text-3xl font-black text-primary">
                 {acompanhamentos.filter(a => a.tipo_contato && a.tipo_contato.includes('Não houve contato')).length}
               </p>
             </div>
             
-            <div className="bg-surface-container-lowest p-5 md:p-6 rounded-xl shadow-sm">
-              <p className="text-[10px] md:text-[0.6875rem] font-medium text-on-surface-variant uppercase tracking-wider mb-1">Sucesso no Agendamento</p>
-              <p className="text-xl md:text-2xl font-bold text-primary">
+            <div className="bg-white p-8 rounded-[2rem] shadow-xl border border-primary/5 hover:border-primary/20 transition-all duration-300">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6 text-blue-500" />
+                </div>
+                <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest leading-none">Sucesso no<br/>Agendamento</p>
+              </div>
+              <p className="text-3xl font-black text-primary">
                 {acompanhamentos.filter(a => a.situacao_pos_busca && a.situacao_pos_busca.includes('1- Agendamento')).length}
+              </p>
+            </div>
+
+            <div className="bg-white p-8 rounded-[2rem] shadow-xl border border-primary/5 hover:border-primary/20 transition-all duration-300">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-purple-500" />
+                </div>
+                <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest leading-none">Taxa de<br/>Conversão</p>
+              </div>
+              <p className="text-3xl font-black text-primary">
+                {acompanhamentos.length > 0 
+                  ? Math.round((acompanhamentos.filter(a => a.situacao_pos_busca && a.situacao_pos_busca.includes('1- Agendamento')).length / acompanhamentos.length) * 100) 
+                  : 0}%
               </p>
             </div>
           </div>
 
-          <div className="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm">
-            <div className="px-4 md:px-8 py-4 md:py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-outline-variant/10 gap-4">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 md:gap-4 w-full sm:w-auto">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant w-4 h-4 md:w-5 md:h-5" />
-                  <input 
-                    className="pl-9 md:pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-md text-sm focus:ring-1 focus:ring-primary w-full sm:w-48 md:w-64 transition-all" 
-                    placeholder="Buscar paciente ou data..." 
-                    type="text" 
-                  />
-                </div>
-                <button className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-primary hover:bg-surface-container-low rounded-md transition-colors border border-primary/10 sm:border-none">
-                  <Filter className="w-4 h-4 md:w-5 md:h-5" />
-                  Filtros
-                </button>
+          {/* Barra de Busca Animada */}
+          {isSearchVisible && (
+            <div className="bg-white p-6 rounded-[2rem] shadow-xl border border-primary/5 mb-6 animate-in slide-in-from-top-6 fade-in duration-500">
+              <div className="relative group">
+                <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/30 group-focus-within:text-primary transition-colors" />
+                <input 
+                  type="text" 
+                  placeholder="Buscar paciente ou data específica..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-14 pr-6 py-5 bg-surface-container-low border-2 border-transparent rounded-2xl text-base font-bold text-on-surface focus:border-primary/20 outline-none transition-all placeholder:text-on-surface-variant/30"
+                  autoFocus
+                />
               </div>
             </div>
+          )}
 
+          {/* Painel de Filtros Avançados */}
+          {isFilterVisible && (
+            <div className="bg-white p-8 rounded-[2rem] shadow-2xl border border-primary/5 mb-6 animate-in slide-in-from-top-6 fade-in duration-500">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="space-y-3">
+                  <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                    <FileText className="w-3.5 h-3.5" />
+                    Tipo de Busca
+                  </label>
+                  <select 
+                    value={filterTipoBusca}
+                    onChange={(e) => setFilterTipoBusca(e.target.value)}
+                    className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="ALL">Todos os Tipos</option>
+                    <option value="Visita domiciliar">Visita domiciliar</option>
+                    <option value="Contato Telefônico">Contato Telefônico</option>
+                    <option value="Mensagem">Mensagem</option>
+                  </select>
+                </div>
+
+                <div className="flex items-end gap-4 lg:col-span-2">
+                  <button 
+                    onClick={() => {setFilterTipoBusca('ALL'); setSearchTerm('');}}
+                    className="flex-1 flex items-center justify-center gap-2 py-4 bg-surface-container-high text-on-surface-variant text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-surface-container-highest transition-all duration-300"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Resetar
+                  </button>
+                  <button 
+                    onClick={() => setIsFilterVisible(false)}
+                    className="flex-1 py-4 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all duration-300 shadow-lg shadow-primary/20"
+                  >
+                    Aplicar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-[2rem] overflow-hidden shadow-2xl border border-outline-variant/10">
             <div className="overflow-x-auto custom-scrollbar-horizontal">
               <table className="w-full text-center border-collapse min-w-[900px] lg:min-w-full">
                 <thead>
-                  <tr className="bg-surface-container-low/50">
-                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest text-center">Paciente</th>
-                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest text-center">Data da Ação</th>
-                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest text-center">Tipo de Contato</th>
-                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest text-center">Desfecho</th>
-                    <th className="px-4 md:px-8 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest text-center">Ações</th>
+                  <tr className="bg-[#001b3d] border-b border-white/10 shadow-sm">
+                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5">
+                      <div className="flex flex-col items-center gap-1">
+                        <Users className="w-4 h-4 text-blue-400/60" />
+                        <span>Paciente</span>
+                      </div>
+                    </th>
+                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5">
+                      <div className="flex flex-col items-center gap-1">
+                        <Calendar className="w-4 h-4 text-blue-400/60" />
+                        <span>Data da Ação</span>
+                      </div>
+                    </th>
+                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5">
+                      <div className="flex flex-col items-center gap-1">
+                        <Phone className="w-4 h-4 text-blue-400/60" />
+                        <span>Tipo de Contato</span>
+                      </div>
+                    </th>
+                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5">
+                      <div className="flex flex-col items-center gap-1">
+                        <BadgeCheck className="w-4 h-4 text-blue-400/60" />
+                        <span>Desfecho</span>
+                      </div>
+                    </th>
+                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <RotateCcw className="w-4 h-4 text-blue-400/60" />
+                        <span>Ações</span>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-outline-variant/10">
+                <tbody className="divide-y divide-outline-variant/5">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-on-surface-variant text-sm">
-                        Carregando acompanhamentos...
+                      <td colSpan={5} className="px-6 py-20 text-center">
+                        <div className="flex flex-col items-center gap-4 opacity-30">
+                          <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                          <span className="text-xs font-black uppercase tracking-widest text-primary mt-2">Sincronizando registros...</span>
+                        </div>
                       </td>
                     </tr>
                   ) : acompanhamentos.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-on-surface-variant text-sm">
-                        Nenhum acompanhamento registrado ainda.
+                      <td colSpan={5} className="px-6 py-20 text-center">
+                        <div className="flex flex-col items-center opacity-30">
+                          <ClipboardList className="w-16 h-16 mb-4" />
+                          <p className="text-sm font-black uppercase tracking-widest">Nenhum registro encontrado</p>
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    acompanhamentos.map((acomp) => {
-                      const pacienteNome = acomp.expand?.paciente?.nome || 'Paciente Desconhecido';
-                      const pacienteIniciais = pacienteNome.substring(0, 2).toUpperCase();
-                      const cns = acomp.expand?.paciente?.cns || '--';
-                      
-                      // Formatando a data
-                      const dataFormatada = acomp.data_busca 
-                        ? new Date(acomp.data_busca).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
-                        : '--';
+                    acompanhamentos
+                      .filter(acomp => {
+                        const search = searchTerm.toLowerCase();
+                        const patientName = (acomp.expand?.paciente?.nome || '').toLowerCase();
+                        const cns = (acomp.expand?.paciente?.cns || '').toLowerCase();
+                        const date = acomp.data_busca ? new Date(acomp.data_busca).toLocaleDateString('pt-BR').toLowerCase() : '';
+                        
+                        const matchesSearch = patientName.includes(search) || cns.includes(search) || date.includes(search);
+                        const matchesFilter = filterTipoBusca === 'ALL' || (acomp.tipo_busca && acomp.tipo_busca.includes(filterTipoBusca));
+                        
+                        return matchesSearch && matchesFilter;
+                      })
+                      .map((acomp) => {
+                        const pacienteNome = acomp.expand?.paciente?.nome || 'Paciente Desconhecido';
+                        const pacienteIniciais = pacienteNome.substring(0, 2).toUpperCase();
+                        const cns = acomp.expand?.paciente?.cns || '--';
+                        
+                        // Formatando a data
+                        const dataFormatada = acomp.data_busca 
+                          ? new Date(acomp.data_busca).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+                          : '--';
 
-                      return (
-                        <tr key={acomp.id} className="hover:bg-surface-container-low/30 transition-colors group">
-                          <td className="px-4 md:px-8 py-5">
-                            <div className="flex items-center justify-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-primary font-bold text-xs flex-shrink-0">
-                                {pacienteIniciais}
+                        return (
+                          <tr key={acomp.id} className="hover:bg-primary/[0.03] transition-all group">
+                            <td className="px-6 py-6">
+                              <div className="flex items-center justify-center gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black text-xs shadow-inner">
+                                  {pacienteIniciais}
+                                </div>
+                                <div className="text-left">
+                                  <p className="text-sm font-black text-primary uppercase leading-tight truncate max-w-[150px]" title={pacienteNome}>{pacienteNome}</p>
+                                  <p className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-tighter mt-0.5">CNS: {cns}</p>
+                                </div>
                               </div>
-                              <div className="min-w-[120px] text-left">
-                                <p className="text-sm font-bold text-primary truncate" title={pacienteNome}>{pacienteNome}</p>
-                                <p className="text-[10px] text-on-surface-variant">CNS: {cns}</p>
+                            </td>
+                            <td className="px-6 py-6 text-center">
+                              <span className="text-[13px] font-black text-[#001b3d] uppercase whitespace-nowrap bg-surface-container-low px-3 py-1.5 rounded-lg border border-outline-variant/10">
+                                {dataFormatada}
+                              </span>
+                            </td>
+                            <td className="px-6 py-6 text-center">
+                              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-tight border border-blue-100 shadow-sm">
+                                <Phone className="w-3.5 h-3.5" />
+                                {acomp.tipo_contato || '--'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-6 text-center">
+                              <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-tight border shadow-sm ${
+                                acomp.situacao_pos_busca?.includes('Sucesso') || acomp.situacao_pos_busca?.includes('Agendamento')
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                  : 'bg-amber-50 text-amber-700 border-amber-100'
+                              }`}>
+                                {acomp.situacao_pos_busca || '--'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-6 text-center">
+                              <div className="flex items-center justify-center gap-3">
+                                <button 
+                                  onClick={() => handleEdit(acomp.id)}
+                                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                                  title="Editar"
+                                >
+                                  <Edit className="w-5 h-5" />
+                                </button>
+                                <button 
+                                  onClick={() => handleDelete(acomp.id)}
+                                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-4 md:px-8 py-5 text-sm font-medium text-on-surface whitespace-nowrap text-center">
-                            {dataFormatada}
-                          </td>
-                          <td className="px-4 md:px-8 py-5 whitespace-nowrap text-center">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-fixed text-on-primary-fixed text-[0.75rem] font-semibold">
-                              <Phone className="w-4 h-4" />
-                              {acomp.tipo_contato || '--'}
-                            </span>
-                          </td>
-                          <td className="px-4 md:px-8 py-5 whitespace-nowrap text-center">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-800 text-[0.75rem] font-semibold">
-                              {acomp.situacao_pos_busca || '--'}
-                            </span>
-                          </td>
-                          <td className="px-4 md:px-8 py-5 text-center">
-                            <div className="flex items-center justify-center gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                              <button 
-                                onClick={() => handleEdit(acomp.id)}
-                                className="text-primary hover:bg-primary/10 p-2 rounded-full transition-colors"
-                                title="Editar"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button 
-                                onClick={() => handleDelete(acomp.id)}
-                                className="text-error hover:bg-error/10 p-2 rounded-full transition-colors"
-                                title="Excluir"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
+                            </td>
+                          </tr>
+                        );
+                      })
                   )}
                 </tbody>
               </table>
-            </div>
-
-            <div className="px-8 py-4 border-t border-outline-variant/10 flex items-center justify-between">
-              <p className="text-xs text-on-surface-variant">Mostrando {acompanhamentos.length} registros</p>
-              <div className="flex items-center gap-1">
-                <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-low text-primary disabled:opacity-30" disabled>
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <button className="w-8 h-8 flex items-center justify-center rounded bg-primary text-white text-xs font-bold">1</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-low text-primary text-xs font-bold">2</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-low text-primary text-xs font-bold">3</button>
-                <span className="px-1 text-xs text-on-surface-variant">...</span>
-                <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-low text-primary text-xs font-bold">129</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-low text-primary">
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
             </div>
           </div>
         </div>
