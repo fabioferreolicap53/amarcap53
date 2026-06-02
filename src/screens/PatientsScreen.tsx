@@ -319,13 +319,13 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     if (p.alertas_rastreamento?.toUpperCase().includes('URGENTE')) return 'URGENTE';
     
     // 1. RESULTADO DNA-HPV NO PRONTUÁRIO (dna_hpv)
-    if (p.dna_hpv && p.dna_hpv !== '--') return 'PEP_MOLECULAR';
+    if (p.dna_hpv && p.dna_hpv !== '--' && p.dna_hpv !== '') return 'PEP_MOLECULAR';
     
     // 2. TESTE MOLECULAR DNA-HPV (cito_pep)
-    if (p.cito_pep && p.cito_pep !== '--') return 'COLETA_MOLECULAR';
+    if (p.cito_pep && p.cito_pep !== '--' && p.cito_pep !== '') return 'COLETA_MOLECULAR';
     
     // 3. RESULTADO DE CITO NO PEP (cito_lab)
-    if (p.cito_lab && p.cito_lab !== '--') return 'PEP_CITO';
+    if (p.cito_lab && p.cito_lab !== '--' && p.cito_lab !== '') return 'PEP_CITO';
     
     // 4. RESULTADO DE CITO LABORATÓRIO (cito_laboratorio)
     if (p.cito_laboratorio && p.cito_laboratorio !== '--' && p.cito_laboratorio !== '') return 'COLETA_CITO';
@@ -525,14 +525,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                               // Salva no banco apenas se estiver completo ou vazio
                               if (displayDate === '' || displayDate === '--' || displayDate.length === 10) {
                                 try {
-                                  let valueToSave = displayDate === '--' ? '' : displayDate;
-                                  
-                                  // Converter para formato ISO (YYYY-MM-DD 12:00:00.000Z) para campos Date no PocketBase
-                                  if (valueToSave.length === 10 && valueToSave.includes('/')) {
-                                    const [d, m, y] = valueToSave.split('/');
-                                    valueToSave = `${y}-${m}-${d} 12:00:00.000Z`;
-                                  }
-
+                                  const valueToSave = displayDate === '--' ? '' : displayDate;
                                   await pb.collection('amarcap53_pacientes').update(paciente.id, { cito_laboratorio: valueToSave });
                                 } catch (err) {
                                   console.error('Erro ao atualizar data no PocketBase:', err);
