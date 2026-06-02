@@ -59,21 +59,27 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Informações Centrais (Mobile) */}
       {user && (
-        <div className="flex lg:hidden flex-1 flex-col items-center justify-center px-2 overflow-hidden">
-          <div className="flex items-center gap-1.5 w-full justify-center">
-            <Building className="w-3.5 h-3.5 text-white/50" />
-            <span className="text-[12px] font-bold text-white leading-none truncate max-w-[160px] text-center">
+        <div className="flex lg:hidden flex-1 flex-col items-center justify-center px-4 overflow-hidden">
+          <div className="flex items-center gap-2">
+            <Building className="w-4 h-4 text-blue-300" />
+            <span className="text-[12px] font-black text-white uppercase tracking-tight">
               {user.unidade_saude}
             </span>
           </div>
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className="text-[11px] font-medium text-white/70 leading-none truncate max-w-[120px]">
-              {user.equipe}
-            </span>
-            <div className="w-1 h-1 rounded-full bg-white/30"></div>
-            <span className="text-[11px] font-medium text-white/70 leading-none">
-              MA: {user.microarea}
-            </span>
+          <div className="flex items-center gap-4 mt-2">
+            <div className="flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-white/50" />
+              <span className="text-[11px] font-bold text-white/80 uppercase">
+                {user.equipe}
+              </span>
+            </div>
+            <div className="w-1.5 h-1.5 rounded-full bg-white/20"></div>
+            <div className="flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-white/50" />
+              <span className="text-[11px] font-bold text-white/80 uppercase">
+                MA: {user.microarea}
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -105,31 +111,39 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="w-px h-8 bg-white/10 mx-2"></div>
 
         {/* Informações do Usuário */}
-        <div className="hidden xl:flex items-center gap-8 border-l border-white/10 pl-8 ml-2">
+        <div className="hidden xl:flex items-center gap-10 border-l border-white/10 pl-8 ml-2">
           {user && (
-            <>
-              <div className="flex flex-col group/info">
-                <span className="text-[8px] uppercase tracking-[0.2em] text-white/30 font-black leading-none mb-1.5 group-hover/info:text-white/50 transition-colors">Unidade</span>
-                <span className="text-[12px] font-bold text-white/90 leading-none truncate max-w-[180px]" title={user.unidade_saude}>{user.unidade_saude}</span>
-              </div>
-              <div className="flex flex-col group/info">
-                <span className="text-[8px] uppercase tracking-[0.2em] text-white/30 font-black leading-none mb-1.5 group-hover/info:text-white/50 transition-colors">Equipe</span>
-                <span className="text-[12px] font-bold text-white/90 leading-none truncate max-w-[120px]" title={user.equipe}>{user.equipe}</span>
-              </div>
-              <div className="flex flex-col group/info">
-                <span className="text-[8px] uppercase tracking-[0.2em] text-white/30 font-black leading-none mb-1.5 group-hover/info:text-white/50 transition-colors">Microárea</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400/50"></div>
-                  <span className="text-[12px] font-bold text-white/90 leading-none">{user.microarea}</span>
+            <div className="flex items-center gap-10">
+              <div className="flex items-center gap-3 group/info">
+                <Building className="w-5 h-5 text-blue-300 group-hover/info:scale-110 transition-transform" />
+                <div className="flex flex-col">
+                  <span className="text-[9px] uppercase tracking-[0.25em] text-white/40 font-black leading-none mb-1.5 group-hover/info:text-blue-300 transition-colors">Unidade</span>
+                  <span className="text-[13px] font-black text-white uppercase tracking-wide whitespace-nowrap" title={user.unidade_saude}>{user.unidade_saude}</span>
                 </div>
               </div>
-            </>
+
+              <div className="flex items-center gap-3 group/info">
+                <Users className="w-5 h-5 text-purple-300 group-hover/info:scale-110 transition-transform" />
+                <div className="flex flex-col">
+                  <span className="text-[9px] uppercase tracking-[0.25em] text-white/40 font-black leading-none mb-1.5 group-hover/info:text-purple-300 transition-colors">Equipe</span>
+                  <span className="text-[13px] font-black text-white uppercase tracking-wide whitespace-nowrap" title={user.equipe}>{user.equipe}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 group/info">
+                <MapPin className="w-5 h-5 text-emerald-300 group-hover/info:scale-110 transition-transform" />
+                <div className="flex flex-col">
+                  <span className="text-[9px] uppercase tracking-[0.25em] text-white/40 font-black leading-none mb-1.5 group-hover/info:text-emerald-300 transition-colors">Microárea</span>
+                  <span className="text-[13px] font-black text-white uppercase tracking-wide">{user.microarea}</span>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
       
       {/* Lado Direito */}
-      <div className="flex items-center gap-4 h-full">
+      <div className="hidden lg:flex items-center gap-4 h-full">
         <div className="flex items-center gap-3 pl-4 border-l border-white/10 h-full">
           <div className="text-right hidden xl:flex flex-col justify-center">
             <p className="text-sm font-bold text-white leading-tight">
