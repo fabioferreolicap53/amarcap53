@@ -105,20 +105,23 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="w-px h-8 bg-white/10 mx-2"></div>
 
         {/* Informações do Usuário */}
-        <div className="flex items-center gap-6">
+        <div className="hidden xl:flex items-center gap-8 border-l border-white/10 pl-8 ml-2">
           {user && (
             <>
-              <div className="flex flex-col">
-                <span className="text-[9px] uppercase tracking-[0.15em] text-white/40 font-black leading-none mb-1">Unidade</span>
-                <span className="text-[13px] font-bold text-white/90 leading-none">{user.unidade_saude}</span>
+              <div className="flex flex-col group/info">
+                <span className="text-[8px] uppercase tracking-[0.2em] text-white/30 font-black leading-none mb-1.5 group-hover/info:text-white/50 transition-colors">Unidade</span>
+                <span className="text-[12px] font-bold text-white/90 leading-none truncate max-w-[180px]" title={user.unidade_saude}>{user.unidade_saude}</span>
               </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] uppercase tracking-[0.15em] text-white/40 font-black leading-none mb-1">Equipe</span>
-                <span className="text-[13px] font-bold text-white/90 leading-none">{user.equipe}</span>
+              <div className="flex flex-col group/info">
+                <span className="text-[8px] uppercase tracking-[0.2em] text-white/30 font-black leading-none mb-1.5 group-hover/info:text-white/50 transition-colors">Equipe</span>
+                <span className="text-[12px] font-bold text-white/90 leading-none truncate max-w-[120px]" title={user.equipe}>{user.equipe}</span>
               </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] uppercase tracking-[0.15em] text-white/40 font-black leading-none mb-1">Microárea</span>
-                <span className="text-[13px] font-bold text-white/90 leading-none">{user.microarea}</span>
+              <div className="flex flex-col group/info">
+                <span className="text-[8px] uppercase tracking-[0.2em] text-white/30 font-black leading-none mb-1.5 group-hover/info:text-white/50 transition-colors">Microárea</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400/50"></div>
+                  <span className="text-[12px] font-bold text-white/90 leading-none">{user.microarea}</span>
+                </div>
               </div>
             </>
           )}
