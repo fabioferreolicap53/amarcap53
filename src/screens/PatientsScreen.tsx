@@ -526,9 +526,16 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                               if (displayDate === '' || displayDate === '--' || displayDate.length === 10) {
                                 try {
                                   let valueToSave = displayDate === '--' ? '' : displayDate;
+                                  
+                                  // Converter para formato ISO (YYYY-MM-DD 12:00:00.000Z) para campos Date no PocketBase
+                                  if (valueToSave.length === 10 && valueToSave.includes('/')) {
+                                    const [d, m, y] = valueToSave.split('/');
+                                    valueToSave = `${y}-${m}-${d} 12:00:00.000Z`;
+                                  }
+
                                   await pb.collection('amarcap53_pacientes').update(paciente.id, { teste_dna_hpv: valueToSave });
                                 } catch (err) {
-                                  console.error('Erro ao atualizar data:', err);
+                                  console.error('Erro ao atualizar data no PocketBase:', err);
                                 }
                               }
                             }}
