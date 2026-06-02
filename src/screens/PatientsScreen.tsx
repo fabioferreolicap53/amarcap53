@@ -345,7 +345,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         setIsLoading(true);
         const options: any = { sort: 'nome' };
         if (!isAdmin) {
-          options.filter = `unidade = "${user.unidade_saude}" && equipe = "${user.equipe}" && microarea = "${user.microarea}"`;
+          options.filter = `unidade = "${user.unidade_saude}" && equipe = "${user.equipe}" && microarea = ${parseInt(user.microarea)}`;
         }
         
         const resultList = await pb.collection('amarcap53_pacientes').getList(currentPage, pageSize, options);

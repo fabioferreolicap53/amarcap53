@@ -26,7 +26,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
       if (!user) return;
       try {
         const records = await pb.collection('amarcap53_pacientes').getFullList({
-          filter: isAdmin ? '' : `unidade = "${user?.unidade_saude}" && equipe = "${user?.equipe}" && microarea = "${user?.microarea}"`,
+          filter: isAdmin ? '' : `unidade = "${user?.unidade_saude}" && equipe = "${user?.equipe}" && microarea = ${parseInt(user?.microarea || '0')}`,
           sort: '-created',
           requestKey: null // Desativa auto-cancelamento para evitar erro 0 no log se houver concorrência leve
         });
