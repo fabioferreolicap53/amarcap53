@@ -17,7 +17,7 @@ interface Paciente {
   cito_lab?: string; // Data
   cito_pep?: string; // Data
   dna_hpv?: string;  // Data
-  teste_dna_hpv?: string; // SIM ou NÃO
+  cito_laboratorio?: string; // Data (Novo campo)
   alertas_rastreamento?: string;
   alertas?: string; 
 }
@@ -327,8 +327,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     // 3. RESULTADO DE CITO NO PEP (cito_lab)
     if (p.cito_lab && p.cito_lab !== '--') return 'PEP_CITO';
     
-    // 4. RESULTADO DE CITO LABORATÓRIO (teste_dna_hpv)
-    if (p.teste_dna_hpv && p.teste_dna_hpv !== '--' && p.teste_dna_hpv !== '') return 'COLETA_CITO';
+    // 4. RESULTADO DE CITO LABORATÓRIO (cito_laboratorio)
+    if (p.cito_laboratorio && p.cito_laboratorio !== '--' && p.cito_laboratorio !== '') return 'COLETA_CITO';
     
     return 'NAO_IDENTIFICADO';
   };
@@ -359,7 +359,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             cito_lab: record.cito_lab || '--',
             cito_pep: record.cito_pep || '--',
             dna_hpv: record.dna_hpv || '--',
-            teste_dna_hpv: formatarData(record.teste_dna_hpv) || '--',
+            cito_laboratorio: formatarData(record.cito_laboratorio) || '--',
             alertas_rastreamento: record.alertas_rastreamento || '--',
           };
           
@@ -510,12 +510,12 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         </td>
                         <td className="px-4 py-6 text-center">
                           <DatePickerPTBR
-                            value={paciente.teste_dna_hpv || ''}
+                            value={paciente.cito_laboratorio || ''}
                             onChange={async (displayDate) => {
                               // Atualização local imediata com recalculo de status
                               setPacientes(prev => prev.map(p => {
                                 if (p.id === paciente.id) {
-                                  const updated = { ...p, teste_dna_hpv: displayDate === '' ? '--' : displayDate };
+                                  const updated = { ...p, cito_laboratorio: displayDate === '' ? '--' : displayDate };
                                   updated.alertas = determinarAlerta(updated);
                                   return updated;
                                 }
@@ -533,7 +533,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                                     valueToSave = `${y}-${m}-${d} 12:00:00.000Z`;
                                   }
 
-                                  await pb.collection('amarcap53_pacientes').update(paciente.id, { teste_dna_hpv: valueToSave });
+                                  await pb.collection('amarcap53_pacientes').update(paciente.id, { cito_laboratorio: valueToSave });
                                 } catch (err) {
                                   console.error('Erro ao atualizar data no PocketBase:', err);
                                 }
