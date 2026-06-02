@@ -158,7 +158,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 </button>
               </div>
               
-              <div className="bg-surface-container-lowest rounded-2xl overflow-hidden border border-outline-variant/30 shadow-[0_8px_30px_-4px_rgba(0,0,0,0.04)]">
+              <div className="bg-surface-container-lowest rounded-2xl overflow-x-auto border border-outline-variant/30 shadow-[0_8px_30px_-4px_rgba(0,0,0,0.04)] custom-scrollbar-horizontal">
                 <table className="w-full text-left border-collapse min-w-[600px] lg:min-w-full">
                   <thead>
                     <tr className="bg-surface-container-low/50">

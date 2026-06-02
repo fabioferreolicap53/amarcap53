@@ -69,6 +69,26 @@ body {
   scrollbar-width: none;
 }
 
+/* Custom Horizontal Scrollbar */
+.custom-scrollbar-horizontal::-webkit-scrollbar {
+  height: 6px;
+}
+.custom-scrollbar-horizontal::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+}
+.custom-scrollbar-horizontal::-webkit-scrollbar-thumb {
+  background: rgba(5, 25, 52, 0.15);
+  border-radius: 4px;
+}
+.custom-scrollbar-horizontal::-webkit-scrollbar-thumb:hover {
+  background: rgba(5, 25, 52, 0.3);
+}
+.custom-scrollbar-horizontal {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(5, 25, 52, 0.15) rgba(0, 0, 0, 0.02);
+}
+
 /* Mobile e Tablet Responsividade */
 @media (max-width: 1024px) {
   .sidebar-mobile-hidden {

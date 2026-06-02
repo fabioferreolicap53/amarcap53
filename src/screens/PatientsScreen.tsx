@@ -20,6 +20,7 @@ interface Paciente {
   cito_laboratorio?: string; // Data (Novo campo)
   alertas_rastreamento?: string;
   alertas?: string; 
+  total_acompanhamentos?: number;
 }
 
 interface PatientsScreenProps {
@@ -173,7 +174,7 @@ export const DatePickerPTBR: React.FC<{ value: string; onChange: (val: string) =
 
 const ALERT_CONFIGS: Record<string, { label: string; icon: any; color: string; bg: string; description: string }> = {
   'PEP_MOLECULAR': {
-    label: 'IDENTIFICADO REGISTRO DE RESULTADO NO PEP DE TESTE MOLECULAR.',
+    label: 'IDENTIFICADO REGISTRO DE RESULTADO NO PEP DE TESTE MOLECULAR',
     icon: TestTube,
     color: 'text-white',
     bg: 'bg-blue-600 border-blue-700 shadow-md shadow-blue-600/20',
@@ -194,14 +195,14 @@ const ALERT_CONFIGS: Record<string, { label: string; icon: any; color: string; b
     description: 'Identificado registro de resultado no PEP de cito.'
   },
   'COLETA_CITO': {
-    label: 'IDENTIFICADO COLETA/ RESULTADO DE CITO.',
+    label: 'IDENTIFICADO COLETA/ RESULTADO DE CITO',
     icon: Microscope,
     color: 'text-white',
     bg: 'bg-yellow-500 border-yellow-600 shadow-md shadow-yellow-500/20',
     description: 'Identificado coleta/resultado de cito.'
   },
   'NAO_IDENTIFICADO': {
-    label: 'NÃO IDENTIFICADO COLETA OU RESULTADO DE EXAME DE RASTREAMENTO.',
+    label: 'NÃO IDENTIFICADO COLETA OU RESULTADO DE EXAME DE RASTREAMENTO',
     icon: SearchX,
     color: 'text-white',
     bg: 'bg-red-600 border-red-700 shadow-md shadow-red-600/20',
@@ -318,17 +319,21 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     // Ordem de prioridade baseada na eficiência da identificação
     if (p.alertas_rastreamento?.toUpperCase().includes('URGENTE')) return 'URGENTE';
     
-    // 1. RESULTADO DNA-HPV NO PRONTUÁRIO (dna_hpv)
-    if (p.dna_hpv && p.dna_hpv !== '--' && p.dna_hpv !== '') return 'PEP_MOLECULAR';
+    // 1. RESULTADO DE DNA- HPV REGISTRADO EM PRONTUÁRIO (DATA DO REGISTRO) -> Azul
+    // Campo interativo: cito_laboratorio
+    if (p.cito_laboratorio && p.cito_laboratorio !== '--' && p.cito_laboratorio !== '') return 'PEP_MOLECULAR';
     
-    // 2. TESTE MOLECULAR DNA-HPV (cito_pep)
-    if (p.cito_pep && p.cito_pep !== '--' && p.cito_pep !== '') return 'COLETA_MOLECULAR';
+    // 2. TESTE MOLECULAR DNA-HPV (DATA DA SOLICITAÇÃO) -> Laranja
+    // Campo fixo: dna_hpv
+    if (p.dna_hpv && p.dna_hpv !== '--' && p.dna_hpv !== '') return 'COLETA_MOLECULAR';
     
-    // 3. RESULTADO DE CITO NO PEP (cito_lab)
-    if (p.cito_lab && p.cito_lab !== '--' && p.cito_lab !== '') return 'PEP_CITO';
+    // 3. RESULTADO DE CITO REGISTRADO NO PEP (DATA DA COLETA) -> Verde
+    // Campo fixo: cito_pep
+    if (p.cito_pep && p.cito_pep !== '--' && p.cito_pep !== '') return 'PEP_CITO';
     
-    // 4. RESULTADO DE CITO LABORATÓRIO (cito_laboratorio)
-    if (p.cito_laboratorio && p.cito_laboratorio !== '--' && p.cito_laboratorio !== '') return 'COLETA_CITO';
+    // 4. RESULTADO DE CITO LABORATÓRIO (DATA DO CADASTRO) -> Amarelo
+    // Campo fixo: cito_lab
+    if (p.cito_lab && p.cito_lab !== '--' && p.cito_lab !== '') return 'COLETA_CITO';
     
     return 'NAO_IDENTIFICADO';
   };
@@ -345,7 +350,19 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         
         const resultList = await pb.collection('amarcap53_pacientes').getList(currentPage, pageSize, options);
         
+        // Busca contagem de acompanhamentos para os pacientes da página
+        const counts = await Promise.all(
+          resultList.items.map(async (record) => {
+            const result = await pb.collection('amarcap53_acompanhamentos').getList(1, 1, {
+              filter: `paciente = "${record.id}"`,
+              fields: 'id'
+            });
+            return { id: record.id, total: result.totalItems };
+          })
+        );
+
         const pacientesFormatados = resultList.items.map(record => {
+          const count = counts.find(c => c.id === record.id)?.total || 0;
           const p: Paciente = {
             id: record.id,
             unidade: record.unidade || '--',
@@ -361,6 +378,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             dna_hpv: record.dna_hpv || '--',
             cito_laboratorio: formatarData(record.cito_laboratorio) || '--',
             alertas_rastreamento: record.alertas_rastreamento || '--',
+            total_acompanhamentos: count,
           };
           
           // Sobrescreve o alerta com a lógica dinâmica (mantendo compatibilidade)
@@ -448,39 +466,38 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           </div>
 
           <div className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-[0px_20px_50px_rgba(0,0,0,0.06)] border border-outline-variant/15">
-            <div className="w-full overflow-x-auto no-scrollbar">
+            <div className="w-full overflow-x-auto custom-scrollbar-horizontal">
               <table className="w-full text-center border-collapse">
                 <thead>
                   <tr className="bg-[#001b3d] border-b border-white/10">
                     <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[100px]">VER DETALHES</th>
                     <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[160px]">
-                      RESULTADO DE CITO LABORATÓRIO<br/>
-                      <span className="text-[8px] font-bold text-white/60 normal-case tracking-normal">(DATA DO CADASTRO)</span>
+                      RESULTADO DE DNA- HPV REGISTRADO EM PRONTUÁRIO<br/>
+                      <span className="text-[8px] font-bold text-white/60 normal-case tracking-normal">(DATA DO REGISTRO)</span>
                     </th>
                     <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center sticky left-0 z-20 bg-[#001b3d] w-[120px]">AÇÃO</th>
                     <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[140px]">STATUS</th>
-                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[180px]">UNIDADE/EQUIPE</th>
+                    {isAdmin && <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[180px]">UNIDADE/EQUIPE</th>}
                     <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[200px]">PACIENTE</th>
-                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[60px]">IDADE</th>
-                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[100px]">GRUPO</th>
+                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[100px]">IDADE / GRUPO</th>
                     <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[200px]">
-                      RESULTADO DE CITO NO PEP<br/>
+                      RESULTADO DE CITO LABORATÓRIO<br/>
+                      <span className="text-[8px] font-bold text-white/60 normal-case tracking-normal">(DATA DO CADASTRO)</span>
+                    </th>
+                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[200px]">
+                      RESULTADO DE CITO REGISTRADO NO PEP<br/>
                       <span className="text-[8px] font-bold text-white/60 normal-case tracking-normal">(DATA DA COLETA)</span>
                     </th>
                     <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[200px]">
                       TESTE MOLECULAR DNA-HPV<br/>
                       <span className="text-[8px] font-bold text-white/60 normal-case tracking-normal">(DATA DA SOLICITAÇÃO)</span>
                     </th>
-                    <th className="px-4 py-5 text-[10px] font-black uppercase tracking-wider text-white text-center w-[200px]">
-                      RESULTADO DNA-HPV NO PRONTUÁRIO<br/>
-                      <span className="text-[8px] font-bold text-white/60 normal-case tracking-normal">(DATA DO REGISTRO)</span>
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={10} className="px-6 py-20 text-center text-on-surface-variant text-base font-medium italic">
+                      <td colSpan={isAdmin ? 11 : 10} className="px-6 py-20 text-center text-on-surface-variant text-base font-medium italic">
                         <div className="flex flex-col items-center gap-4">
                           <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
                           <span className="text-xs font-black uppercase tracking-widest text-primary/40 mt-2">Sincronizando pacientes...</span>
@@ -489,7 +506,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     </tr>
                   ) : pacientes.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="px-6 py-20 text-center">
+                      <td colSpan={isAdmin ? 11 : 10} className="px-6 py-20 text-center">
                         <div className="flex flex-col items-center opacity-30">
                           <SearchX className="w-16 h-16 mb-4" />
                           <p className="text-sm font-black uppercase tracking-widest">Nenhum registro encontrado</p>
@@ -536,13 +553,18 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         </td>
 
                         <td className="px-6 py-6 text-center sticky left-0 z-10 bg-surface-container-lowest group-hover:bg-slate-50/80 transition-colors shadow-[4px_0_12px_rgba(0,0,0,0.04)]">
-                          <div className="flex items-center justify-center">
+                          <div className="flex items-center justify-center relative">
                             <button 
                               onClick={() => handleOpenModal(paciente)}
                               className="h-9 px-4 bg-[#001b3d] hover:bg-[#002b5c] text-white rounded-xl text-[9px] font-black uppercase tracking-[0.12em] shadow-md shadow-blue-900/15 transition-all duration-300 active:scale-95 flex items-center gap-1.5 border border-white/10 hover:shadow-lg hover:shadow-blue-900/20 hover:-translate-y-0.5"
                             >
                               <ClipboardList className="w-3.5 h-3.5 text-blue-300" />
                               <span>Acomp.</span>
+                              {paciente.total_acompanhamentos !== undefined && paciente.total_acompanhamentos > 0 && (
+                                <span className="absolute -top-2 -right-2 min-w-[18px] h-4.5 px-1.5 flex items-center justify-center bg-blue-500 text-white text-[9px] font-black rounded-full border-2 border-white shadow-sm animate-in zoom-in duration-300">
+                                  {paciente.total_acompanhamentos}
+                                </span>
+                              )}
                             </button>
                           </div>
                         </td>
@@ -563,19 +585,21 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           )}
                         </td>
 
-                        <td className="px-4 py-6 text-center">
-                          <div className="flex flex-col items-center gap-1">
-                            <p className="text-[10px] font-black text-primary uppercase leading-tight break-words" title={paciente.unidade}>
-                              {paciente.unidade}
-                            </p>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
-                              {paciente.equipe}
-                            </p>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
-                              MA: {paciente.microarea}
-                            </p>
-                          </div>
-                        </td>
+                        {isAdmin && (
+                          <td className="px-4 py-6 text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <p className="text-[10px] font-black text-primary uppercase leading-tight break-words" title={paciente.unidade}>
+                                {paciente.unidade}
+                              </p>
+                              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
+                                {paciente.equipe}
+                              </p>
+                              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
+                                MA: {paciente.microarea}
+                              </p>
+                            </div>
+                          </td>
+                        )}
 
                         <td className="px-4 py-6 text-center">
                           <div className="flex flex-col items-center gap-1">
@@ -592,29 +616,28 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         </td>
                         
                         <td className="px-4 py-6 text-center">
-                          <p className="text-[13px] font-black text-[#001b3d] leading-none">{paciente.idade}</p>
+                          <div className="flex flex-col items-center gap-1">
+                            <p className="text-[13px] font-black text-[#001b3d] leading-none">{paciente.idade}</p>
+                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${paciente.grupo !== '--' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'text-slate-300 italic'}`}>
+                              {paciente.grupo}
+                            </span>
+                          </div>
                         </td>
 
                         <td className="px-4 py-6 text-center">
-                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${paciente.grupo !== '--' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'text-slate-300 italic'}`}>
-                            {paciente.grupo}
-                          </span>
-                        </td>
-
-                        <td className="px-4 py-6 text-center">
-                          <span className={`inline-block px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight shadow-sm ${paciente.cito_lab !== '--' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'text-slate-300 italic'}`}>
+                          <span className={`inline-block px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight shadow-sm ${paciente.cito_lab !== '--' ? 'bg-yellow-50 text-yellow-700 border border-yellow-100' : 'text-slate-300 italic'}`}>
                             {formatarData(paciente.cito_lab)}
                           </span>
                         </td>
 
                         <td className="px-4 py-6 text-center">
-                          <span className={`inline-block px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight shadow-sm ${paciente.cito_pep !== '--' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'text-slate-300 italic'}`}>
+                          <span className={`inline-block px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight shadow-sm ${paciente.cito_pep !== '--' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'text-slate-300 italic'}`}>
                             {formatarData(paciente.cito_pep)}
                           </span>
                         </td>
 
                         <td className="px-4 py-6 text-center">
-                          <span className={`inline-block px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight shadow-sm ${paciente.dna_hpv !== '--' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'text-slate-300 italic'}`}>
+                          <span className={`inline-block px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight shadow-sm ${paciente.dna_hpv !== '--' ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'text-slate-300 italic'}`}>
                             {formatarData(paciente.dna_hpv)}
                           </span>
                         </td>
