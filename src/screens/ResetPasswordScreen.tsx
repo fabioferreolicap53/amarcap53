@@ -14,14 +14,20 @@ export function ResetPasswordScreen() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    // Captura o token da URL
+    // Captura o token da URL (hash ou query)
     const searchParams = new URLSearchParams(window.location.search);
-    const tokenParam = searchParams.get('token');
+    let tokenParam = searchParams.get('token');
     
+    // Fallback para tokens em hash
+    if (!tokenParam && window.location.hash.includes('token=')) {
+      const hashParams = new URLSearchParams(window.location.hash.split('?')[1]);
+      tokenParam = hashParams.get('token');
+    }
+
     if (tokenParam) {
       setToken(tokenParam);
     } else {
-      setError('Token de recuperação inválido ou ausente. Por favor, solicite um novo link.');
+      setError('Token de redefinição inválido ou ausente.');
     }
   }, []);
 
