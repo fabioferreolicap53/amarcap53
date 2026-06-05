@@ -1,36 +1,7 @@
 import React, { useState } from 'react';
 import { pb } from '../lib/pocketbase';
 import { Activity, Mail, Lock, Building, Users, MapPin, ArrowRight, ArrowLeft, Eye, EyeOff } from 'lucide-react';
-
-const UNIDADES_EQUIPES: Record<string, string[]> = {
-  "CF ALICE DE JESUS REGO": ["BAIXADINHA", "JESUÍTAS", "MERCADANTE", "NOVO CONDOMÍNIO"],
-  "CF DEOLINDO COUTO": ["BONS AMIGOS", "DR. CONTINENTINO", "JAQUEIRA", "MARQUES DE ERVAL", "PEDRINHAS"],
-  "CF EDSON ABDALLA SAAD": ["CENTRO CULTURAL", "MARCOLINA", "ESPERANÇA", "PALESTINA", "PRAÇA DO MAIA", "VETERANO"],
-  "CF ERNANI DE PAIVA FERREIRA BRAGA": ["GUANDU E GUANDU", "GUANDU E LIBERDADE", "HORTO FLORESTAL", "JOÃO XXIII", "MIÉCIMO", "PADRE GUILHERME DECAMINADA", "SERAFIM VIEGAS", "VILLAGE ATLANTA"],
-  "CF HELANDE DE MELLO GONÇALVES": ["JÚLIA MIGUEL", "PARQUE SÃO PAULO", "VIEIRAS"],
-  "CF ILZO MOTTA DE MELLO": ["MARIA APARECIDA", "ROBERTO MORENA", "TRÊS PONTES"],
-  "CF JAMIL HADDAD": ["AGAI", "ANDORINHAS", "AUSTIN", "COLINA", "IPEG"],
-  "CF JOÃO BATISTA CHAGAS": ["ÁGUAS DA PRATA", "FUTURO", "NOVA ESPERANÇA", "OLINDINA", "VENDA DE VARANDA"],
-  "CF JOSÉ ANTÔNIO CIRAUDO": ["MANOEL JÚLIO", "COQUEIRAL (C)", "AURORA", "SÃO DOMINGOS SÁVIO", "VITOR DUMAS", "SÃO BENEDITO", "AREIA BRANCA"],
-  "CF LENICE MARIA MONTEIRO COELHO": ["BOA ESPERANÇA", "LOTE 14", "PARQUE DAS PEDRAS", "SAQUASSU"],
-  "CF LOURENÇO DE MELLO": ["ALZIRA GENI", "ALZIRA MARTINHO", "BAIRRO FARIAS"],
-  "CF SAMUEL PENHA VALLE": ["ALTA", "TORRE", "VAGÃO"],
-  "CF SÉRGIO AROUCA": ["BOA VISTA", "BODEGÃO", "CAMPEIRO MOR", "GENERAL OLÍMPIO", "IMPÉRIO", "JARDIM ITÁ"],
-  "CF VALÉRIA GOMES ESTEVES": ["PIAI", "PEDRO LEITÃO", "BARREIRA", "EUCALIPAL", "BALNEÁRIO GLOBO"],
-  "CF WALDEMAR BERARDINELLI": ["AMAZONAS", "AREAL", "COQUEIRAL (W)", "ILHA DO TATU", "IPIRANGA", "MIRANTE", "TRÊS PODERES", "TRIUNFO"],
-  "CMS ADELINO SIMÕES": ["DIAMANTE", "ESMERALDA", "RUBI", "SAFIRA", "TOPÁZIO"],
-  "CMS ALOYSIO AMÂNCIO DA SILVA": ["MORRO DO AR"],
-  "CMS CATTAPRETA": ["ALVORADA", "CHATUBA", "CONJUNTO 61"],
-  "CMS CESÁRIO DE MELO": ["CARVALHAU", "FELIPE CARDOSO", "MARQUES", "BLASO", "CURRAL FALSO", "TASSO", "VERIDIANA"],
-  "CMS CYRO DE MELLO": ["JOÃO DE BARRO", "NOVA ÍNDIA", "PARAÍSO"],
-  "CMS DÉCIO AMARAL FILHO": ["BARRO VERMELHO", "MAESTRO OLÍMPIO", "URUCÂNIA", "BAMBUZAL", "VALE DOS PALMARES"],
-  "CMS EMYDIO CABRAL": ["1º DE ABRIL", "DR. HÉLIO RIBEIRO", "GOUVEIA", "MONTE DAS OLIVEIRAS", "MONTE SINAI"],
-  "CMS FLORIPES GALDINO PEREIRA": ["SAGRADO CORAÇÃO", "NOVO HORIZONTE"],
-  "CMS MARIA APARECIDA DE ALMEIDA": ["CESARINHO"],
-  "CMS SÁVIO ANTUNES": ["CAMPO DOS BANDEIRANTES", "PONTE AMARELA", "SEMPRE VIDA"]
-};
-
-const MICROAREAS = ["01", "02", "03", "04", "05", "06"];
+import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 
 type AuthState = 'login' | 'register' | 'forgot_password';
 
@@ -131,6 +102,10 @@ export function AuthScreen() {
       };
 
       await pb.collection('amarcap53_users').create(data);
+      
+      // Solicita a verificação de e-mail imediatamente após a criação
+      await pb.collection('amarcap53_users').requestVerification(email);
+
       // Após criar, faz o login automaticamente
       await pb.collection('amarcap53_users').authWithPassword(email, password);
     } catch (err: any) {

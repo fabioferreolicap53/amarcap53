@@ -4,6 +4,7 @@ import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, Messa
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { DatePickerPTBR } from './PatientsScreen';
+import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 
 interface Paciente {
   id: string;
@@ -166,6 +167,9 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
   const [filterEntraves, setFilterEntraves] = useState('ALL');
   const [filterDataInicio, setFilterDataInicio] = useState('');
   const [filterDataFim, setFilterDataFim] = useState('');
+  const [filterUnidade, setFilterUnidade] = useState('');
+  const [filterEquipe, setFilterEquipe] = useState('');
+  const [filterMicroarea, setFilterMicroarea] = useState('');
 
   const [availableGroups, setAvailableGroups] = useState<string[]>([]);
 
@@ -333,6 +337,9 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     setFilterEntraves('ALL');
     setFilterDataInicio('');
     setFilterDataFim('');
+    setFilterUnidade('');
+    setFilterEquipe('');
+    setFilterMicroarea('');
   };
 
   const filteredPacientes = pacientes.filter(p => {
@@ -340,6 +347,11 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     const matchesStatus = filterStatus === 'ALL' || p.alertas === filterStatus;
     const matchesGrupo = filterGrupo === 'ALL' || p.grupo === filterGrupo;
     
+    // Regional filters
+    const matchesUnidade = !filterUnidade || p.unidade === filterUnidade;
+    const matchesEquipe = !filterEquipe || p.equipe === filterEquipe;
+    const matchesMicroarea = !filterMicroarea || String(p.microarea) === filterMicroarea;
+
     // Filtros de acompanhamento (baseados no último registro)
     const matchesTipoBusca = filterTipoBusca === 'ALL' || p.lastAcomp?.tipo_busca === filterTipoBusca;
     const matchesTipoContato = filterTipoContato === 'ALL' || p.lastAcomp?.tipo_contato === filterTipoContato;
@@ -368,7 +380,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       }
     }
     
-    return matchesSearch && matchesStatus && matchesGrupo && matchesTipoBusca && matchesTipoContato && matchesSituacao && matchesEntraves && matchesData;
+    return matchesSearch && matchesStatus && matchesGrupo && matchesTipoBusca && matchesTipoContato && matchesSituacao && matchesEntraves && matchesData && matchesUnidade && matchesEquipe && matchesMicroarea;
   });
 
   return (
@@ -493,6 +505,71 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                       ))}
                     </select>
                   </div>
+
+                  {/* Filtros Regionais Condicionais */}
+                  {(isAdmin || user?.role === 'cap') && (
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                        <Building className="w-3.5 h-3.5" />
+                        Unidade
+                      </label>
+                      <select 
+                        value={filterUnidade}
+                        onChange={(e) => {
+                          setFilterUnidade(e.target.value);
+                          setFilterEquipe('');
+                          setFilterMicroarea('');
+                        }}
+                        className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
+                      >
+                        <option value="">Todas</option>
+                        {Object.keys(UNIDADES_EQUIPES).map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                    </div>
+                  )}
+
+                  {(isAdmin || user?.role === 'cap' || user?.role === 'unidade') && (
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                        <Users className="w-3.5 h-3.5" />
+                        Equipe
+                      </label>
+                      <select 
+                        value={filterEquipe}
+                        onChange={(e) => {
+                          setFilterEquipe(e.target.value);
+                          setFilterMicroarea('');
+                        }}
+                        disabled={!filterUnidade && (isAdmin || user?.role === 'cap')}
+                        className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer disabled:opacity-30"
+                      >
+                        <option value="">Todas</option>
+                        {filterUnidade ? UNIDADES_EQUIPES[filterUnidade]?.map(eq => (
+                          <option key={eq} value={eq}>{eq}</option>
+                        )) : user?.role === 'unidade' ? UNIDADES_EQUIPES[user.unidade_saude]?.map(eq => (
+                          <option key={eq} value={eq}>{eq}</option>
+                        )) : null}
+                      </select>
+                    </div>
+                  )}
+
+                  {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe') && (
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                        <MapPin className="w-3.5 h-3.5" />
+                        Microárea
+                      </label>
+                      <select 
+                        value={filterMicroarea}
+                        onChange={(e) => setFilterMicroarea(e.target.value)}
+                        disabled={!filterEquipe && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
+                        className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer disabled:opacity-30"
+                      >
+                        <option value="">Todas</option>
+                        {MICROAREAS.map(ma => <option key={ma} value={ma}>{ma}</option>)}
+                      </select>
+                    </div>
+                  )}
 
                   {/* Filtro de Grupo */}
                   <div className="space-y-3">

@@ -3,6 +3,7 @@ import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRi
 import { Header } from '../components/Header';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
+import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 
 interface DashboardScreenProps {
   activeTab: string;
@@ -26,6 +27,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
   const [filterDataInicio, setFilterDataInicio] = useState('');
   const [filterDataFim, setFilterDataFim] = useState('');
+  const [filterUnidade, setFilterUnidade] = useState('');
+  const [filterEquipe, setFilterEquipe] = useState('');
+  const [filterMicroarea, setFilterMicroarea] = useState('');
   const [isFilterVisible, setIsFilterVisible] = useState(false);
 
   const [acompStats, setAcompStats] = useState({
@@ -34,7 +38,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     contatos: 0,
     tipoBusca: {} as Record<string, number>,
     situacao: {} as Record<string, number>,
-    entraves: {} as Record<string, number>
+    entraves: {} as Record<string, number>,
+    unidadeBreakdown: {} as Record<string, number>,
+    equipeBreakdown: {} as Record<string, number>,
+    microareaBreakdown: {} as Record<string, number>
   });
 
   const formatEnumLabel = (value?: string) => value || '';
@@ -70,15 +77,29 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
       if (!user) return;
       try {
         const patientFilterParts: string[] = [];
+        
+        // Base filters from user role
         if (!isAdmin) {
-          if (user.unidade_saude) patientFilterParts.push(`unidade = "${user.unidade_saude}"`);
-          if (user.equipe) patientFilterParts.push(`equipe = "${user.equipe}"`);
-          if (user.microarea) patientFilterParts.push(`microarea ~ "${user.microarea}"`);
+          if (user.role === 'unidade') {
+            patientFilterParts.push(`unidade = "${user.unidade_saude}"`);
+          } else if (user.role === 'equipe') {
+            patientFilterParts.push(`unidade = "${user.unidade_saude}"`);
+            patientFilterParts.push(`equipe = "${user.equipe}"`);
+          } else if (user.role === 'microarea') {
+            patientFilterParts.push(`unidade = "${user.unidade_saude}"`);
+            patientFilterParts.push(`equipe = "${user.equipe}"`);
+            patientFilterParts.push(`microarea ~ "${user.microarea}"`);
+          }
         }
+
+        // Applied UI filters
+        if (filterUnidade) patientFilterParts.push(`unidade = "${filterUnidade}"`);
+        if (filterEquipe) patientFilterParts.push(`equipe = "${filterEquipe}"`);
+        if (filterMicroarea) patientFilterParts.push(`microarea ~ "${filterMicroarea}"`);
 
         // Fetch Pacientes
         const records = await pb.collection('amarcap53_pacientes').getFullList({
-          filter: isAdmin ? '' : patientFilterParts.join(' && '),
+          filter: patientFilterParts.join(' && '),
           sort: '-created',
           requestKey: null
         });
@@ -86,6 +107,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         // Breakdown de Alertas e Grupos
         const alerts: Record<string, number> = {};
         const groups: Record<string, number> = {};
+        const unidadeBreakdown: Record<string, number> = {};
+        const equipeBreakdown: Record<string, number> = {};
+        const microareaBreakdown: Record<string, number> = {};
+        
         const lastSixMonths = getLastSixMonths();
         const examTrendMap = Object.fromEntries(lastSixMonths.map(month => [month.key, { cito: 0, hpv: 0 }])) as Record<string, { cito: number; hpv: number }>;
         let currentCito = 0;
@@ -100,6 +125,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           
           alerts[status] = (alerts[status] || 0) + 1;
           groups[p.grupo || 'NÃO INFORMADO'] = (groups[p.grupo || 'NÃO INFORMADO'] || 0) + 1;
+          
+          // Regional breakdowns
+          if (p.unidade) unidadeBreakdown[p.unidade] = (unidadeBreakdown[p.unidade] || 0) + 1;
+          if (p.equipe) equipeBreakdown[p.equipe] = (equipeBreakdown[p.equipe] || 0) + 1;
+          if (p.microarea) microareaBreakdown[p.microarea] = (microareaBreakdown[p.microarea] || 0) + 1;
 
           const citoDates = [toValidDate(p.cito_lab), toValidDate(p.cito_pep)].filter(Boolean) as Date[];
           const hpvDates = [toValidDate(p.dna_hpv), toValidDate(p.cito_laboratorio)].filter(Boolean) as Date[];
@@ -138,11 +168,26 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
         // Fetch Acompanhamentos
         const acompFilters = [];
+        
+        // Base filters from user role (mirroring patient filters)
         if (!isAdmin) {
-          if (user.unidade_saude) acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
-          if (user.equipe) acompFilters.push(`paciente.equipe = "${user.equipe}"`);
-          if (user.microarea) acompFilters.push(`paciente.microarea ~ "${user.microarea}"`);
+          if (user.role === 'unidade') {
+            acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
+          } else if (user.role === 'equipe') {
+            acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
+            acompFilters.push(`paciente.equipe = "${user.equipe}"`);
+          } else if (user.role === 'microarea') {
+            acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
+            acompFilters.push(`paciente.equipe = "${user.equipe}"`);
+            acompFilters.push(`paciente.microarea ~ "${user.microarea}"`);
+          }
         }
+
+        // Applied UI filters
+        if (filterUnidade) acompFilters.push(`paciente.unidade = "${filterUnidade}"`);
+        if (filterEquipe) acompFilters.push(`paciente.equipe = "${filterEquipe}"`);
+        if (filterMicroarea) acompFilters.push(`paciente.microarea ~ "${filterMicroarea}"`);
+
         if (filterDataInicio) {
           acompFilters.push(`data_busca >= "${filterDataInicio} 00:00:00"`);
         }
@@ -162,7 +207,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           contatos: acompRecords.filter(r => r.tipo_contato && !r.tipo_contato.includes('Não houve contato')).length,
           tipoBusca: {} as Record<string, number>,
           situacao: {} as Record<string, number>,
-          entraves: {} as Record<string, number>
+          entraves: {} as Record<string, number>,
+          unidadeBreakdown,
+          equipeBreakdown,
+          microareaBreakdown
         };
 
         const acompTrendMap = Object.fromEntries(lastSixMonths.map(month => [month.key, 0])) as Record<string, number>;
@@ -205,7 +253,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     };
 
     fetchStats();
-  }, [user, isAdmin, filterDataInicio, filterDataFim]);
+  }, [user, isAdmin, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea]);
 
   const ColumnChart: React.FC<{ data: { label: string; value: number; color: string }[] }> = ({ data }) => {
     const max = Math.max(...data.map(d => d.value), 1);
@@ -332,19 +380,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               </div>
             </div>
 
-            {/* Seletor de Período Profissional */}
-            <div className="lg:w-[450px] bg-white p-8 rounded-[3.25rem] shadow-2xl border border-primary/5 relative overflow-hidden flex flex-col justify-center">
+            {/* Seletor de Período e Regional Profissional */}
+            <div className="lg:w-[600px] bg-white p-8 rounded-[3.25rem] shadow-2xl border border-primary/5 relative overflow-hidden flex flex-col justify-center">
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shadow-inner">
                   <Calendar className="w-7 h-7 text-primary" strokeWidth={2.5} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-primary uppercase tracking-tighter">Período de Análise</h3>
-                  <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Filtrar Acompanhamentos</p>
+                  <h3 className="text-lg font-black text-primary uppercase tracking-tighter">Filtros Avançados</h3>
+                  <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Análise Geográfica e Temporal</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 mb-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest ml-1">Início</label>
                   <input 
@@ -364,14 +412,77 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                   />
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {(isAdmin || user?.role === 'cap') && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest ml-1">Unidade</label>
+                    <select
+                      value={filterUnidade}
+                      onChange={(e) => {
+                        setFilterUnidade(e.target.value);
+                        setFilterEquipe('');
+                        setFilterMicroarea('');
+                      }}
+                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-xs font-bold text-on-surface outline-none focus:border-primary/20 transition-all cursor-pointer appearance-none"
+                    >
+                      <option value="">Todas</option>
+                      {Object.keys(UNIDADES_EQUIPES).map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {(isAdmin || user?.role === 'cap' || user?.role === 'unidade') && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest ml-1">Equipe</label>
+                    <select
+                      value={filterEquipe}
+                      onChange={(e) => {
+                        setFilterEquipe(e.target.value);
+                        setFilterMicroarea('');
+                      }}
+                      disabled={!filterUnidade && (isAdmin || user?.role === 'cap')}
+                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-xs font-bold text-on-surface outline-none focus:border-primary/20 transition-all cursor-pointer appearance-none disabled:opacity-30"
+                    >
+                      <option value="">Todas</option>
+                      {filterUnidade ? UNIDADES_EQUIPES[filterUnidade]?.map(eq => (
+                        <option key={eq} value={eq}>{eq}</option>
+                      )) : user?.role === 'unidade' ? UNIDADES_EQUIPES[user.unidade_saude]?.map(eq => (
+                        <option key={eq} value={eq}>{eq}</option>
+                      )) : null}
+                    </select>
+                  </div>
+                )}
+
+                {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe') && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest ml-1">Microárea</label>
+                    <select
+                      value={filterMicroarea}
+                      onChange={(e) => setFilterMicroarea(e.target.value)}
+                      disabled={!filterEquipe && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
+                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-xs font-bold text-on-surface outline-none focus:border-primary/20 transition-all cursor-pointer appearance-none disabled:opacity-30"
+                    >
+                      <option value="">Todas</option>
+                      {MICROAREAS.map(ma => <option key={ma} value={ma}>{ma}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
               
-              {(filterDataInicio || filterDataFim) && (
+              {(filterDataInicio || filterDataFim || filterUnidade || filterEquipe || filterMicroarea) && (
                 <button 
-                  onClick={() => { setFilterDataInicio(''); setFilterDataFim(''); }}
-                  className="mt-4 text-[10px] font-black text-rose-600 uppercase tracking-widest hover:text-rose-700 transition-colors flex items-center gap-2 justify-center py-2 bg-rose-50 rounded-xl border border-rose-100"
+                  onClick={() => { 
+                    setFilterDataInicio(''); 
+                    setFilterDataFim('');
+                    setFilterUnidade('');
+                    setFilterEquipe('');
+                    setFilterMicroarea('');
+                  }}
+                  className="mt-6 text-[10px] font-black text-rose-600 uppercase tracking-widest hover:text-rose-700 transition-colors flex items-center gap-2 justify-center py-3 bg-rose-50 rounded-2xl border border-rose-100 shadow-sm"
                 >
                   <AlertTriangle className="w-3.5 h-3.5" />
-                  Limpar Período
+                  Limpar Todos os Filtros
                 </button>
               )}
             </div>
@@ -431,6 +542,78 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           {/* Nova Seção de Levantamentos Estatísticos Criativos */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-10">
             
+            {/* Gráfico Geográfico Condicional */}
+            {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe') && (
+              <div className="bg-white p-9 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden lg:col-span-2">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-primary/5 rounded-full blur-3xl" />
+                <div className="flex items-center justify-between mb-10 relative z-10">
+                  <div>
+                    <h3 className="text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight flex items-center gap-4">
+                      <MapPin className="w-7 h-7 text-primary" />
+                      Análise Regional
+                    </h3>
+                    <p className="text-sm font-bold text-on-surface-variant/45 uppercase tracking-widest mt-2">Distribuição por Unidade, Equipe ou Microárea</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-10 relative z-10">
+                  {(isAdmin || user?.role === 'cap') && (
+                    <div className="space-y-6">
+                      <p className="text-xs font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-2">Top Unidades</p>
+                      {Object.entries(acompStats.unidadeBreakdown)
+                        .sort(([, a], [, b]) => b - a)
+                        .slice(0, 5)
+                        .map(([label, val]) => (
+                          <SimpleProgressBar 
+                            key={label}
+                            label={label} 
+                            value={val} 
+                            total={stats.totalPacientes} 
+                            color="bg-primary" 
+                          />
+                        ))}
+                    </div>
+                  )}
+
+                  {(isAdmin || user?.role === 'cap' || user?.role === 'unidade') && (
+                    <div className="space-y-6">
+                      <p className="text-xs font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-2">Top Equipes</p>
+                      {Object.entries(acompStats.equipeBreakdown)
+                        .sort(([, a], [, b]) => b - a)
+                        .slice(0, 5)
+                        .map(([label, val]) => (
+                          <SimpleProgressBar 
+                            key={label}
+                            label={label} 
+                            value={val} 
+                            total={stats.totalPacientes} 
+                            color="bg-blue-600" 
+                          />
+                        ))}
+                    </div>
+                  )}
+
+                  {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe') && (
+                    <div className="space-y-6">
+                      <p className="text-xs font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-2">Top Microáreas</p>
+                      {Object.entries(acompStats.microareaBreakdown)
+                        .sort(([, a], [, b]) => b - a)
+                        .slice(0, 5)
+                        .map(([label, val]) => (
+                          <SimpleProgressBar 
+                            key={label}
+                            label={label} 
+                            value={val} 
+                            total={stats.totalPacientes} 
+                            color="bg-emerald-600" 
+                          />
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Gráfico de Grupos de Idade */}
             <div className="bg-white p-9 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-40 h-40 bg-primary/5 rounded-full blur-3xl" />

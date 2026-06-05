@@ -4,6 +4,7 @@ import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText
 import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
 import { DatePickerPTBR } from './PatientsScreen';
+import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 
 interface Acompanhamento {
   id: string;
@@ -51,6 +52,9 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const [filterEntraves, setFilterEntraves] = useState('ALL');
   const [filterDataInicio, setFilterDataInicio] = useState('');
   const [filterDataFim, setFilterDataFim] = useState('');
+  const [filterUnidade, setFilterUnidade] = useState('');
+  const [filterEquipe, setFilterEquipe] = useState('');
+  const [filterMicroarea, setFilterMicroarea] = useState('');
 
   const resetFilters = () => {
     setSearchTerm('');
@@ -60,6 +64,9 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     setFilterEntraves('ALL');
     setFilterDataInicio('');
     setFilterDataFim('');
+    setFilterUnidade('');
+    setFilterEquipe('');
+    setFilterMicroarea('');
   };
 
   const normalizeCanalLabel = (value?: string) => value || '';
@@ -128,10 +135,23 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
         const acompFilters = [];
         if (!isAdmin) {
-          if (user.unidade_saude) acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
-          if (user.equipe) acompFilters.push(`paciente.equipe = "${user.equipe}"`);
-          if (user.microarea) acompFilters.push(`paciente.microarea ~ "${user.microarea}"`);
+          if (user.role === 'unidade') {
+            acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
+          } else if (user.role === 'equipe') {
+            acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
+            acompFilters.push(`paciente.equipe = "${user.equipe}"`);
+          } else if (user.role === 'microarea') {
+            acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
+            acompFilters.push(`paciente.equipe = "${user.equipe}"`);
+            acompFilters.push(`paciente.microarea ~ "${user.microarea}"`);
+          }
         }
+
+        // Regional UI Filters
+        if (filterUnidade) acompFilters.push(`paciente.unidade = "${filterUnidade}"`);
+        if (filterEquipe) acompFilters.push(`paciente.equipe = "${filterEquipe}"`);
+        if (filterMicroarea) acompFilters.push(`paciente.microarea ~ "${filterMicroarea}"`);
+
         const filterString = acompFilters.join(' && ');
 
         // Expandimos o paciente para pegar o nome e cns
@@ -150,7 +170,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     };
 
     fetchAcompanhamentos();
-  }, [user]);
+  }, [user, filterUnidade, filterEquipe, filterMicroarea]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este registro?')) {
@@ -320,6 +340,71 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
             {isFilterVisible && (
               <div className="col-span-1 md:col-span-2 lg:col-span-4 bg-white p-8 rounded-[2rem] shadow-2xl border border-primary/5 animate-in slide-in-from-top-6 fade-in duration-500">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                  {/* Filtros Regionais Condicionais */}
+                  {(isAdmin || user?.role === 'cap') && (
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                        <Building className="w-3.5 h-3.5" />
+                        Unidade
+                      </label>
+                      <select 
+                        value={filterUnidade}
+                        onChange={(e) => {
+                          setFilterUnidade(e.target.value);
+                          setFilterEquipe('');
+                          setFilterMicroarea('');
+                        }}
+                        className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
+                      >
+                        <option value="">Todas</option>
+                        {Object.keys(UNIDADES_EQUIPES).map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                    </div>
+                  )}
+
+                  {(isAdmin || user?.role === 'cap' || user?.role === 'unidade') && (
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                        <Users className="w-3.5 h-3.5" />
+                        Equipe
+                      </label>
+                      <select 
+                        value={filterEquipe}
+                        onChange={(e) => {
+                          setFilterEquipe(e.target.value);
+                          setFilterMicroarea('');
+                        }}
+                        disabled={!filterUnidade && (isAdmin || user?.role === 'cap')}
+                        className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer disabled:opacity-30"
+                      >
+                        <option value="">Todas</option>
+                        {filterUnidade ? UNIDADES_EQUIPES[filterUnidade]?.map(eq => (
+                          <option key={eq} value={eq}>{eq}</option>
+                        )) : user?.role === 'unidade' ? UNIDADES_EQUIPES[user.unidade_saude]?.map(eq => (
+                          <option key={eq} value={eq}>{eq}</option>
+                        )) : null}
+                      </select>
+                    </div>
+                  )}
+
+                  {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe') && (
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                        <MapPin className="w-3.5 h-3.5" />
+                        Microárea
+                      </label>
+                      <select 
+                        value={filterMicroarea}
+                        onChange={(e) => setFilterMicroarea(e.target.value)}
+                        disabled={!filterEquipe && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
+                        className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer disabled:opacity-30"
+                      >
+                        <option value="">Todas</option>
+                        {MICROAREAS.map(ma => <option key={ma} value={ma}>{ma}</option>)}
+                      </select>
+                    </div>
+                  )}
+
                   {/* Período de Busca */}
                   <div className="lg:col-span-2 space-y-3">
                     <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">

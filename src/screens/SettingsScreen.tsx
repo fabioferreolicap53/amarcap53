@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Header } from '../components/Header';
-import { Edit2, ShieldCheck, MapPin, Moon, AlignJustify, Mail, AlertOctagon, Shield, Terminal, UploadCloud, CheckCircle, AlertTriangle, FileText, History, BarChart3, ChevronRight, Info, Trash2, Database, Activity, Loader2, Search, Users } from 'lucide-react';
+import { Edit2, User, Check, ShieldCheck, MapPin, Moon, AlignJustify, Mail, AlertOctagon, Shield, Terminal, UploadCloud, CheckCircle, AlertTriangle, FileText, History, BarChart3, ChevronRight, Info, Trash2, Database, Activity, Loader2, Search, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Papa from 'papaparse';
 import { pb } from '../lib/pocketbase';
@@ -35,32 +35,16 @@ interface SettingsScreenProps {
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setActiveTab }) => {
   const { user, isAdmin } = useAuth();
 
-  if (!isAdmin) {
-    return (
-      <div className="flex-1 flex flex-col min-h-screen bg-surface items-center justify-center p-8">
-        <div className="bg-white p-12 rounded-[2.5rem] shadow-2xl border border-error/10 text-center max-w-md">
-          <div className="w-20 h-20 bg-error/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <Shield className="w-10 h-10 text-error" />
-          </div>
-          <h2 className="text-2xl font-black text-primary uppercase tracking-tighter mb-4">Acesso Restrito</h2>
-          <p className="text-on-surface-variant font-medium mb-8">
-            Você não tem permissão para acessar as configurações do sistema. Entre em contato com o administrador.
-          </p>
-          <button 
-            onClick={() => setActiveTab('resumo')}
-            className="w-full py-4 bg-primary text-white font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-primary/20"
-          >
-            Voltar ao Início
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   const [isUploading, setIsUploading] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [userName, setUserName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
+  
+  // Email change states
+  const [newEmail, setNewEmail] = useState('');
+  const [isRequestingEmail, setIsRequestingEmail] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState(false);
+
   const [importHistory, setImportHistory] = useState<ImportLog[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>({ 
@@ -157,6 +141,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       alert('Erro ao atualizar nome. Tente novamente.');
     } finally {
       setIsSavingName(false);
+    }
+  };
+
+  const handleRequestEmailChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEmail || !user) return;
+    
+    setIsRequestingEmail(true);
+    try {
+      await pb.collection('amarcap53_users').requestEmailChange(newEmail);
+      setEmailSuccess(true);
+      setNewEmail('');
+      setTimeout(() => setEmailSuccess(false), 5000);
+    } catch (err: any) {
+      console.error('Erro ao solicitar troca de e-mail:', err);
+      alert('Erro ao solicitar troca de e-mail. Verifique se o novo e-mail já está em uso.');
+    } finally {
+      setIsRequestingEmail(false);
     }
   };
 
@@ -352,6 +354,90 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Lado Esquerdo: Dashboard de Gestão */}
             <div className="flex-1 space-y-8">
+
+              {/* Perfil do Usuário */}
+              <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-slate-200/60 relative overflow-hidden">
+                <div className="flex items-center gap-4 mb-10">
+                  <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
+                    <User className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800 tracking-tight uppercase">Meu Perfil</h3>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">Gerencie seus dados pessoais</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                  <div className="space-y-6">
+                    {/* Nome */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Nome Completo</label>
+                      <div className="flex gap-3">
+                        <div className="flex-1 relative">
+                          <input 
+                            type="text" 
+                            value={isEditingName ? userName : user?.name || 'Não informado'}
+                            onChange={(e) => setUserName(e.target.value)}
+                            disabled={!isEditingName}
+                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-blue-500/20 transition-all disabled:opacity-70"
+                          />
+                        </div>
+                        {!isEditingName ? (
+                          <button 
+                            onClick={() => { setUserName(user?.name || ''); setIsEditingName(true); }}
+                            className="p-4 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-2xl transition-all shadow-sm"
+                          >
+                            <Edit2 className="w-5 h-5" />
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={handleUpdateName}
+                            disabled={isSavingName}
+                            className="p-4 bg-emerald-500 text-white hover:bg-emerald-600 rounded-2xl transition-all shadow-lg shadow-emerald-200"
+                          >
+                            <Check className="w-5 h-5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Email Display */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">E-mail de Acesso</label>
+                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-400">
+                        {user?.email}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100">
+                    <form onSubmit={handleRequestEmailChange} className="space-y-4">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center mb-4">Solicitar troca de e-mail</p>
+                      <div className="flex flex-col gap-3">
+                        <input 
+                          type="email" 
+                          placeholder="Novo e-mail"
+                          value={newEmail}
+                          onChange={(e) => setNewEmail(e.target.value)}
+                          className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-blue-500/20 transition-all"
+                        />
+                        <button 
+                          type="submit"
+                          disabled={isRequestingEmail || !newEmail}
+                          className="w-full py-4 bg-blue-600 text-white font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-blue-200 text-xs disabled:opacity-30"
+                        >
+                          {isRequestingEmail ? 'Processando...' : 'Solicitar Alteração'}
+                        </button>
+                      </div>
+                      {emailSuccess && (
+                        <p className="text-[10px] font-bold text-emerald-600 uppercase text-center animate-pulse mt-2">
+                          Verifique sua caixa de entrada para confirmar!
+                        </p>
+                      )}
+                    </form>
+                  </div>
+                </div>
+              </div>
               
               {/* Card Premium: Gestão de Dados (Dashboard Style) */}
               <div className="bg-[#001b3d] rounded-[2.5rem] p-1 shadow-[0_20px_50px_rgba(0,27,61,0.3)] relative overflow-hidden group">
@@ -480,151 +566,162 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
             {/* Lado Direito: Upload e Histórico */}
             <div className="w-full lg:w-96 space-y-8">
-              
-              {/* Card de Ação: Upload */}
-              <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60">
-                <div className="mb-8">
-                  <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Novo Upload</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Atualize a base de pacientes</p>
-                </div>
+              {isAdmin ? (
+                <>
+                  {/* Card de Ação: Upload */}
+                  <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60">
+                    <div className="mb-8">
+                      <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Novo Upload</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Atualize a base de pacientes</p>
+                    </div>
 
-                <div className="relative">
-                  <AnimatePresence mode="wait">
-                    {isUploading ? (
+                    <div className="relative">
+                      <AnimatePresence mode="wait">
+                        {isUploading ? (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="w-full aspect-square bg-slate-50 rounded-[2rem] border-2 border-blue-100 p-6 flex flex-col items-center justify-center text-center space-y-6"
+                          >
+                            <div className="relative">
+                              <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 animate-bounce">
+                                <FileText className="w-8 h-8 text-white" />
+                              </div>
+                              <div className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-4 border-slate-50 flex items-center justify-center">
+                                <Loader2 className="w-3 h-3 text-white animate-spin" />
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2 w-full">
+                              <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">{uploadStatus.message}</p>
+                              <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase">
+                                <span>{uploadStatus.stage}</span>
+                                <span>{Math.round((uploadStatus.current / (uploadStatus.total || 1)) * 100)}%</span>
+                              </div>
+                              <div className="w-full h-2 bg-blue-100 rounded-full overflow-hidden">
+                                <motion.div 
+                                  className="h-full bg-blue-600"
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${(uploadStatus.current / (uploadStatus.total || 1)) * 100}%` }}
+                                />
+                              </div>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase">{uploadStatus.current} / {uploadStatus.total} Registros</p>
+                            </div>
+                          </motion.div>
+                        ) : (
+                          <motion.label 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="flex flex-col items-center justify-center w-full aspect-square border-2 border-slate-200 border-dashed rounded-[2rem] cursor-pointer bg-slate-50/50 hover:bg-white hover:border-blue-400 hover:shadow-xl hover:shadow-blue-500/5 transition-all relative group overflow-hidden"
+                          >
+                            <div className="flex flex-col items-center justify-center text-center px-6 relative z-10">
+                              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:bg-blue-600 transition-all duration-500">
+                                <UploadCloud className="w-8 h-8 text-blue-600 group-hover:text-white transition-colors" />
+                              </div>
+                              <p className="text-xs font-black text-slate-800 uppercase tracking-widest">Solte o CSV aqui</p>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase mt-2">ou clique para navegar</p>
+                            </div>
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              accept=".csv" 
+                              onChange={handleFileUpload}
+                              disabled={isUploading}
+                              ref={fileInputRef}
+                            />
+                          </motion.label>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {uploadStatus.stage === 'completed' && (
                       <motion.div 
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="w-full aspect-square bg-slate-50 rounded-[2rem] border-2 border-blue-100 p-6 flex flex-col items-center justify-center text-center space-y-6"
+                        className="mt-6 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3"
                       >
-                        <div className="relative">
-                          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 animate-bounce">
-                            <FileText className="w-8 h-8 text-white" />
-                          </div>
-                          <div className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-4 border-slate-50 flex items-center justify-center">
-                            <Loader2 className="w-3 h-3 text-white animate-spin" />
-                          </div>
+                        <div className="w-8 h-8 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-200">
+                          <CheckCircle className="w-4 h-4 text-white" />
                         </div>
-                        
-                        <div className="space-y-2 w-full">
-                          <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">{uploadStatus.message}</p>
-                          <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase">
-                            <span>{uploadStatus.stage}</span>
-                            <span>{Math.round((uploadStatus.current / (uploadStatus.total || 1)) * 100)}%</span>
-                          </div>
-                          <div className="w-full h-2 bg-blue-100 rounded-full overflow-hidden">
-                            <motion.div 
-                              className="h-full bg-blue-600"
-                              initial={{ width: 0 }}
-                              animate={{ width: `${(uploadStatus.current / (uploadStatus.total || 1)) * 100}%` }}
-                            />
-                          </div>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">{uploadStatus.current} / {uploadStatus.total} Registros</p>
-                        </div>
+                        <p className="text-[10px] font-black text-emerald-800 uppercase leading-tight">{uploadStatus.message}</p>
                       </motion.div>
-                    ) : (
-                      <motion.label 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="flex flex-col items-center justify-center w-full aspect-square border-2 border-slate-200 border-dashed rounded-[2rem] cursor-pointer bg-slate-50/50 hover:bg-white hover:border-blue-400 hover:shadow-xl hover:shadow-blue-500/5 transition-all relative group overflow-hidden"
-                      >
-                        <div className="flex flex-col items-center justify-center text-center px-6 relative z-10">
-                          <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:bg-blue-600 transition-all duration-500">
-                            <UploadCloud className="w-8 h-8 text-blue-600 group-hover:text-white transition-colors" />
-                          </div>
-                          <p className="text-xs font-black text-slate-800 uppercase tracking-widest">Solte o CSV aqui</p>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase mt-2">ou clique para navegar</p>
-                        </div>
-                        <input 
-                          type="file" 
-                          className="hidden" 
-                          accept=".csv" 
-                          onChange={handleFileUpload}
-                          disabled={isUploading}
-                          ref={fileInputRef}
-                        />
-                      </motion.label>
                     )}
-                  </AnimatePresence>
-                </div>
-
-                {uploadStatus.stage === 'completed' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-6 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3"
-                  >
-                    <div className="w-8 h-8 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-200">
-                      <CheckCircle className="w-4 h-4 text-white" />
-                    </div>
-                    <p className="text-[10px] font-black text-emerald-800 uppercase leading-tight">{uploadStatus.message}</p>
-                  </motion.div>
-                )}
-                
-                {uploadStatus.stage === 'error' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3"
-                  >
-                    <div className="w-8 h-8 bg-rose-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-rose-200">
-                      <AlertTriangle className="w-4 h-4 text-white" />
-                    </div>
-                    <p className="text-[10px] font-black text-rose-800 uppercase leading-tight">{uploadStatus.message}</p>
-                  </motion.div>
-                )}
-              </div>
-
-              {/* Histórico de Operações */}
-              <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60">
-                <div className="flex items-center justify-between mb-8">
-                  <div>
-                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Histórico</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Últimos sincronismos</p>
+                    
+                    {uploadStatus.stage === 'error' && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3"
+                      >
+                        <div className="w-8 h-8 bg-rose-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-rose-200">
+                          <AlertTriangle className="w-4 h-4 text-white" />
+                        </div>
+                        <p className="text-[10px] font-black text-rose-800 uppercase leading-tight">{uploadStatus.message}</p>
+                      </motion.div>
+                    )}
                   </div>
-                  <button onClick={fetchImportHistory} className="p-2.5 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors border border-slate-100">
-                    <History className={`w-4 h-4 text-slate-500 ${isLoadingHistory ? 'animate-spin' : ''}`} />
-                  </button>
-                </div>
 
-                <div className="space-y-4">
-                  {importHistory.length > 0 ? importHistory.map((log) => (
-                    <div key={log.id} className="p-5 bg-slate-50/50 border border-slate-100 rounded-3xl relative group hover:border-blue-200 transition-colors">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center border border-slate-100 shadow-sm">
-                            <FileText className="w-4 h-4 text-blue-600" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-black text-slate-800 truncate max-w-[140px]">{log.filename}</p>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(log.created).toLocaleDateString('pt-BR')}</p>
-                          </div>
-                        </div>
-                        <button 
-                          onClick={(e) => handleDeleteImport(e, log.id)} 
-                          className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                  {/* Histórico de Operações */}
+                  <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60">
+                    <div className="flex items-center justify-between mb-8">
+                      <div>
+                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Histórico</h3>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Últimos sincronismos</p>
                       </div>
-                      <div className="flex justify-between items-center bg-white/50 rounded-2xl p-3 border border-white">
-                        <div className="flex flex-col">
-                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Registros</span>
-                          <span className="text-xs font-black text-slate-700">{log.total_records}</span>
-                        </div>
-                        <div className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-[8px] font-black uppercase">
-                          Sucesso
-                        </div>
-                      </div>
+                      <button onClick={fetchImportHistory} className="p-2.5 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors border border-slate-100">
+                        <History className={`w-4 h-4 text-slate-500 ${isLoadingHistory ? 'animate-spin' : ''}`} />
+                      </button>
                     </div>
-                  )) : (
-                    <div className="py-12 flex flex-col items-center justify-center text-center opacity-40">
-                      <Search className="w-8 h-8 text-slate-300 mb-3" />
-                      <p className="text-[10px] font-black text-slate-400 uppercase">Nenhum registro encontrado</p>
+
+                    <div className="space-y-4">
+                      {importHistory.length > 0 ? importHistory.map((log) => (
+                        <div key={log.id} className="p-5 bg-slate-50/50 border border-slate-100 rounded-3xl relative group hover:border-blue-200 transition-colors">
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center border border-slate-100 shadow-sm">
+                                <FileText className="w-4 h-4 text-blue-600" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-black text-slate-800 truncate max-w-[140px]">{log.filename}</p>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(log.created).toLocaleDateString('pt-BR')}</p>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={(e) => handleDeleteImport(e, log.id)} 
+                              className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <div className="flex justify-between items-center bg-white/50 rounded-2xl p-3 border border-white">
+                            <div className="flex flex-col">
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Registros</span>
+                              <span className="text-xs font-black text-slate-700">{log.total_records}</span>
+                            </div>
+                            <div className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-[8px] font-black uppercase">
+                              Sucesso
+                            </div>
+                          </div>
+                        </div>
+                      )) : (
+                        <div className="py-12 flex flex-col items-center justify-center text-center opacity-40">
+                          <Search className="w-8 h-8 text-slate-300 mb-3" />
+                          <p className="text-[10px] font-black text-slate-400 uppercase">Nenhum registro encontrado</p>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+                </>
+              ) : (
+                <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60 flex flex-col items-center justify-center text-center opacity-60 aspect-square">
+                  <Shield className="w-12 h-12 text-slate-200 mb-4" />
+                  <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter mb-2">Área Administrativa</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest max-w-[200px]">
+                    Recursos de importação disponíveis apenas para administradores.
+                  </p>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
