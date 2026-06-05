@@ -103,15 +103,15 @@ export function AuthScreen() {
 
       await pb.collection('amarcap53_users').create(data);
       
-      // Após criar, faz o login automaticamente
-      await pb.collection('amarcap53_users').authWithPassword(email, password);
-      
-      // Solicita a verificação de e-mail APÓS o login (PocketBase requirement for some configs)
+      // Solicita a verificação de e-mail ANTES do login
       try {
         await pb.collection('amarcap53_users').requestVerification(email);
       } catch (verifyErr) {
         console.warn('Verificação já enviada ou erro silencioso:', verifyErr);
       }
+      
+      setSuccessMsg('Cadastro realizado! Verifique seu e-mail para ativar a conta.');
+      setAuthState('login');
     } catch (err: any) {
       console.error('Erro detalhado:', err.data);
       
