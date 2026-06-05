@@ -125,7 +125,7 @@ export function AuthScreen() {
         unidade_saude: finalUnidade,
         equipe: finalEquipe,
         microarea: finalMicroarea,
-        role: perfil === 'cap' ? 'admin' : 'user'
+        role: perfil // Salva o perfil selecionado (cap, unidade, equipe, microarea)
       };
 
       await pb.collection('amarcap53_users').create(data);

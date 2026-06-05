@@ -14,6 +14,9 @@ import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthScreen } from './screens/AuthScreen';
+import { ResetPasswordScreen } from './screens/ResetPasswordScreen';
+import { VerifyEmailScreen } from './screens/VerifyEmailScreen';
+import { ConfirmEmailChangeScreen } from './screens/ConfirmEmailChangeScreen';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -21,10 +24,23 @@ function AppContent() {
   });
   const { isOpen, closeSidebar, isMobile, setIsMobile } = useSidebar();
   const { user, isLoading } = useAuth();
+  const [currentRoute, setCurrentRoute] = useState('');
 
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    // Check if the current URL is an auth action route
+    const checkRoute = () => {
+      const path = window.location.pathname;
+      setCurrentRoute(path);
+    };
+    
+    checkRoute();
+    window.addEventListener('popstate', checkRoute);
+    return () => window.removeEventListener('popstate', checkRoute);
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -46,6 +62,19 @@ function AppContent() {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
+  }
+
+  // Intercepta as rotas de ações de autenticação (Central de Acesso)
+  if (currentRoute === '/reset-password' || currentRoute === '/confirm-password-reset') {
+    return <ResetPasswordScreen />;
+  }
+
+  if (currentRoute === '/verify-email' || currentRoute === '/confirm-verification') {
+    return <VerifyEmailScreen />;
+  }
+
+  if (currentRoute === '/confirm-email-change') {
+    return <ConfirmEmailChangeScreen />;
   }
 
   if (!user) {

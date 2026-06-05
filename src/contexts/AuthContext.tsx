@@ -7,7 +7,7 @@ interface UserRecord extends RecordModel {
   unidade_saude: string;
   equipe: string;
   microarea: string;
-  role: 'admin' | 'user';
+  role: 'cap' | 'unidade' | 'equipe' | 'microarea' | 'admin' | 'user';
 }
 
 interface AuthContextType {
@@ -26,14 +26,18 @@ const AuthContext = createContext<AuthContextType>({
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserRecord | null>(pb.authStore.model as UserRecord);
-  const [isAdmin, setIsAdmin] = useState<boolean>((pb.authStore.model as UserRecord)?.role === 'admin');
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    const model = pb.authStore.model as UserRecord;
+    return model?.role === 'admin' || model?.role === 'cap';
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Escuta mudanças de autenticação
     const unsubscribe = pb.authStore.onChange((token, model) => {
-      setUser(model as UserRecord);
-      setIsAdmin((model as UserRecord)?.role === 'admin');
+      const userModel = model as UserRecord;
+      setUser(userModel);
+      setIsAdmin(userModel?.role === 'admin' || userModel?.role === 'cap');
     });
 
     setIsLoading(false);
