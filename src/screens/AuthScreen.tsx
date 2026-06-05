@@ -110,7 +110,7 @@ export function AuthScreen() {
         console.warn('Verificação já enviada ou erro silencioso:', verifyErr);
       }
       
-      setSuccessMsg('Cadastro realizado! Verifique seu e-mail para ativar a conta.');
+      setSuccessMsg('Cadastro realizado! Verifique seu e-mail (e a caixa de SPAM) para ativar a conta.');
       setAuthState('login');
     } catch (err: any) {
       console.error('Erro detalhado:', err.data);
@@ -139,7 +139,7 @@ export function AuthScreen() {
     clearMessages();
     try {
       await pb.collection('amarcap53_users').requestPasswordReset(email);
-      setSuccessMsg('Se o e-mail estiver cadastrado, você receberá um link de recuperação.');
+      setSuccessMsg('Se o e-mail estiver cadastrado, você receberá um link de recuperação. Verifique também sua caixa de SPAM.');
     } catch (err: any) {
       console.error(err);
       setError('Erro ao solicitar recuperação. Tente novamente mais tarde.');

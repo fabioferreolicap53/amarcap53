@@ -17,11 +17,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     { id: 'pacientes', label: 'Meus Pacientes', icon: Users },
     { id: 'favoritos', label: 'Favoritos', icon: Star },
     { id: 'acompanhamento', label: 'Acompanhamentos', icon: ClipboardList },
+    { id: 'configuracoes', label: 'Configurações', icon: Settings },
   ];
-
-  if (isAdmin) {
-    navItems.push({ id: 'configuracoes', label: 'Configurações', icon: Settings });
-  }
 
   const handleNavClick = (id: string) => {
     setActiveTab(id);

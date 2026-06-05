@@ -35,6 +35,8 @@ interface SettingsScreenProps {
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setActiveTab }) => {
   const { user, isAdmin } = useAuth();
 
+  const isCap = user?.role === 'cap';
+
   const [isUploading, setIsUploading] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [userName, setUserName] = useState('');
@@ -61,10 +63,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
   // Carrega histórico de importações
   useEffect(() => {
-    if (isAdmin) {
+    if (isCap) {
       fetchImportHistory();
     }
-  }, [isAdmin]);
+  }, [isCap]);
 
   const fetchImportHistory = async () => {
     try {
@@ -153,7 +155,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       await pb.collection('amarcap53_users').requestEmailChange(newEmail);
       setEmailSuccess(true);
       setNewEmail('');
-      setTimeout(() => setEmailSuccess(false), 5000);
+      setTimeout(() => setEmailSuccess(false), 8000);
     } catch (err: any) {
       console.error('Erro ao solicitar troca de e-mail:', err);
       alert('Erro ao solicitar troca de e-mail. Verifique se o novo e-mail já está em uso.');
@@ -430,16 +432,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                         </button>
                       </div>
                       {emailSuccess && (
-                        <p className="text-[10px] font-bold text-emerald-600 uppercase text-center animate-pulse mt-2">
-                          Verifique sua caixa de entrada para confirmar!
-                        </p>
-                      )}
+                    <p className="text-[10px] font-bold text-emerald-600 uppercase text-center animate-pulse mt-2">
+                      Verifique sua caixa de entrada e SPAM para confirmar!
+                    </p>
+                  )}
                     </form>
                   </div>
                 </div>
               </div>
-              
-              {/* Card Premium: Gestão de Dados (Dashboard Style) */}
+
+            {/* Card Premium: Gestão de Dados (Dashboard Style) - Apenas CAP */}
+            {isCap && (
               <div className="bg-[#001b3d] rounded-[2.5rem] p-1 shadow-[0_20px_50px_rgba(0,27,61,0.3)] relative overflow-hidden group">
                 {/* Efeitos de Fundo Glassmorphism */}
                 <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] -mr-48 -mt-48"></div>
@@ -459,8 +462,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                         </div>
                       </div>
                     </div>
-                    
-
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -499,8 +500,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                   </div>
                 </div>
               </div>
+            )}
 
-              {/* Instruções Processuais */}
+            {/* Instruções Processuais - Apenas CAP */}
+            {isCap && (
               <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-slate-200/60 relative overflow-hidden">
                 <div className="flex items-center gap-4 mb-10">
                   <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
@@ -562,12 +565,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                   </div>
                 </div>
               </div>
-            </div>
+            )}
+          </div>
 
-            {/* Lado Direito: Upload e Histórico */}
-            <div className="w-full lg:w-96 space-y-8">
-              {isAdmin ? (
-                <>
+          {/* Lado Direito: Upload e Histórico */}
+          <div className="w-full lg:w-96 space-y-8">
+            {isCap ? (
+              <>
                   {/* Card de Ação: Upload */}
                   <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60">
                     <div className="mb-8">
