@@ -17,6 +17,7 @@ import { AuthScreen } from './screens/AuthScreen';
 import { ResetPasswordScreen } from './screens/ResetPasswordScreen';
 import { VerifyEmailScreen } from './screens/VerifyEmailScreen';
 import { ConfirmEmailChangeScreen } from './screens/ConfirmEmailChangeScreen';
+import { extractTokenFromLocation, getActionUrlForApp, getAuthTargetFromToken } from './lib/authTarget';
 
 const AUTH_ACTION_SEGMENTS = [
   'reset-password',
@@ -89,6 +90,29 @@ function AppContent() {
       window.removeEventListener('hashchange', checkRoute);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isAuthActionRoute(currentRoute)) {
+      return;
+    }
+
+    const token = extractTokenFromLocation();
+    if (!token) {
+      return;
+    }
+
+    const { appKey } = getAuthTargetFromToken(token);
+    const targetUrl = getActionUrlForApp(appKey, window.location.pathname, window.location.search);
+
+    if (!targetUrl) {
+      return;
+    }
+
+    const targetOrigin = new URL(targetUrl).origin;
+    if (targetOrigin !== window.location.origin) {
+      window.location.replace(targetUrl);
+    }
+  }, [currentRoute]);
 
   useEffect(() => {
     const handleResize = () => {

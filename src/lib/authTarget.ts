@@ -7,6 +7,7 @@ interface KnownAppMeta {
   description: string;
   collection: string;
   collectionIds: string[];
+  appUrl: string;
 }
 
 const uniqueValues = (values: Array<string | undefined>) => {
@@ -27,6 +28,7 @@ export const KNOWN_APPS: Record<AppKey, KnownAppMeta> = {
       'twexrmhjkbtopmh',
       import.meta.env.VITE_AMARCAP53_COLLECTION_ID,
     ]),
+    appUrl: import.meta.env.VITE_AMARCAP53_APP_URL || 'https://amarcap53.pages.dev',
   },
   agenda: {
     name: 'AGENDA',
@@ -35,6 +37,7 @@ export const KNOWN_APPS: Record<AppKey, KnownAppMeta> = {
     collectionIds: uniqueValues([
       import.meta.env.VITE_AGENDA_CAP53_COLLECTION_ID,
     ]),
+    appUrl: import.meta.env.VITE_AGENDA_CAP53_APP_URL || 'https://centraldedados.dev.br',
   },
 };
 
@@ -128,5 +131,17 @@ export const getAuthTargetFromToken = (token: string) => {
 };
 
 export const getLoginUrlForApp = (appKey: AppKey | null | undefined) => {
-  return appKey ? `/?app=${appKey}` : '/';
+  if (!appKey) return '/';
+  return KNOWN_APPS[appKey].appUrl;
+};
+
+export const getActionUrlForApp = (
+  appKey: AppKey | null | undefined,
+  pathname: string,
+  search: string,
+) => {
+  if (!appKey) return null;
+
+  const baseUrl = KNOWN_APPS[appKey].appUrl;
+  return new URL(`${pathname}${search}`, `${baseUrl}/`).toString();
 };
