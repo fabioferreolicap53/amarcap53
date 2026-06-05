@@ -24,7 +24,7 @@ function AppContent() {
   });
   const { isOpen, closeSidebar, isMobile, setIsMobile } = useSidebar();
   const { user, isLoading } = useAuth();
-  const [currentRoute, setCurrentRoute] = useState('');
+  const [currentRoute, setCurrentRoute] = useState(() => window.location.pathname + window.location.hash);
 
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
@@ -33,13 +33,22 @@ function AppContent() {
   useEffect(() => {
     // Check if the current URL is an auth action route
     const checkRoute = () => {
+      // Pega o caminho e o hash para suportar redirecionamentos variados
       const path = window.location.pathname;
-      setCurrentRoute(path);
+      const hash = window.location.hash;
+      setCurrentRoute(path + hash);
     };
     
+    // Check immediately on mount
     checkRoute();
+    
     window.addEventListener('popstate', checkRoute);
-    return () => window.removeEventListener('popstate', checkRoute);
+    window.addEventListener('hashchange', checkRoute);
+    
+    return () => {
+      window.removeEventListener('popstate', checkRoute);
+      window.removeEventListener('hashchange', checkRoute);
+    };
   }, []);
 
   useEffect(() => {
@@ -65,15 +74,21 @@ function AppContent() {
   }
 
   // Intercepta as rotas de ações de autenticação (Central de Acesso)
-  if (currentRoute === '/reset-password' || currentRoute === '/confirm-password-reset') {
+  // Usamos includes e convertemos para lowercase para ser mais flexível com query params e hashes
+  const normalizedPath = currentRoute.toLowerCase();
+  const isResetPassword = normalizedPath.includes('reset-password') || normalizedPath.includes('confirm-password-reset');
+  const isVerifyEmail = normalizedPath.includes('verify-email') || normalizedPath.includes('confirm-verification');
+  const isConfirmEmailChange = normalizedPath.includes('confirm-email-change');
+
+  if (isResetPassword) {
     return <ResetPasswordScreen />;
   }
 
-  if (currentRoute === '/verify-email' || currentRoute === '/confirm-verification') {
+  if (isVerifyEmail) {
     return <VerifyEmailScreen />;
   }
 
-  if (currentRoute === '/confirm-email-change') {
+  if (isConfirmEmailChange) {
     return <ConfirmEmailChangeScreen />;
   }
 
