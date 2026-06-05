@@ -2,42 +2,60 @@ import React, { useState, useEffect } from 'react';
 import { pb } from '../lib/pocketbase';
 import { Activity, Mail, Lock, Building, Users, MapPin, ArrowRight, ArrowLeft, Eye, EyeOff, Calendar } from 'lucide-react';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
+import { AppKey, DEFAULT_APP_KEY, KNOWN_APPS, getStoredAuthTarget, persistAuthTarget } from '../lib/authTarget';
 
 type AuthState = 'login' | 'register' | 'forgot_password';
 
-const APP_CONFIGS: Record<string, any> = {
+const APP_CONFIGS: Record<AppKey, any> = {
   amarcap53: {
-    name: 'AMAR',
-    description: 'ACOMPANHAMENTO DA MULHER NAS AÇÕES DE RASTREIO',
-    collection: 'amarcap53_users',
+    name: KNOWN_APPS.amarcap53.name,
+    description: KNOWN_APPS.amarcap53.description,
+    collection: KNOWN_APPS.amarcap53.collection,
     icon: <Activity className="h-8 w-8 text-primary" />,
   },
   agenda: {
-    name: 'AGENDA',
-    description: 'SISTEMA DE AGENDAMENTO DE CONSULTAS',
-    collection: 'agenda_cap53_usuarios',
+    name: KNOWN_APPS.agenda.name,
+    description: KNOWN_APPS.agenda.description,
+    collection: KNOWN_APPS.agenda.collection,
     icon: <Calendar className="h-8 w-8 text-primary" />,
   },
 };
 
 export function AuthScreen() {
+  const storedTarget = getStoredAuthTarget();
   const [authState, setAuthState] = useState<AuthState>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [selectedApp, setSelectedApp] = useState(() => {
-    return localStorage.getItem('selectedApp') || 'amarcap53';
+  const [selectedApp, setSelectedApp] = useState<AppKey | null>(() => {
+    if (storedTarget.appKey) {
+      return storedTarget.appKey;
+    }
+
+    return storedTarget.collectionRef ? null : DEFAULT_APP_KEY;
+  });
+  const [selectedCollection, setSelectedCollection] = useState(() => {
+    if (storedTarget.collectionRef) {
+      return storedTarget.collectionRef;
+    }
+
+    return APP_CONFIGS[storedTarget.appKey || DEFAULT_APP_KEY].collection;
   });
 
-  const appConfig = APP_CONFIGS[selectedApp] || APP_CONFIGS.amarcap53;
+  const appConfig = selectedApp ? APP_CONFIGS[selectedApp] : null;
+  const authCollection = selectedCollection || appConfig?.collection || APP_CONFIGS[DEFAULT_APP_KEY].collection;
+  const showRegister = selectedApp === 'amarcap53';
 
   useEffect(() => {
-    // Verifica se há um app selecionado na URL
+    // Query param wins over previous local storage selection.
     const searchParams = new URLSearchParams(window.location.search);
     const appParam = searchParams.get('app');
-    if (appParam && APP_CONFIGS[appParam]) {
-      setSelectedApp(appParam);
-      localStorage.setItem('selectedApp', appParam);
+    if (appParam && appParam in APP_CONFIGS) {
+      const nextApp = appParam as AppKey;
+      const nextCollection = APP_CONFIGS[nextApp].collection;
+      setSelectedApp(nextApp);
+      setSelectedCollection(nextCollection);
+      persistAuthTarget(nextCollection, nextApp);
     }
   }, []);
 
@@ -69,7 +87,7 @@ export function AuthScreen() {
     setIsLoading(true);
     clearMessages();
     try {
-      await pb.collection(appConfig.collection).authWithPassword(email, password);
+      await pb.collection(authCollection).authWithPassword(email, password);
       // O App.tsx reage automaticamente à mudança no authStore via AuthContext
     } catch (err: any) {
       console.error(err);
@@ -111,7 +129,7 @@ export function AuthScreen() {
         filterCondition = `unidade_saude="${finalUnidade}" && equipe="${finalEquipe}" && microarea="${finalMicroarea}"`;
       }
 
-      const existingUser = await pb.collection(appConfig.collection).getFirstListItem(filterCondition).catch(() => null);
+      const existingUser = await pb.collection(authCollection).getFirstListItem(filterCondition).catch(() => null);
 
       if (existingUser) {
         setError('Já existe um cadastro com esta combinação de perfil.');
@@ -131,11 +149,11 @@ export function AuthScreen() {
         role: perfil
       };
 
-      await pb.collection(appConfig.collection).create(data);
+      await pb.collection(authCollection).create(data);
       
       // Solicita a verificação de e-mail ANTES do login
       try {
-        await pb.collection(appConfig.collection).requestVerification(email);
+        await pb.collection(authCollection).requestVerification(email);
       } catch (verifyErr) {
         console.warn('Verificação já enviada ou erro silencioso:', verifyErr);
       }
@@ -168,7 +186,7 @@ export function AuthScreen() {
     setIsLoading(true);
     clearMessages();
     try {
-      await pb.collection(appConfig.collection).requestPasswordReset(email);
+      await pb.collection(authCollection).requestPasswordReset(email);
       setSuccessMsg('Se o e-mail estiver cadastrado, você receberá um link de recuperação. Verifique também sua caixa de SPAM.');
     } catch (err: any) {
       console.error(err);
@@ -183,16 +201,16 @@ export function AuthScreen() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <div className="h-12 w-12 bg-primary/10 rounded-xl flex items-center justify-center">
-            {appConfig.icon}
+            {appConfig?.icon || <Activity className="h-8 w-8 text-primary" />}
           </div>
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-on-surface tracking-tight">
-          {authState === 'login' && `Acesso ao ${appConfig.name}`}
-          {authState === 'register' && `Criar Conta no ${appConfig.name}`}
-          {authState === 'forgot_password' && `Recuperar no ${appConfig.name}`}
+          {authState === 'login' && `Acesso ao ${appConfig?.name || 'Sistema'}`}
+          {authState === 'register' && `Criar Conta no ${appConfig?.name || 'Sistema'}`}
+          {authState === 'forgot_password' && `Recuperar no ${appConfig?.name || 'Sistema'}`}
         </h2>
         <p className="mt-2 text-center text-sm text-on-surface/60 uppercase tracking-wider font-bold">
-          {appConfig.description}
+          {appConfig?.description || 'CENTRAL DE ACESSO'}
         </p>
       </div>
 
@@ -278,7 +296,7 @@ export function AuthScreen() {
             </form>
           )}
 
-          {authState === 'register' && (
+          {authState === 'register' && showRegister && (
             <form className="space-y-5" onSubmit={handleRegister}>
               <div>
                 <label className="block text-sm font-medium text-on-surface/80">Perfil de Acesso</label>
@@ -513,21 +531,29 @@ export function AuthScreen() {
           <div className="mt-8 pt-6 border-t border-outline/10 space-y-4">
             {authState === 'login' ? (
               <>
-                <p className="text-center text-sm text-on-surface/70">
-                  Não possui conta?{' '}
-                  <button
-                    onClick={() => { setAuthState('register'); clearMessages(); }}
-                    className="font-medium text-primary hover:text-primary/80 transition-colors inline-flex items-center"
-                  >
-                    Solicitar acesso <ArrowRight className="ml-1 h-4 w-4" />
-                  </button>
-                </p>
+                {showRegister ? (
+                  <p className="text-center text-sm text-on-surface/70">
+                    Não possui conta?{' '}
+                    <button
+                      onClick={() => { setAuthState('register'); clearMessages(); }}
+                      className="font-medium text-primary hover:text-primary/80 transition-colors inline-flex items-center"
+                    >
+                      Solicitar acesso <ArrowRight className="ml-1 h-4 w-4" />
+                    </button>
+                  </p>
+                ) : (
+                  <p className="text-center text-sm text-on-surface/70">
+                    Entre com e-mail e senha do aplicativo correspondente.
+                  </p>
+                )}
                 <div className="flex justify-center pt-2">
                   <button
                     onClick={() => {
                       const nextApp = selectedApp === 'amarcap53' ? 'agenda' : 'amarcap53';
+                      const nextCollection = APP_CONFIGS[nextApp].collection;
                       setSelectedApp(nextApp);
-                      localStorage.setItem('selectedApp', nextApp);
+                      setSelectedCollection(nextCollection);
+                      persistAuthTarget(nextCollection, nextApp);
                       clearMessages();
                     }}
                     className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-primary transition-colors"

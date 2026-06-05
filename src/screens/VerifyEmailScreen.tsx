@@ -1,26 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { pb } from '../lib/pocketbase';
 import { MailCheck, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { AppKey, extractTokenFromLocation, getAuthTargetFromToken, getLoginUrlForApp, persistAuthTarget } from '../lib/authTarget';
 
 export function VerifyEmailScreen() {
   const [token, setToken] = useState('');
+  const [appKey, setAppKey] = useState<AppKey | null>(null);
+  const [targetCollection, setTargetCollection] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    // Captura o token da URL (hash ou query)
-    const searchParams = new URLSearchParams(window.location.search);
-    let tokenParam = searchParams.get('token');
-    
-    // Fallback para tokens em hash (#/verify-email?token=...)
-    if (!tokenParam && window.location.hash.includes('token=')) {
-      const hashParams = new URLSearchParams(window.location.hash.split('?')[1]);
-      tokenParam = hashParams.get('token');
-    }
+    const tokenParam = extractTokenFromLocation();
     
     if (tokenParam) {
+      const nextTarget = getAuthTargetFromToken(tokenParam);
       setToken(tokenParam);
+      setAppKey(nextTarget.appKey);
+      setTargetCollection(nextTarget.collectionRef || '');
+      persistAuthTarget(nextTarget.collectionRef, nextTarget.appKey);
     } else {
       setError('Token de verificação inválido ou ausente. Por favor, solicite um novo link.');
     }
@@ -36,29 +35,23 @@ export function VerifyEmailScreen() {
     setError(null);
 
     try {
-      // Tentamos primeiro na coleção amarcap53_users
-      await pb.collection('amarcap53_users').confirmVerification(token);
-      localStorage.setItem('selectedApp', 'amarcap53');
+      const collectionRef = targetCollection;
+      if (!collectionRef) {
+        throw new Error('Coleção de autenticação não identificada no token.');
+      }
+
+      await pb.collection(collectionRef).confirmVerification(token);
       setSuccess(true);
     } catch (err: any) {
       console.error(err);
-      
-      // Se falhar na amarcap53_users, tenta na agenda
-      try {
-         await pb.collection('agenda_cap53_usuarios').confirmVerification(token);
-         localStorage.setItem('selectedApp', 'agenda');
-         setSuccess(true);
-      } catch (err2: any) {
-         setError('Não foi possível verificar o e-mail. O link pode ter expirado ou já foi utilizado.');
-      }
+      setError('Não foi possível verificar o e-mail. O link pode ter expirado ou já foi utilizado.');
     } finally {
       setIsLoading(false);
     }
   };
 
   if (success) {
-    const selectedApp = localStorage.getItem('selectedApp') || 'amarcap53';
-    const appName = selectedApp === 'agenda' ? 'Agenda' : 'AMAR';
+    const appName = appKey === 'agenda' ? 'Agenda' : appKey === 'amarcap53' ? 'AMAR' : 'aplicativo';
 
     return (
       <div className="min-h-screen bg-surface flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
@@ -73,10 +66,10 @@ export function VerifyEmailScreen() {
             </p>
             <div className="space-y-4">
               <button
-                onClick={() => window.location.href = '/'}
+                onClick={() => window.location.href = getLoginUrlForApp(appKey)}
                 className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-black text-white bg-slate-800 hover:bg-slate-900 transition-all uppercase tracking-wider"
               >
-                Ir para o Login do {appName}
+                Ir para o Login {appKey ? `do ${appName}` : 'do aplicativo'}
               </button>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                 Ou feche esta janela e volte para o seu aplicativo.
