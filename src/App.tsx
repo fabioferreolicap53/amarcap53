@@ -18,13 +18,44 @@ import { ResetPasswordScreen } from './screens/ResetPasswordScreen';
 import { VerifyEmailScreen } from './screens/VerifyEmailScreen';
 import { ConfirmEmailChangeScreen } from './screens/ConfirmEmailChangeScreen';
 
+const AUTH_ACTION_SEGMENTS = [
+  'reset-password',
+  'confirm-password-reset',
+  'verify-email',
+  'confirm-verification',
+  'confirm-email-change',
+];
+
+const isAuthActionRoute = (value: string) => {
+  const normalized = value.toLowerCase();
+  return AUTH_ACTION_SEGMENTS.some((segment) => normalized.includes(segment));
+};
+
+const isLoginHash = (hash: string) => {
+  const normalized = hash.toLowerCase();
+
+  if (!normalized || normalized.includes('token=')) {
+    return false;
+  }
+
+  return (
+    normalized === '#/login' ||
+    normalized === '#login' ||
+    normalized.startsWith('#/login?') ||
+    normalized.startsWith('#/signin') ||
+    normalized.startsWith('#/auth')
+  );
+};
+
 function AppContent() {
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('activeTab') || 'resumo';
   });
   const { isOpen, closeSidebar, isMobile, setIsMobile } = useSidebar();
   const { user, isLoading } = useAuth();
-  const [currentRoute, setCurrentRoute] = useState(() => window.location.pathname + window.location.hash);
+  const [currentRoute, setCurrentRoute] = useState(() => {
+    return `${window.location.pathname}${window.location.search}`;
+  });
 
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
@@ -33,10 +64,18 @@ function AppContent() {
   useEffect(() => {
     // Check if the current URL is an auth action route
     const checkRoute = () => {
-      // Pega o caminho e o hash para suportar redirecionamentos variados
       const path = window.location.pathname;
+      const search = window.location.search;
       const hash = window.location.hash;
-      setCurrentRoute(path + hash);
+      const routeWithSearch = `${path}${search}`;
+
+      // Alguns ambientes empurram hash de login (#/login) mesmo em links de ação.
+      // Removemos isso cedo para não competir com verificação/reset/troca de e-mail.
+      if (isAuthActionRoute(routeWithSearch) && isLoginHash(hash)) {
+        window.history.replaceState(null, '', routeWithSearch);
+      }
+
+      setCurrentRoute(routeWithSearch);
     };
     
     // Check immediately on mount
@@ -74,7 +113,6 @@ function AppContent() {
   }
 
   // Intercepta as rotas de ações de autenticação (Central de Acesso)
-  // Usamos includes e convertemos para lowercase para ser mais flexível com query params e hashes
   const normalizedPath = currentRoute.toLowerCase();
   const isResetPassword = normalizedPath.includes('reset-password') || normalizedPath.includes('confirm-password-reset');
   const isVerifyEmail = normalizedPath.includes('verify-email') || normalizedPath.includes('confirm-verification');
