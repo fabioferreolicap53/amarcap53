@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, ClipboardCheck, Settings, HelpCircle, LogOut, X, Building, MapPin } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, HelpCircle, LogOut, X, Building, MapPin, ClipboardList, Star } from 'lucide-react';
 import { useSidebar } from '../contexts/SidebarContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -10,14 +10,18 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const { isOpen, closeSidebar } = useSidebar();
-  const { user, logout } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   
   const navItems = [
     { id: 'resumo', label: 'Resumo', icon: LayoutDashboard },
     { id: 'pacientes', label: 'Meus Pacientes', icon: Users },
-    { id: 'acompanhamentos', label: 'Acompanhamentos Realizados', icon: ClipboardCheck },
-    { id: 'configuracoes', label: 'Configurações', icon: Settings },
+    { id: 'favoritos', label: 'Favoritos', icon: Star },
+    { id: 'acompanhamento', label: 'Acompanhamentos', icon: ClipboardList },
   ];
+
+  if (isAdmin) {
+    navItems.push({ id: 'configuracoes', label: 'Configurações', icon: Settings });
+  }
 
   const handleNavClick = (id: string) => {
     setActiveTab(id);
@@ -83,29 +87,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                   <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">
                     Profissional
                   </p>
-                </div>
-              </div>
-              
-              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/10 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Building className="w-3.5 h-3.5 text-blue-500" />
-                  <span className="text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase truncate">
-                    {user.unidade_saude}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-3.5 h-3.5 text-purple-500" />
-                    <span className="text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase">
-                      {user.equipe}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-emerald-500" />
-                    <span className="text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase">
-                      MA: {user.microarea}
-                    </span>
-                  </div>
                 </div>
               </div>
             </div>

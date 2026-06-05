@@ -8,6 +8,7 @@ import { Sidebar } from './components/Sidebar';
 import { DashboardScreen } from './screens/DashboardScreen';
 import { PatientsScreen } from './screens/PatientsScreen';
 import { FollowUpsScreen } from './screens/FollowUpsScreen';
+import { FavoritesScreen } from './screens/FavoritesScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 
@@ -66,7 +67,8 @@ function AppContent() {
       <main className={`flex-1 flex flex-col h-screen overflow-hidden transition-all duration-300`}>
         {activeTab === 'resumo' && <DashboardScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
         {activeTab === 'pacientes' && <PatientsScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
-        {activeTab === 'acompanhamentos' && <FollowUpsScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
+        {activeTab === 'favoritos' && <FavoritesScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
+        {activeTab === 'acompanhamento' && <FollowUpsScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
         {activeTab === 'configuracoes' && <SettingsScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
       </main>
     </div>

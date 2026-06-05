@@ -27,8 +27,7 @@ const UNIDADES_EQUIPES: Record<string, string[]> = {
   "CMS EMYDIO CABRAL": ["1º DE ABRIL", "DR. HÉLIO RIBEIRO", "GOUVEIA", "MONTE DAS OLIVEIRAS", "MONTE SINAI"],
   "CMS FLORIPES GALDINO PEREIRA": ["SAGRADO CORAÇÃO", "NOVO HORIZONTE"],
   "CMS MARIA APARECIDA DE ALMEIDA": ["CESARINHO"],
-  "CMS SÁVIO ANTUNES": ["CAMPO DOS BANDEIRANTES", "PONTE AMARELA", "SEMPRE VIDA"],
-  "FORA DE ÁREA": ["NÃO SE APLICA"]
+  "CMS SÁVIO ANTUNES": ["CAMPO DOS BANDEIRANTES", "PONTE AMARELA", "SEMPRE VIDA"]
 };
 
 const MICROAREAS = ["01", "02", "03", "04", "05", "06"];
@@ -47,6 +46,7 @@ export function AuthScreen() {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [perfil, setPerfil] = useState('');
   const [unidadeSaude, setUnidadeSaude] = useState('');
   const [equipe, setEquipe] = useState('');
   const [microarea, setMicroarea] = useState('');
@@ -89,13 +89,31 @@ export function AuthScreen() {
         return;
       }
 
-      // Check for duplicate combination of Unidade, Equipe and Microárea
-      const existingUser = await pb.collection('amarcap53_users').getFirstListItem(
-        `unidade_saude="${unidadeSaude}" && equipe="${equipe}" && microarea="${microarea}"`
-      ).catch(() => null); // Catch error if not found (which is what we want)
+      if (!perfil) {
+        setError('Selecione um perfil de acesso.');
+        setIsLoading(false);
+        return;
+      }
+
+      const finalUnidade = perfil === 'cap' ? '' : unidadeSaude;
+      const finalEquipe = (perfil === 'cap' || perfil === 'unidade') ? '' : equipe;
+      const finalMicroarea = perfil === 'microarea' ? microarea : '';
+
+      let filterCondition = '';
+      if (perfil === 'cap') {
+        filterCondition = `unidade_saude="" && equipe="" && microarea=""`;
+      } else if (perfil === 'unidade') {
+        filterCondition = `unidade_saude="${finalUnidade}" && equipe="" && microarea=""`;
+      } else if (perfil === 'equipe') {
+        filterCondition = `unidade_saude="${finalUnidade}" && equipe="${finalEquipe}" && microarea=""`;
+      } else if (perfil === 'microarea') {
+        filterCondition = `unidade_saude="${finalUnidade}" && equipe="${finalEquipe}" && microarea="${finalMicroarea}"`;
+      }
+
+      const existingUser = await pb.collection('amarcap53_users').getFirstListItem(filterCondition).catch(() => null);
 
       if (existingUser) {
-        setError('Esta combinação de Unidade, Equipe e Microárea já está cadastrada.');
+        setError('Já existe um cadastro com esta combinação de perfil.');
         setIsLoading(false);
         return;
       }
@@ -104,9 +122,10 @@ export function AuthScreen() {
         email,
         password,
         passwordConfirm,
-        unidade_saude: unidadeSaude,
-        equipe,
-        microarea,
+        unidade_saude: finalUnidade,
+        equipe: finalEquipe,
+        microarea: finalMicroarea,
+        role: perfil === 'cap' ? 'admin' : 'user'
       };
 
       await pb.collection('amarcap53_users').create(data);
@@ -238,54 +257,27 @@ export function AuthScreen() {
           {authState === 'register' && (
             <form className="space-y-5" onSubmit={handleRegister}>
               <div>
-                <label className="block text-sm font-medium text-on-surface/80">Unidade de Saúde</label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Building className="h-5 w-5 text-on-surface/40" />
-                  </div>
-                  <select
-                    required
-                    value={unidadeSaude}
-                    onChange={(e) => {
-                      setUnidadeSaude(e.target.value);
-                      setEquipe('');
-                      setMicroarea('');
-                    }}
-                    className="block w-full pl-10 pr-10 sm:text-sm bg-surface text-on-surface border border-outline/30 rounded-lg py-2.5 focus:ring-2 focus:ring-primary focus:border-primary transition-colors appearance-none"
-                  >
-                    <option value="" disabled>Selecione a Unidade</option>
-                    {Object.keys(UNIDADES_EQUIPES).map(unidade => (
-                      <option key={unidade} value={unidade}>{unidade}</option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                    <svg className="h-5 w-5 text-on-surface/40" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-on-surface/80">Equipe</label>
+                <label className="block text-sm font-medium text-on-surface/80">Perfil de Acesso</label>
                 <div className="mt-1 relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Users className="h-5 w-5 text-on-surface/40" />
                   </div>
                   <select
                     required
-                    value={equipe}
+                    value={perfil}
                     onChange={(e) => {
-                      setEquipe(e.target.value);
+                      setPerfil(e.target.value);
+                      setUnidadeSaude('');
+                      setEquipe('');
                       setMicroarea('');
                     }}
-                    disabled={!unidadeSaude}
-                    className="block w-full pl-10 pr-10 sm:text-sm bg-surface text-on-surface border border-outline/30 rounded-lg py-2.5 focus:ring-2 focus:ring-primary focus:border-primary transition-colors appearance-none disabled:opacity-50 disabled:bg-surface-variant"
+                    className="block w-full pl-10 pr-10 sm:text-sm bg-surface text-on-surface border border-outline/30 rounded-lg py-2.5 focus:ring-2 focus:ring-primary focus:border-primary transition-colors appearance-none"
                   >
-                    <option value="" disabled>Selecione a Equipe</option>
-                    {unidadeSaude && UNIDADES_EQUIPES[unidadeSaude]?.map(eq => (
-                      <option key={eq} value={eq}>{eq}</option>
-                    ))}
+                    <option value="" disabled>Selecione o Perfil</option>
+                    <option value="microarea">Microárea (Microárea, Equipe, Unidade)</option>
+                    <option value="equipe">Equipe (Equipe, Unidade)</option>
+                    <option value="unidade">Unidade (Unidade)</option>
+                    <option value="cap">CAP (Todas as Unidades)</option>
                   </select>
                   <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                     <svg className="h-5 w-5 text-on-surface/40" viewBox="0 0 20 20" fill="currentColor">
@@ -295,31 +287,95 @@ export function AuthScreen() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-on-surface/80">Microárea</label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <MapPin className="h-5 w-5 text-on-surface/40" />
-                  </div>
-                  <select
-                    required
-                    value={microarea}
-                    onChange={(e) => setMicroarea(e.target.value)}
-                    disabled={!equipe}
-                    className="block w-full pl-10 pr-10 sm:text-sm bg-surface text-on-surface border border-outline/30 rounded-lg py-2.5 focus:ring-2 focus:ring-primary focus:border-primary transition-colors appearance-none disabled:opacity-50 disabled:bg-surface-variant"
-                  >
-                    <option value="" disabled>Selecione a Microárea</option>
-                    {MICROAREAS.map(ma => (
-                      <option key={ma} value={ma}>{ma}</option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                    <svg className="h-5 w-5 text-on-surface/40" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
+              {(perfil === 'microarea' || perfil === 'equipe' || perfil === 'unidade') && (
+                <div>
+                  <label className="block text-sm font-medium text-on-surface/80">Unidade de Saúde</label>
+                  <div className="mt-1 relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Building className="h-5 w-5 text-on-surface/40" />
+                    </div>
+                    <select
+                      required
+                      value={unidadeSaude}
+                      onChange={(e) => {
+                        setUnidadeSaude(e.target.value);
+                        setEquipe('');
+                        setMicroarea('');
+                      }}
+                      className="block w-full pl-10 pr-10 sm:text-sm bg-surface text-on-surface border border-outline/30 rounded-lg py-2.5 focus:ring-2 focus:ring-primary focus:border-primary transition-colors appearance-none"
+                    >
+                      <option value="" disabled>Selecione a Unidade</option>
+                      {Object.keys(UNIDADES_EQUIPES).map(unidade => (
+                        <option key={unidade} value={unidade}>{unidade}</option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                      <svg className="h-5 w-5 text-on-surface/40" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {(perfil === 'microarea' || perfil === 'equipe') && (
+                <div>
+                  <label className="block text-sm font-medium text-on-surface/80">Equipe</label>
+                  <div className="mt-1 relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Users className="h-5 w-5 text-on-surface/40" />
+                    </div>
+                    <select
+                      required
+                      value={equipe}
+                      onChange={(e) => {
+                        setEquipe(e.target.value);
+                        setMicroarea('');
+                      }}
+                      disabled={!unidadeSaude}
+                      className="block w-full pl-10 pr-10 sm:text-sm bg-surface text-on-surface border border-outline/30 rounded-lg py-2.5 focus:ring-2 focus:ring-primary focus:border-primary transition-colors appearance-none disabled:opacity-50 disabled:bg-surface-variant"
+                    >
+                      <option value="" disabled>Selecione a Equipe</option>
+                      {unidadeSaude && UNIDADES_EQUIPES[unidadeSaude]?.map(eq => (
+                        <option key={eq} value={eq}>{eq}</option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                      <svg className="h-5 w-5 text-on-surface/40" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {perfil === 'microarea' && (
+                <div>
+                  <label className="block text-sm font-medium text-on-surface/80">Microárea</label>
+                  <div className="mt-1 relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <MapPin className="h-5 w-5 text-on-surface/40" />
+                    </div>
+                    <select
+                      required
+                      value={microarea}
+                      onChange={(e) => setMicroarea(e.target.value)}
+                      disabled={!equipe}
+                      className="block w-full pl-10 pr-10 sm:text-sm bg-surface text-on-surface border border-outline/30 rounded-lg py-2.5 focus:ring-2 focus:ring-primary focus:border-primary transition-colors appearance-none disabled:opacity-50 disabled:bg-surface-variant"
+                    >
+                      <option value="" disabled>Selecione a Microárea</option>
+                      {MICROAREAS.map(ma => (
+                        <option key={ma} value={ma}>{ma}</option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                      <svg className="h-5 w-5 text-on-surface/40" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-on-surface/80">E-mail de acesso</label>

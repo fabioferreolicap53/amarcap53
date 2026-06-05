@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, Settings, Menu, X, Building, Users, MapPin, LayoutDashboard, ClipboardCheck, LogOut } from 'lucide-react';
+import { Bell, Settings, Menu, X, Building, Users, MapPin, LayoutDashboard, LogOut, ClipboardList, Star } from 'lucide-react';
 import { useSidebar } from '../contexts/SidebarContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -21,14 +21,18 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveTab
 }) => {
   const { toggleSidebar, isOpen } = useSidebar();
-  const { user, logout } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
 
   const navItems = [
     { id: 'resumo', label: 'Resumo', icon: LayoutDashboard },
     { id: 'pacientes', label: 'Meus Pacientes', icon: Users },
-    { id: 'acompanhamentos', label: 'Acompanhamentos', icon: ClipboardCheck },
-    { id: 'configuracoes', label: 'Configurações', icon: Settings },
+    { id: 'favoritos', label: 'Favoritos', icon: Star },
+    { id: 'acompanhamento', label: 'Acompanhamentos', icon: ClipboardList },
   ];
+
+  if (isAdmin) {
+    navItems.push({ id: 'configuracoes', label: 'Configurações', icon: Settings });
+  }
 
   return (
     <header className="bg-gradient-to-r from-[#001b3d] to-[#002b5c] backdrop-blur-md shadow-[0px_8px_32px_rgba(0,0,0,0.3)] flex items-center w-full px-4 md:px-8 h-[80px] sticky top-0 z-40 border-b border-white/10">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
-import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw } from 'lucide-react';
+import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 
@@ -21,6 +22,7 @@ interface Paciente {
   alertas_rastreamento?: string;
   alertas?: string; 
   total_acompanhamentos?: number;
+  isFavorite?: boolean;
 }
 
 interface PatientsScreenProps {
@@ -172,48 +174,135 @@ export const DatePickerPTBR: React.FC<{ value: string; onChange: (val: string) =
   );
 };
 
+const InfoTooltip: React.FC<{ content: string }> = ({ content }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tooltipRef.current && !tooltipRef.current.contains(event.target as Node) &&
+          buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (closeTimeoutRef.current) window.clearTimeout(closeTimeoutRef.current);
+    };
+  }, []);
+
+  const updatePosition = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.top - 8,
+        left: rect.left + rect.width / 2,
+      });
+    }
+  };
+
+  const handleOpen = () => {
+    if (closeTimeoutRef.current) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    updatePosition();
+    setIsOpen(true);
+  };
+
+  const handleClose = (immediate = false) => {
+    if (closeTimeoutRef.current) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+
+    if (immediate) {
+      setIsOpen(false);
+      return;
+    }
+
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setIsOpen(false);
+      closeTimeoutRef.current = null;
+    }, 120);
+  };
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={(e) => { e.stopPropagation(); if (isOpen) handleClose(true); else handleOpen(); }}
+        onMouseEnter={handleOpen}
+        onMouseLeave={handleClose}
+        onFocus={handleOpen}
+        onBlur={() => handleClose(true)}
+        className="w-3.5 h-3.5 rounded-full bg-blue-400/20 hover:bg-blue-400/40 text-blue-300 hover:text-blue-200 flex items-center justify-center transition-all duration-200 flex-shrink-0 ring-1 ring-blue-400/20 hover:ring-blue-400/40"
+        aria-label="Mais informações"
+      >
+        <span className="text-[7px] font-black leading-none" style={{ fontFamily: 'serif' }}>i</span>
+      </button>
+      {isOpen && createPortal(
+        <div
+          ref={tooltipRef}
+          className="fixed z-[9999] pointer-events-auto"
+          style={{ top: position.top, left: position.left }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseEnter={handleOpen}
+          onMouseLeave={handleClose}
+        >
+          <div className="relative -translate-x-1/2 -translate-y-[calc(100%+4px)]">
+            <div className="bg-white text-slate-800 text-[10px] leading-relaxed font-medium rounded-xl px-4 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.18)] border border-slate-200/80 max-w-[240px] text-center">
+              {content}
+            </div>
+            <div className="absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.08)]"></div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+};
+
 const ALERT_CONFIGS: Record<string, { label: string; icon: any; color: string; bg: string; description: string }> = {
   'PEP_MOLECULAR': {
     label: 'IDENTIFICADO REGISTRO DE RESULTADO NO PEP DE TESTE MOLECULAR',
     icon: TestTube,
     color: 'text-white',
     bg: 'bg-blue-600 border-blue-700 shadow-md shadow-blue-600/20',
-    description: 'Identificado registro de resultado no PEP de teste molecular.'
+    description: 'Identificado registro de resultado no PEP de teste molecular'
   },
   'COLETA_MOLECULAR': {
-    label: 'IDENTIFICADO COLETA/RESULTADO DE TESTE MOLECULAR.',
+    label: 'IDENTIFICADO COLETA/RESULTADO DE TESTE MOLECULAR',
     icon: TestTube,
     color: 'text-white',
     bg: 'bg-orange-500 border-orange-600 shadow-md shadow-orange-500/20',
-    description: 'Identificado coleta/resultado de teste molecular.'
+    description: 'Identificado coleta/resultado de teste molecular'
   },
   'PEP_CITO': {
-    label: 'IDENTIFICADO REGISTRO DE RESULTADO NO PEP DE CITO.',
+    label: 'IDENTIFICADO REGISTRO DE RESULTADO NO PEP DE CITO',
     icon: Microscope,
     color: 'text-white',
     bg: 'bg-emerald-600 border-emerald-700 shadow-md shadow-emerald-600/20',
-    description: 'Identificado registro de resultado no PEP de cito.'
+    description: 'Identificado registro de resultado no PEP de cito'
   },
   'COLETA_CITO': {
     label: 'IDENTIFICADO COLETA/ RESULTADO DE CITO',
     icon: Microscope,
     color: 'text-white',
     bg: 'bg-yellow-500 border-yellow-600 shadow-md shadow-yellow-500/20',
-    description: 'Identificado coleta/resultado de cito.'
+    description: 'Identificado coleta/resultado de cito'
   },
   'NAO_IDENTIFICADO': {
     label: 'NÃO IDENTIFICADO COLETA OU RESULTADO DE EXAME DE RASTREAMENTO',
     icon: SearchX,
     color: 'text-white',
     bg: 'bg-red-600 border-red-700 shadow-md shadow-red-600/20',
-    description: 'Não identificado coleta ou resultado de exame de rastreamento.'
-  },
-  'URGENTE': {
-    label: 'URGENTE',
-    icon: AlertTriangle,
-    color: 'text-white',
-    bg: 'bg-error shadow-[0_2px_8px_rgba(185,28,28,0.4)]',
-    description: 'Ação imediata recomendada para este caso.'
+    description: 'Não identificado coleta ou resultado de exame de rastreamento'
   }
 };
 
@@ -267,6 +356,53 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterGrupo, setFilterGrupo] = useState('ALL');
+  const [filterTipoBusca, setFilterTipoBusca] = useState('ALL');
+  const [filterTipoContato, setFilterTipoContato] = useState('ALL');
+  const [filterSituacao, setFilterSituacao] = useState('ALL');
+  const [filterEntraves, setFilterEntraves] = useState('ALL');
+  const [filterDataInicio, setFilterDataInicio] = useState('');
+  const [filterDataFim, setFilterDataFim] = useState('');
+
+  const [availableGroups, setAvailableGroups] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    const saved = localStorage.getItem('amarcap53_favorites');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('amarcap53_favorites', JSON.stringify(favorites));
+  }, [favorites]);
+
+  const toggleFavorite = (id: string) => {
+    setFavorites(prev => 
+      prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]
+    );
+  };
+
+  useEffect(() => {
+    const fetchGroups = async () => {
+      if (!user) return;
+      try {
+        const filterParts = [];
+        if (!isAdmin && user) {
+          if (user.unidade_saude) filterParts.push(`unidade = "${user.unidade_saude}"`);
+          if (user.equipe) filterParts.push(`equipe = "${user.equipe}"`);
+          if (user.microarea) filterParts.push(`microarea ~ "${user.microarea}"`);
+        }
+
+        const result = await pb.collection('amarcap53_pacientes').getFullList({
+          fields: 'grupo',
+          filter: filterParts.length > 0 ? filterParts.join(' && ') : ''
+        });
+        const groups = Array.from(new Set(result.map(r => r.grupo))).filter(g => g && g !== '--');
+        setAvailableGroups(groups);
+      } catch (error) {
+        console.error("Erro ao buscar grupos:", error);
+      }
+    };
+    fetchGroups();
+  }, [user, isAdmin]);
+
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
 
@@ -299,14 +435,22 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
     
+    const rawDate = formData.get('data_busca') as string;
+    let dataBuscaIso = '';
+    if (rawDate && rawDate.includes('/')) {
+      const [d, m, y] = rawDate.split('/');
+      dataBuscaIso = `${y}-${m}-${d} 12:00:00`; // Formato ISO esperado pelo PocketBase para campos Date
+    }
+
     const data = {
       paciente: selectedPaciente.id,
       profissional: user.id,
-      data_busca: formData.get('data_busca') || '',
+      data_busca: dataBuscaIso || rawDate,
       tipo_busca: formData.get('tipo_busca') || '',
       tipo_contato: formData.get('tipo_contato') || '',
       situacao_pos_busca: formData.get('situacao_pos_busca') || '',
       entraves_identificados: formData.get('entraves_identificados') || '',
+      entraves_informado_por: formData.get('entraves_informado_por') || '', // Novo campo
       observacoes: formData.get('observacoes') || '',
     };
 
@@ -324,7 +468,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
   const determinarAlerta = (p: any) => {
     // Ordem de prioridade baseada na eficiência da identificação
-    if (p.alertas_rastreamento?.toUpperCase().includes('URGENTE')) return 'URGENTE';
     
     // 1. RESULTADO DE DNA- HPV REGISTRADO EM PRONTUÁRIO (DATA DO REGISTRO) -> Azul
     // Campo interativo: cito_laboratorio
@@ -352,30 +495,57 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         setIsLoading(true);
         const options: any = { sort: 'nome' };
         
-        // Filtros baseados no usuário logado
-        let filterStr = '';
-        if (!isAdmin) {
-          filterStr = `unidade = "${user.unidade_saude}" && equipe = "${user.equipe}" && microarea = ${parseInt(user.microarea)}`;
+        const filterParts = [];
+        if (!isAdmin && user) {
+          if (user.unidade_saude) filterParts.push(`unidade = "${user.unidade_saude}"`);
+          if (user.equipe) filterParts.push(`equipe = "${user.equipe}"`);
+          if (user.microarea) filterParts.push(`microarea ~ "${user.microarea}"`);
+        }
+
+        // Filtros de Acompanhamento (Requer busca na outra coleção)
+        const hasAcompFilter = filterTipoBusca !== 'ALL' || filterTipoContato !== 'ALL' || filterSituacao !== 'ALL' || filterEntraves !== 'ALL' || filterDataInicio || filterDataFim;
+        
+        if (hasAcompFilter) {
+          const acompFilters = [];
+          if (filterTipoBusca !== 'ALL') acompFilters.push(`tipo_busca = "${filterTipoBusca}"`);
+          if (filterTipoContato !== 'ALL') acompFilters.push(`tipo_contato = "${filterTipoContato}"`);
+          if (filterSituacao !== 'ALL') acompFilters.push(`situacao_pos_busca = "${filterSituacao}"`);
+          if (filterEntraves !== 'ALL') acompFilters.push(`entraves_identificados = "${filterEntraves}"`);
+          
+          if (filterDataInicio) {
+            acompFilters.push(`data_busca >= "${filterDataInicio} 00:00:00"`);
+          }
+          if (filterDataFim) {
+            acompFilters.push(`data_busca <= "${filterDataFim} 23:59:59"`);
+          }
+          
+          const acompRecords = await pb.collection('amarcap53_acompanhamentos').getFullList({
+            filter: acompFilters.join(' && '),
+            fields: 'paciente'
+          });
+          
+          const patientIds = Array.from(new Set(acompRecords.map(r => r.paciente)));
+          if (patientIds.length > 0) {
+            filterParts.push(`(${patientIds.map(id => `id = "${id}"`).join(' || ')})`);
+          } else {
+            // Nenhum acompanhamento encontrado com esses filtros, força resultado vazio
+            filterParts.push(`id = "none"`);
+          }
         }
 
         // Filtro de Busca (Nome ou CNS)
         if (searchTerm) {
-          const searchFilter = `(nome ~ "${searchTerm}" || cns ~ "${searchTerm}")`;
-          filterStr = filterStr ? `${filterStr} && ${searchFilter}` : searchFilter;
+          filterParts.push(`(nome ~ "${searchTerm}" || cns ~ "${searchTerm}")`);
         }
 
         // Filtro de Grupo
         if (filterGrupo !== 'ALL') {
-          const grupoFilter = `grupo = "${filterGrupo}"`;
-          filterStr = filterStr ? `${filterStr} && ${grupoFilter}` : grupoFilter;
+          filterParts.push(`grupo = "${filterGrupo}"`);
         }
 
-        // Filtro de Status (Alerta)
-        // Como o status é calculado dinamicamente no front, o filtro de status idealmente seria no front
-        // Mas para manter a paginação, vamos aplicar os filtros de campos relacionados se possível
-        // Por simplicidade e eficiência com paginação, filtramos o que dá no PocketBase
-        
-        options.filter = filterStr;
+        if (filterParts.length > 0) {
+          options.filter = filterParts.join(' && ');
+        }
         
         const resultList = await pb.collection('amarcap53_pacientes').getList(currentPage, pageSize, options);
         
@@ -408,6 +578,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             cito_laboratorio: formatarData(record.cito_laboratorio) || '--',
             alertas_rastreamento: record.alertas_rastreamento || '--',
             total_acompanhamentos: count,
+            isFavorite: favorites.includes(record.id),
           };
           
           p.alertas = determinarAlerta(p);
@@ -435,6 +606,12 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     setSearchTerm('');
     setFilterStatus('ALL');
     setFilterGrupo('ALL');
+    setFilterTipoBusca('ALL');
+    setFilterTipoContato('ALL');
+    setFilterSituacao('ALL');
+    setFilterEntraves('ALL');
+    setFilterDataInicio('');
+    setFilterDataFim('');
     setCurrentPage(1);
   };
 
@@ -528,16 +705,16 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                 <button 
                   onClick={() => setIsFilterVisible(!isFilterVisible)}
                   className={`flex items-center gap-3 px-8 h-14 rounded-2xl text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
-                    isFilterVisible || filterStatus !== 'ALL' || filterGrupo !== 'ALL'
+                    isFilterVisible || filterStatus !== 'ALL' || filterGrupo !== 'ALL' || filterTipoBusca !== 'ALL' || filterTipoContato !== 'ALL' || filterSituacao !== 'ALL' || filterEntraves !== 'ALL'
                       ? 'bg-primary text-white border-primary shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]' 
                       : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
                   }`}
                 >
                   <Filter className="w-5 h-5" />
                   <span>Filtros</span>
-                  {(filterStatus !== 'ALL' || filterGrupo !== 'ALL') && (
+                  {(filterStatus !== 'ALL' || filterGrupo !== 'ALL' || filterTipoBusca !== 'ALL' || filterTipoContato !== 'ALL' || filterSituacao !== 'ALL' || filterEntraves !== 'ALL') && (
                     <div className="w-6 h-6 flex items-center justify-center bg-white text-primary text-[10px] rounded-full font-black animate-pulse">
-                      {(filterStatus !== 'ALL' ? 1 : 0) + (filterGrupo !== 'ALL' ? 1 : 0)}
+                      {[filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves].filter(f => f !== 'ALL').length}
                     </div>
                   )}
                 </button>
@@ -564,7 +741,35 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             {/* Painel de Filtros Avançados */}
             {isFilterVisible && (
               <div className="bg-white p-8 rounded-3xl shadow-2xl border border-primary/5 animate-in slide-in-from-top-6 fade-in duration-500">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                  {/* Período de Busca (Acomp.) */}
+                  <div className="lg:col-span-2 space-y-3">
+                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                      <Calendar className="w-3.5 h-3.5" />
+                      Período da Busca (Acomp.)
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="relative">
+                        <input 
+                          type="date"
+                          value={filterDataInicio}
+                          onChange={(e) => setFilterDataInicio(e.target.value)}
+                          className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
+                        />
+                        {!filterDataInicio && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/30 text-xs font-bold pointer-events-none uppercase">Início</span>}
+                      </div>
+                      <div className="relative">
+                        <input 
+                          type="date"
+                          value={filterDataFim}
+                          onChange={(e) => setFilterDataFim(e.target.value)}
+                          className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
+                        />
+                        {!filterDataFim && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/30 text-xs font-bold pointer-events-none uppercase">Fim</span>}
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Filtro de Status */}
                   <div className="space-y-3">
                     <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
@@ -595,13 +800,100 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                       className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
                     >
                       <option value="ALL">Todos os Grupos</option>
-                      <option value="25 a 64 anos">25 a 64 anos</option>
-                      <option value="Fora da faixa etária">Fora da faixa etária</option>
+                      {availableGroups.map(grupo => (
+                        <option key={grupo} value={grupo}>{grupo}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Filtro de Tipo de Busca */}
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                      <Search className="w-3.5 h-3.5" />
+                      Tipo de Busca (Acomp.)
+                    </label>
+                    <select 
+                      value={filterTipoBusca}
+                      onChange={(e) => setFilterTipoBusca(e.target.value)}
+                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="ALL">Todos os Tipos</option>
+                      <option value="1 - Busca ativa- Visita domiciliar registrada em prontuário">1 - Busca ativa- Visita domiciliar registrada em prontuário</option>
+                      <option value="2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário">2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário</option>
+                      <option value="3 - Busca ativa - Mensagem registrada em prontuário">3 - Busca ativa - Mensagem registrada em prontuário</option>
+                    </select>
+                  </div>
+
+                  {/* Filtro de Tipo de Contato */}
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                      <Phone className="w-3.5 h-3.5" />
+                      Tipo de Contato (Acomp.)
+                    </label>
+                    <select 
+                      value={filterTipoContato}
+                      onChange={(e) => setFilterTipoContato(e.target.value)}
+                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="ALL">Todos os Contatos</option>
+                      <option value="Contato direto (conversa)">Contato direto (conversa)</option>
+                      <option value="Contato indireto (mensagem)">Contato indireto (mensagem)</option>
+                      <option value="Não houve contato ( não localizada, ligação não atendida...)">Não houve contato ( não localizada, ligação não atendida...)</option>
+                    </select>
+                  </div>
+
+                  {/* Filtro de Situação */}
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                      <BadgeCheck className="w-3.5 h-3.5" />
+                      Situação Pós Busca (Acomp.)
+                    </label>
+                    <select 
+                      value={filterSituacao}
+                      onChange={(e) => setFilterSituacao(e.target.value)}
+                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="ALL">Todas as Situações</option>
+                      <option value="1- Agendamento após contato direto">1- Agendamento após contato direto</option>
+                      <option value="2 - Convite para demanda livre">2 - Convite para demanda livre</option>
+                      <option value="3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP">3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP</option>
+                      <option value="4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP">4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP</option>
+                      <option value="5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP">5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP</option>
+                      <option value="6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP">6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP</option>
+                      <option value="7 - Mudança de território (situação atualizada no PEP)">7 - Mudança de território (situação atualizada no PEP)</option>
+                      <option value="8 - Óbito (situação atualizada no PEP)">8 - Óbito (situação atualizada no PEP)</option>
+                      <option value="9 - Não localizada">9 - Não localizada</option>
+                      <option value="10 - Recusa">10 - Recusa</option>
+                    </select>
+                  </div>
+
+                  {/* Filtro de Entraves */}
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Entraves (Acomp.)
+                    </label>
+                    <select 
+                      value={filterEntraves}
+                      onChange={(e) => setFilterEntraves(e.target.value)}
+                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="ALL">Todos os Entraves</option>
+                      <option value="1 - Horários incompatíveis com a rotina de trabalho">1 - Horários incompatíveis com a rotina de trabalho</option>
+                      <option value="2 - Vergonha ou constrangimento durante o exame">2 - Vergonha ou constrangimento durante o exame</option>
+                      <option value="3 - Ideia equivocada sobre a necessidade de fazer exame">3 - Ideia equivocada sobre a necessidade de fazer exame</option>
+                      <option value="4 - Faz o rastreamento pela rede privada">4 - Faz o rastreamento pela rede privada</option>
+                      <option value="5 - Dificuldade de locomoção ( ex: acamada)">5 - Dificuldade de locomoção ( ex: acamada)</option>
+                      <option value="6 - Distância da Unidade">6 - Distância da Unidade</option>
+                      <option value="7 - Se recusa a fazer o exame com o profissional da equipe">7 - Se recusa a fazer o exame com o profissional da equipe</option>
+                      <option value="8 - Esquece a data do agendamento">8 - Esquece a data do agendamento</option>
+                      <option value="9 - Indisponibilidade de tempo">9 - Indisponibilidade de tempo</option>
+                      <option value="10 - Não identificado entrave">10 - Não identificado entrave</option>
                     </select>
                   </div>
 
                   {/* Botões de Ação */}
-                  <div className="flex items-end gap-4">
+                  <div className="flex items-end gap-4 lg:col-span-3">
                     <button 
                       onClick={resetFilters}
                       className="flex-1 flex items-center justify-center gap-2 py-4 bg-surface-container-high text-on-surface-variant text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-surface-container-highest transition-all duration-300"
@@ -655,7 +947,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
                       <div className="flex flex-col items-center gap-1">
                         <TestTube className="w-4 h-4 text-blue-400/60" />
-                        <span>DNA-HPV (PEP)</span>
+                        <div className="flex items-center gap-1.5">
+                          <span>DNA-HPV (PEP)</span>
+                          <InfoTooltip content="Data de registro do resultado do teste molecular de DNA-HPV no PEP (Prontuário Eletrônico do Paciente)." />
+                        </div>
                         <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Registro)</span>
                       </div>
                     </th>
@@ -668,22 +963,31 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
                       <div className="flex flex-col items-center gap-1">
                         <Microscope className="w-4 h-4 text-blue-400/60" />
-                        <span>Cito (Lab)</span>
+                        <div className="flex items-center gap-1.5">
+                          <span>Cito (Lab)</span>
+                          <InfoTooltip content="Data de cadastro do resultado do exame citopatológico realizado no laboratório." />
+                        </div>
                         <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Cadastro)</span>
                       </div>
                     </th>
                     <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
                       <div className="flex flex-col items-center gap-1">
                         <FileText className="w-4 h-4 text-blue-400/60" />
-                        <span>Cito (PEP)</span>
+                        <div className="flex items-center gap-1.5">
+                          <span>Cito (PEP)</span>
+                          <InfoTooltip content="Data de coleta do exame citopatológico registrada no PEP (Prontuário Eletrônico do Paciente)." />
+                        </div>
                         <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Coleta)</span>
                       </div>
                     </th>
                     <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px]">
                       <div className="flex flex-col items-center gap-1">
                         <TestTube className="w-4 h-4 text-blue-400/60" />
-                        <span>DNA-HPV (Solic.)</span>
-                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Solicitação)</span>
+                        <div className="flex items-center gap-1.5">
+                          <span>DNA-HPV (GAL)</span>
+                          <InfoTooltip content="Data do resultado do teste molecular de DNA-HPV registrada no GAL (Gerenciador de Ambiente Laboratorial)." />
+                        </div>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data GAL)</span>
                       </div>
                     </th>
                   </tr>
@@ -711,8 +1015,19 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     pacientes.map((paciente) => (
                       <tr key={paciente.id} className="hover:bg-primary/[0.03] transition-all group">
                         {/* 1. PACIENTE */}
-                        <td className="px-4 py-6 text-center">
-                          <div className="flex flex-col items-center gap-0.5">
+                        <td className="px-4 py-6 text-center relative">
+                          <button 
+                            onClick={() => toggleFavorite(paciente.id)}
+                            className={`absolute left-2 top-2 p-1.5 rounded-lg transition-all duration-300 ${
+                              favorites.includes(paciente.id) 
+                                ? 'text-amber-400 bg-amber-50 shadow-sm border border-amber-100' 
+                                : 'text-slate-300 hover:text-amber-300 bg-slate-50 border border-slate-100'
+                            }`}
+                            title={favorites.includes(paciente.id) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                          >
+                            <Star className={`w-3.5 h-3.5 ${favorites.includes(paciente.id) ? 'fill-current' : ''}`} />
+                          </button>
+                          <div className="flex flex-col items-center gap-0.5 mt-2">
                             <p className="text-[11px] md:text-[13px] font-black text-primary uppercase leading-tight break-words" title={paciente.nome}>
                               {paciente.nome}
                             </p>
@@ -941,22 +1256,21 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             <div className="overflow-y-auto custom-scrollbar-modal flex-1 p-5 sm:p-8 md:p-10">
               <form id="registro-acompanhamento-form" onSubmit={handleSaveFollowUp}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5 sm:gap-y-6">
-                {/* Data da Busca */}
-                <div className="space-y-2 group/field">
-                  <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
-                    <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
-                      <Calendar className="w-3.5 h-3.5" />
+                  <div className="space-y-2 group/field">
+                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
+                      <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
+                        <Calendar className="w-3.5 h-3.5" />
+                      </div>
+                      Data da Busca
+                    </label>
+                    <div className="relative">
+                      <DatePickerPTBR 
+                        value={selectedDate} 
+                        onChange={(val) => setSelectedDate(val)} 
+                      />
+                      <input type="hidden" name="data_busca" value={selectedDate} />
                     </div>
-                    Data da Busca
-                  </label>
-                  <div className="relative">
-                    <input type="hidden" name="data_busca" value={selectedDate} />
-                    <DatePickerPTBR 
-                      value={selectedDate} 
-                      onChange={(val) => setSelectedDate(val)} 
-                    />
                   </div>
-                </div>
 
                 {/* Tipo de Busca */}
                 <div className="space-y-2 group/field">
@@ -967,8 +1281,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     Tipo de Busca
                   </label>
                   <div className="relative">
-                    <select name="tipo_busca" required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40">
-                      <option value="" disabled selected>Selecione</option>
+                    <select name="tipo_busca" defaultValue="" required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40">
+                      <option value="" disabled>Selecione</option>
                       <option value="1 - Busca ativa- Visita domiciliar registrada em prontuário">1 - Busca ativa- Visita domiciliar registrada em prontuário</option>
                       <option value="2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário">2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário</option>
                       <option value="3 - Busca ativa - Mensagem registrada em prontuário">3 - Busca ativa - Mensagem registrada em prontuário</option>
@@ -988,8 +1302,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     Tipo de Contato
                   </label>
                   <div className="relative">
-                    <select name="tipo_contato" required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40">
-                      <option value="" disabled selected>Selecione uma modalidade</option>
+                    <select name="tipo_contato" defaultValue="" required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40">
+                      <option value="" disabled>Selecione uma modalidade</option>
                       <option value="Contato direto (conversa)">Contato direto (conversa)</option>
                       <option value="Contato indireto (mensagem)">Contato indireto (mensagem)</option>
                       <option value="Não houve contato ( não localizada, ligação não atendida...)">Não houve contato ( não localizada, ligação não atendida...)</option>
@@ -1009,8 +1323,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     Situação Pós Busca Ativa
                   </label>
                   <div className="relative">
-                    <select name="situacao_pos_busca" required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40">
-                      <option value="" disabled selected>Selecione o desfecho da busca</option>
+                    <select name="situacao_pos_busca" defaultValue="" required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40">
+                      <option value="" disabled>Selecione o desfecho da busca</option>
                       <option value="1- Agendamento após contato direto">1- Agendamento após contato direto</option>
                       <option value="2 - Convite para demanda livre">2 - Convite para demanda livre</option>
                       <option value="3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP">3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP</option>
@@ -1047,6 +1361,28 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                       <option value="6 - Distância da Unidade">6 - Distância da Unidade</option>
                       <option value="7 - Se recusa a fazer o exame com o profissional da equipe">7 - Se recusa a fazer o exame com o profissional da equipe</option>
                       <option value="8 - Esquece a data do agendamento">8 - Esquece a data do agendamento</option>
+                      <option value="9 - Indisponibilidade de tempo">9 - Indisponibilidade de tempo</option>
+                      <option value="10 - Não identificado entrave">10 - Não identificado entrave</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-on-surface-variant">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Entraves Informado Por */}
+                <div className="col-span-1 md:col-span-2 space-y-2 group/field">
+                  <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
+                    <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
+                      <Info className="w-3.5 h-3.5" />
+                    </div>
+                    Entrave(s) Informado Por
+                  </label>
+                  <div className="relative">
+                    <select name="entraves_informado_por" className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40">
+                      <option value="" disabled selected>Selecione (Opcional)</option>
+                      <option value="1 - Informado por paciente">1 - Informado por paciente</option>
+                      <option value="2 - Identificado por profissional">2 - Identificado por profissional</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-on-surface-variant">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>

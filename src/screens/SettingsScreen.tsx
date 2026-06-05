@@ -34,6 +34,29 @@ interface SettingsScreenProps {
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setActiveTab }) => {
   const { user, isAdmin } = useAuth();
+
+  if (!isAdmin) {
+    return (
+      <div className="flex-1 flex flex-col min-h-screen bg-surface items-center justify-center p-8">
+        <div className="bg-white p-12 rounded-[2.5rem] shadow-2xl border border-error/10 text-center max-w-md">
+          <div className="w-20 h-20 bg-error/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <Shield className="w-10 h-10 text-error" />
+          </div>
+          <h2 className="text-2xl font-black text-primary uppercase tracking-tighter mb-4">Acesso Restrito</h2>
+          <p className="text-on-surface-variant font-medium mb-8">
+            Você não tem permissão para acessar as configurações do sistema. Entre em contato com o administrador.
+          </p>
+          <button 
+            onClick={() => setActiveTab('resumo')}
+            className="w-full py-4 bg-primary text-white font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-primary/20"
+          >
+            Voltar ao Início
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const [isUploading, setIsUploading] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [userName, setUserName] = useState('');
