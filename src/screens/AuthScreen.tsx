@@ -119,21 +119,36 @@ export function AuthScreen() {
       }
 
       const data = {
+        username: email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') + Math.floor(Math.random() * 10000),
         email,
+        emailVisibility: true,
         password,
         passwordConfirm,
         unidade_saude: finalUnidade,
         equipe: finalEquipe,
         microarea: finalMicroarea,
-        role: perfil // Salva o perfil selecionado (cap, unidade, equipe, microarea)
+        role: perfil
       };
 
       await pb.collection('amarcap53_users').create(data);
       // Após criar, faz o login automaticamente
       await pb.collection('amarcap53_users').authWithPassword(email, password);
     } catch (err: any) {
-      console.error(err);
-      setError('Erro ao criar conta. Verifique os dados ou se o e-mail já existe.');
+      console.error('Erro detalhado:', err.data);
+      
+      let msg = 'Erro ao criar conta. Verifique os dados.';
+      
+      if (err.data?.data) {
+        const firstField = Object.keys(err.data.data)[0];
+        const fieldError = err.data.data[firstField];
+        msg = `Erro no campo ${firstField}: ${fieldError.message}`;
+      } else if (err.message === 'Já existe um cadastro com esta combinação de perfil.') {
+        msg = err.message;
+      } else if (err.data?.message) {
+        msg = err.data.message;
+      }
+      
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
