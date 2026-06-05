@@ -38,6 +38,7 @@ export function VerifyEmailScreen() {
     try {
       // Tentamos primeiro na coleção amarcap53_users
       await pb.collection('amarcap53_users').confirmVerification(token);
+      localStorage.setItem('selectedApp', 'amarcap53');
       setSuccess(true);
     } catch (err: any) {
       console.error(err);
@@ -45,6 +46,7 @@ export function VerifyEmailScreen() {
       // Se falhar na amarcap53_users, tenta na agenda
       try {
          await pb.collection('agenda_cap53_usuarios').confirmVerification(token);
+         localStorage.setItem('selectedApp', 'agenda');
          setSuccess(true);
       } catch (err2: any) {
          setError('Não foi possível verificar o e-mail. O link pode ter expirado ou já foi utilizado.');
@@ -55,6 +57,9 @@ export function VerifyEmailScreen() {
   };
 
   if (success) {
+    const selectedApp = localStorage.getItem('selectedApp') || 'amarcap53';
+    const appName = selectedApp === 'agenda' ? 'Agenda' : 'AMAR';
+
     return (
       <div className="min-h-screen bg-surface flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -64,11 +69,17 @@ export function VerifyEmailScreen() {
             </div>
             <h2 className="text-2xl font-black text-slate-800 mb-4 tracking-tight">E-mail Verificado!</h2>
             <p className="text-slate-600 mb-8 leading-relaxed">
-              Sua conta foi verificada com sucesso. Você já tem acesso total aos recursos.
+              Sua conta no <strong>{appName}</strong> foi verificada com sucesso. Você já tem acesso total aos recursos.
             </p>
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <p className="text-sm font-bold text-slate-600">
-                Você já pode fechar esta janela e voltar para o seu aplicativo.
+            <div className="space-y-4">
+              <button
+                onClick={() => window.location.href = '/'}
+                className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-black text-white bg-slate-800 hover:bg-slate-900 transition-all uppercase tracking-wider"
+              >
+                Ir para o Login do {appName}
+              </button>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Ou feche esta janela e volte para o seu aplicativo.
               </p>
             </div>
           </div>
