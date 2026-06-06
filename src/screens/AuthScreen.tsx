@@ -492,15 +492,17 @@ export function AuthScreen() {
 
           <div className="mt-8 pt-6 border-t border-outline/10 space-y-4">
             {authState === 'login' ? (
-              <p className="text-center text-sm text-on-surface/70">
-                Não possui conta?{' '}
-                <button
-                  onClick={() => { setAuthState('register'); clearMessages(); }}
-                  className="font-medium text-primary hover:text-primary/80 transition-colors inline-flex items-center"
-                >
-                  Solicitar acesso <ArrowRight className="ml-1 h-4 w-4" />
-                </button>
-              </p>
+              <>
+                <p className="text-center text-sm text-on-surface/70">
+                  Não possui conta?{' '}
+                  <button
+                    onClick={() => { setAuthState('register'); clearMessages(); }}
+                    className="font-medium text-primary hover:text-primary/80 transition-colors inline-flex items-center"
+                  >
+                    Solicitar acesso <ArrowRight className="ml-1 h-4 w-4" />
+                  </button>
+                </p>
+              </>
             ) : (
               <button
                 onClick={() => { setAuthState('login'); clearMessages(); }}
