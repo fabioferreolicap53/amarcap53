@@ -43,11 +43,22 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
   const updatePosition = () => {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + window.scrollY + 12,
-        left: rect.left + window.scrollX,
-        width: Math.max(rect.width, 280) // Mínimo de 280px para o calendário
-      });
+      const isMobile = window.innerWidth < 768;
+      
+      if (isMobile) {
+        // Centralizado no mobile
+        setDropdownPosition({
+          top: rect.bottom + window.scrollY + 8,
+          left: (window.innerWidth - 300) / 2, // Centraliza calendário de 300px
+          width: 300
+        });
+      } else {
+        setDropdownPosition({
+          top: rect.bottom + window.scrollY + 12,
+          left: rect.left + window.scrollX,
+          width: Math.max(rect.width, 280)
+        });
+      }
     }
   };
 
@@ -167,6 +178,7 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
       <div className="relative group">
         <input
           type="text"
+          inputMode="numeric"
           value={displayValue}
           onChange={handleTextChange}
           onFocus={handleOpen}
@@ -194,50 +206,50 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
 
       {isOpen && dropdownPosition && createPortal(
         <div 
-          className="datepicker-portal-content fixed z-[9999] animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-300 origin-top"
+          className="datepicker-portal-content fixed z-[9999] animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-300 origin-top max-w-[95vw]"
           style={{ 
             top: dropdownPosition.top, 
-            left: dropdownPosition.left, 
+            left: Math.max(8, dropdownPosition.left), 
             width: dropdownPosition.width 
           }}
         >
-          <div className="bg-white border border-primary/10 rounded-[2rem] shadow-[0px_25px_70px_rgba(0,0,0,0.2)] p-6 backdrop-blur-xl bg-white/95 ring-1 ring-black/5">
-            <div className="flex gap-2 mb-6">
+          <div className="bg-white border border-primary/10 rounded-[2rem] shadow-[0px_25px_70px_rgba(0,0,0,0.2)] p-4 sm:p-6 backdrop-blur-xl bg-white/95 ring-1 ring-black/5">
+            <div className="flex gap-2 mb-4 sm:mb-6">
               <button 
                 onClick={() => setQuickDate(0)}
-                className="flex-1 py-2.5 bg-primary/5 hover:bg-primary text-primary hover:text-white text-[10px] font-black uppercase rounded-xl transition-all border border-primary/10 hover:border-transparent hover:shadow-lg hover:shadow-primary/20"
+                className="flex-1 py-2 sm:py-2.5 bg-primary/5 hover:bg-primary text-primary hover:text-white text-[9px] sm:text-[10px] font-black uppercase rounded-xl transition-all border border-primary/10 hover:border-transparent"
               >
                 Hoje
               </button>
               <button 
                 onClick={() => setQuickDate(null)}
-                className="flex-1 py-2.5 bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white text-[10px] font-black uppercase rounded-xl transition-all border border-rose-100 hover:border-transparent hover:shadow-lg hover:shadow-rose-200"
+                className="flex-1 py-2 sm:py-2.5 bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white text-[9px] sm:text-[10px] font-black uppercase rounded-xl transition-all border border-rose-100 hover:border-transparent"
               >
                 Limpar
               </button>
             </div>
             
-            <div className="flex items-center justify-between mb-6 px-1">
+            <div className="flex items-center justify-between mb-4 sm:mb-6 px-1">
               <button 
                 onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} 
-                className="p-2 hover:bg-slate-100 rounded-xl transition-all active:scale-90"
+                className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-xl transition-all active:scale-90"
               >
-                <ChevronLeft className="w-5 h-5 text-primary" />
+                <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
               </button>
               <div className="text-center">
-                <span className="text-xs font-black uppercase text-slate-800 tracking-widest block">{months[currentMonth.getMonth()]}</span>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{currentMonth.getFullYear()}</span>
+                <span className="text-[11px] sm:text-xs font-black uppercase text-slate-800 tracking-widest block">{months[currentMonth.getMonth()]}</span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{currentMonth.getFullYear()}</span>
               </div>
               <button 
                 onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} 
-                className="p-2 hover:bg-slate-100 rounded-xl transition-all active:scale-90"
+                className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-xl transition-all active:scale-90"
               >
-                <ChevronRight className="w-5 h-5 text-primary" />
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
               </button>
             </div>
 
-            <div className="grid grid-cols-7 gap-1 mb-3">
-              {daysOfWeek.map(d => <div key={d} className="text-[9px] font-black text-slate-300 uppercase text-center py-1">{d}</div>)}
+            <div className="grid grid-cols-7 gap-1 mb-2 sm:mb-3">
+              {daysOfWeek.map(d => <div key={d} className="text-[8px] sm:text-[9px] font-black text-slate-300 uppercase text-center py-1">{d}</div>)}
             </div>
             
             <div className="grid grid-cols-7 gap-1">
@@ -250,7 +262,7 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
                     key={i} 
                     onClick={() => day && handleDateSelect(day)}
                     className={`
-                      text-[11px] font-black h-9 flex items-center justify-center rounded-xl transition-all relative
+                      text-[10px] sm:text-[11px] font-black h-8 sm:h-9 flex items-center justify-center rounded-xl transition-all relative
                       ${day ? 'cursor-pointer hover:bg-primary/10 hover:text-primary active:scale-90' : ''}
                       ${isSelected ? 'bg-primary !text-white shadow-lg shadow-primary/30 z-10 scale-105' : 'text-slate-600'}
                       ${isToday && !isSelected ? 'text-primary' : ''}
