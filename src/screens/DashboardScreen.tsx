@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, Activity, HeartPulse, Calendar, BadgeCheck, TrendingUp, Phone, MessageSquare, ClipboardList, PieChart, BarChart3, MapPin } from 'lucide-react';
 import { Header } from '../components/Header';
+import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
@@ -392,25 +393,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest ml-1">Início</label>
-                  <input 
-                    type="date"
-                    value={filterDataInicio}
-                    onChange={(e) => setFilterDataInicio(e.target.value)}
-                    className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all cursor-pointer"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest ml-1">Fim</label>
-                  <input 
-                    type="date"
-                    value={filterDataFim}
-                    onChange={(e) => setFilterDataFim(e.target.value)}
-                    className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all cursor-pointer"
-                  />
-                </div>
+              <div className="flex gap-4 mb-4">
+                <DatePickerPTBR 
+                  label="Início"
+                  value={filterDataInicio}
+                  onChange={setFilterDataInicio}
+                />
+                <DatePickerPTBR 
+                  label="Fim"
+                  value={filterDataFim}
+                  onChange={setFilterDataFim}
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -47,6 +47,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
   const [isRequestingEmail, setIsRequestingEmail] = useState(false);
   const [emailSuccess, setEmailSuccess] = useState(false);
 
+  // Password reset states
+  const [isRequestingPassword, setIsRequestingPassword] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+
   const [importHistory, setImportHistory] = useState<ImportLog[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>({ 
@@ -128,16 +132,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       const updatedRecord = await pb.collection('amarcap53_users').update(user.id, {
         name: userName
       });
-
-      if (updatedRecord && !('name' in updatedRecord)) {
-        alert('AVISO: O campo "name" não existe no seu PocketBase. O nome NÃO foi salvo. Por favor, adicione o campo "name" na coleção "amarcap53_users" no painel do PocketBase.');
-        setIsEditingName(false);
-        return;
-      }
       
+      // Atualiza o estado global do AuthContext forçando um refresh da sessão
       await pb.collection('amarcap53_users').authRefresh();
-      setUserName(pb.authStore.model?.name || '');
+      
+      // O useEffect do SettingsScreen sincronizará o userName automaticamente
       setIsEditingName(false);
+      alert('Nome atualizado com sucesso!');
     } catch (err) {
       console.error('Erro ao atualizar nome:', err);
       alert('Erro ao atualizar nome. Tente novamente.');
@@ -161,6 +162,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       alert('Erro ao solicitar troca de e-mail. Verifique se o novo e-mail já está em uso.');
     } finally {
       setIsRequestingEmail(false);
+    }
+  };
+
+  const handleRequestPasswordReset = async () => {
+    if (!user?.email) return;
+    
+    setIsRequestingPassword(true);
+    try {
+      await pb.collection('amarcap53_users').requestPasswordReset(user.email);
+      setPasswordSuccess(true);
+      setTimeout(() => setPasswordSuccess(false), 8000);
+    } catch (err) {
+      console.error('Erro ao solicitar reset de senha:', err);
+      alert('Erro ao solicitar troca de senha. Tente novamente mais tarde.');
+    } finally {
+      setIsRequestingPassword(false);
     }
   };
 
@@ -412,7 +429,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                     </div>
                   </div>
 
-                  <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100">
+                  <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col justify-between">
                     <form onSubmit={handleRequestEmailChange} className="space-y-4">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center mb-4">Solicitar troca de e-mail</p>
                       <div className="flex flex-col gap-3">
@@ -432,11 +449,32 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                         </button>
                       </div>
                       {emailSuccess && (
-                    <p className="text-[10px] font-bold text-emerald-600 uppercase text-center animate-pulse mt-2">
-                      Verifique sua caixa de entrada e SPAM para confirmar!
-                    </p>
-                  )}
+                        <p className="text-[10px] font-bold text-emerald-600 uppercase text-center animate-pulse mt-2">
+                          Verifique sua caixa de entrada e SPAM para confirmar!
+                        </p>
+                      )}
                     </form>
+
+                    <div className="pt-6 mt-6 border-t border-slate-200">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center mb-4">Segurança da Conta</p>
+                      <button 
+                        onClick={handleRequestPasswordReset}
+                        disabled={isRequestingPassword}
+                        className="w-full py-4 bg-slate-800 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-slate-900 transition-all shadow-lg shadow-slate-200 text-xs disabled:opacity-30 flex items-center justify-center gap-2"
+                      >
+                        {isRequestingPassword ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Shield className="w-4 h-4" />
+                        )}
+                        {isRequestingPassword ? 'Solicitando...' : 'Redefinir Senha por E-mail'}
+                      </button>
+                      {passwordSuccess && (
+                        <p className="text-[10px] font-bold text-emerald-600 uppercase text-center animate-pulse mt-3">
+                          Link de redefinição enviado para seu e-mail!
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

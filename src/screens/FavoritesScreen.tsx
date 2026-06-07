@@ -3,7 +3,7 @@ import { Header } from '../components/Header';
 import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
-import { DatePickerPTBR } from './PatientsScreen';
+import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 
 interface Paciente {
@@ -466,25 +466,17 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                       <Calendar className="w-3.5 h-3.5" />
                       Período da Busca (Acomp.)
                     </label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="relative">
-                        <input 
-                          type="date"
-                          value={filterDataInicio}
-                          onChange={(e) => setFilterDataInicio(e.target.value)}
-                          className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                        />
-                        {!filterDataInicio && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/30 text-xs font-bold pointer-events-none uppercase">Início</span>}
-                      </div>
-                      <div className="relative">
-                        <input 
-                          type="date"
-                          value={filterDataFim}
-                          onChange={(e) => setFilterDataFim(e.target.value)}
-                          className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                        />
-                        {!filterDataFim && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/30 text-xs font-bold pointer-events-none uppercase">Fim</span>}
-                      </div>
+                    <div className="flex gap-4">
+                      <DatePickerPTBR 
+                        placeholder="Início"
+                        value={filterDataInicio}
+                        onChange={setFilterDataInicio}
+                      />
+                      <DatePickerPTBR 
+                        placeholder="Fim"
+                        value={filterDataFim}
+                        onChange={setFilterDataFim}
+                      />
                     </div>
                   </div>
 

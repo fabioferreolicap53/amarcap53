@@ -3,7 +3,7 @@ import { Header } from '../components/Header';
 import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2, RotateCcw, Users, MapPin } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
-import { DatePickerPTBR } from './PatientsScreen';
+import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 
 interface Acompanhamento {
@@ -411,25 +411,17 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                       <Calendar className="w-3.5 h-3.5" />
                       Período da Busca (Início e Fim)
                     </label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="relative group/date">
-                        <input 
-                          type="date"
-                          value={filterDataInicio}
-                          onChange={(e) => setFilterDataInicio(e.target.value)}
-                          className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                        />
-                        {!filterDataInicio && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/30 text-xs font-bold pointer-events-none uppercase">Data Inicial</span>}
-                      </div>
-                      <div className="relative group/date">
-                        <input 
-                          type="date"
-                          value={filterDataFim}
-                          onChange={(e) => setFilterDataFim(e.target.value)}
-                          className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                        />
-                        {!filterDataFim && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/30 text-xs font-bold pointer-events-none uppercase">Data Final</span>}
-                      </div>
+                    <div className="flex gap-4">
+                      <DatePickerPTBR 
+                        placeholder="Data Inicial"
+                        value={filterDataInicio}
+                        onChange={setFilterDataInicio}
+                      />
+                      <DatePickerPTBR 
+                        placeholder="Data Final"
+                        value={filterDataFim}
+                        onChange={setFilterDataFim}
+                      />
                     </div>
                   </div>
 

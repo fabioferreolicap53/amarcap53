@@ -4,6 +4,7 @@ import { Header } from '../components/Header';
 import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
+import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 
 interface Paciente {
@@ -30,150 +31,6 @@ interface PatientsScreenProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
-
-export const DatePickerPTBR: React.FC<{ value: string; onChange: (val: string) => void }> = ({ value, onChange }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const daysOfWeek = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-  const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-
-  const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
-  const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
-
-  const days = [];
-  const totalDays = getDaysInMonth(currentMonth.getFullYear(), currentMonth.getMonth());
-  const firstDay = getFirstDayOfMonth(currentMonth.getFullYear(), currentMonth.getMonth());
-
-  for (let i = 0; i < firstDay; i++) days.push(null);
-  for (let i = 1; i <= totalDays; i++) days.push(i);
-
-  const handleDateSelect = (day: number) => {
-    const selected = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    const d = String(selected.getDate()).padStart(2, '0');
-    const m = String(selected.getMonth() + 1).padStart(2, '0');
-    const y = selected.getFullYear();
-    onChange(`${d}/${m}/${y}`);
-    setIsOpen(false);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/\D/g, '');
-    if (val.length > 8) val = val.slice(0, 8);
-    
-    if (val.length > 4) {
-      val = `${val.slice(0, 2)}/${val.slice(2, 4)}/${val.slice(4)}`;
-    } else if (val.length > 2) {
-      val = `${val.slice(0, 2)}/${val.slice(2)}`;
-    }
-    
-    onChange(val);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      if (value === '' || value === '--' || value.length === 10) {
-        setIsOpen(false);
-        (e.target as HTMLInputElement).blur();
-      }
-    }
-  };
-
-  const handleBlur = () => {
-    // Força salvamento ao sair do campo se a data for válida ou vazia
-    if (value === '' || value === '--' || value.length === 10) {
-      onChange(value);
-    }
-  };
-
-  const setQuickDate = (offset: number | null) => {
-    if (offset === null) {
-      onChange('');
-    } else {
-      const date = new Date();
-      date.setDate(date.getDate() + offset);
-      const d = String(date.getDate()).padStart(2, '0');
-      const m = String(date.getMonth() + 1).padStart(2, '0');
-      const y = date.getFullYear();
-      onChange(`${d}/${m}/${y}`);
-    }
-    setIsOpen(false);
-  };
-
-  return (
-    <div className="relative inline-block w-full max-w-[150px]" ref={containerRef}>
-      <div 
-        className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[11px] md:text-[12px] font-black text-[#001b3d] flex items-center justify-between gap-2 hover:border-primary/40 hover:bg-white transition-all shadow-sm focus-within:ring-2 focus-within:ring-primary/10 focus-within:border-primary focus-within:bg-white"
-      >
-        <input
-          type="text"
-          value={value === '--' ? '' : value}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          placeholder="DD/MM/YYYY"
-          className="bg-transparent border-none outline-none w-full text-[#001b3d] placeholder:text-slate-300 font-black uppercase tracking-tight"
-          onFocus={() => setIsOpen(true)}
-        />
-        <Calendar 
-          className="w-4 h-4 text-slate-400 cursor-pointer hover:text-primary transition-colors shrink-0" 
-          onClick={() => setIsOpen(!isOpen)}
-        />
-      </div>
-
-      {isOpen && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white border border-slate-200 rounded-2xl shadow-[0px_20px_50px_rgba(0,0,0,0.15)] z-[100] p-4 w-[240px] animate-in fade-in zoom-in-95 duration-200">
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            <button 
-              onClick={() => setQuickDate(0)}
-              className="py-1.5 px-3 bg-primary/5 hover:bg-primary/10 text-primary text-[9px] font-black uppercase rounded-lg transition-all border border-primary/10"
-            >
-              Hoje
-            </button>
-            <button 
-              onClick={() => setQuickDate(null)}
-              className="py-1.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[9px] font-black uppercase rounded-lg transition-all border border-rose-100"
-            >
-              Limpar
-            </button>
-          </div>
-          <div className="flex items-center justify-between mb-4 px-1">
-            <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-1.5 hover:bg-slate-100 rounded-xl transition-colors"><ChevronLeft className="w-4 h-4 text-primary" /></button>
-            <span className="text-[11px] font-black uppercase text-primary tracking-widest">{months[currentMonth.getMonth()]} {currentMonth.getFullYear()}</span>
-            <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-1.5 hover:bg-slate-100 rounded-xl transition-colors"><ChevronRight className="w-4 h-4 text-primary" /></button>
-          </div>
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {daysOfWeek.map(d => <div key={d} className="text-[9px] font-black text-slate-400 uppercase text-center">{d}</div>)}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {days.map((day, i) => (
-              <div 
-                key={i} 
-                onClick={() => day && handleDateSelect(day)}
-                className={`
-                  text-[10px] font-black h-7 flex items-center justify-center rounded-lg transition-all
-                  ${day ? 'cursor-pointer hover:bg-primary/10 hover:text-primary' : ''}
-                  ${day && value === `${String(day).padStart(2, '0')}/${String(currentMonth.getMonth() + 1).padStart(2, '0')}/${currentMonth.getFullYear()}` ? 'bg-primary !text-white shadow-md shadow-primary/20' : 'text-slate-600'}
-                `}
-              >
-                {day}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
 
 const InfoTooltip: React.FC<{ content: string }> = ({ content }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -783,25 +640,17 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                       <Calendar className="w-3.5 h-3.5" />
                       Período da Busca (Acomp.)
                     </label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="relative">
-                        <input 
-                          type="date"
-                          value={filterDataInicio}
-                          onChange={(e) => setFilterDataInicio(e.target.value)}
-                          className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                        />
-                        {!filterDataInicio && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/30 text-xs font-bold pointer-events-none uppercase">Início</span>}
-                      </div>
-                      <div className="relative">
-                        <input 
-                          type="date"
-                          value={filterDataFim}
-                          onChange={(e) => setFilterDataFim(e.target.value)}
-                          className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                        />
-                        {!filterDataFim && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/30 text-xs font-bold pointer-events-none uppercase">Fim</span>}
-                      </div>
+                    <div className="flex gap-4">
+                      <DatePickerPTBR 
+                        placeholder="Início"
+                        value={filterDataInicio}
+                        onChange={setFilterDataInicio}
+                      />
+                      <DatePickerPTBR 
+                        placeholder="Fim"
+                        value={filterDataFim}
+                        onChange={setFilterDataFim}
+                      />
                     </div>
                   </div>
 
@@ -1202,6 +1051,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         <td className="px-4 py-6 text-center">
                           <DatePickerPTBR
                             value={paciente.cito_laboratorio || ''}
+                            isISO={false}
                             onChange={async (displayDate) => {
                               // Atualização local imediata com recalculo de status
                               setPacientes(prev => prev.map(p => {
@@ -1366,6 +1216,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     <div className="relative">
                       <DatePickerPTBR 
                         value={selectedDate} 
+                        isISO={false}
                         onChange={(val) => setSelectedDate(val)} 
                       />
                       <input type="hidden" name="data_busca" value={selectedDate} />

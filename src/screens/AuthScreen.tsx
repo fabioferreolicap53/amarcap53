@@ -80,6 +80,13 @@ export function AuthScreen() {
       const finalEquipe = (perfil === 'cap' || perfil === 'unidade') ? '' : equipe;
       const finalMicroarea = perfil === 'microarea' ? microarea : '';
 
+      const existingEmail = await pb.collection('amarcap53_users').getFirstListItem(`email="${email}"`).catch(() => null);
+      if (existingEmail) {
+        setError('Este e-mail já está sendo utilizado por outro usuário.');
+        setIsLoading(false);
+        return;
+      }
+
       let filterCondition = '';
       if (perfil === 'cap') {
         filterCondition = `unidade_saude="" && equipe="" && microarea=""`;
@@ -94,7 +101,13 @@ export function AuthScreen() {
       const existingUser = await pb.collection('amarcap53_users').getFirstListItem(filterCondition).catch(() => null);
 
       if (existingUser) {
-        setError('Já existe um cadastro com esta combinação de perfil.');
+        let msg = 'Já existe um cadastro com esta combinação.';
+        if (perfil === 'cap') msg = 'Já existe um usuário cadastrado para a Coordenação (CAP).';
+        else if (perfil === 'unidade') msg = `Já existe um gestor cadastrado para a unidade "${finalUnidade}".`;
+        else if (perfil === 'equipe') msg = `Já existe um enfermeiro/médico cadastrado para a equipe "${finalEquipe}" da unidade "${finalUnidade}".`;
+        else if (perfil === 'microarea') msg = `Já existe um agente cadastrado para a microárea "${finalMicroarea}" da equipe "${finalEquipe}" na unidade "${finalUnidade}".`;
+        
+        setError(msg);
         setIsLoading(false);
         return;
       }
@@ -278,10 +291,10 @@ export function AuthScreen() {
                     className="block w-full pl-10 pr-10 sm:text-sm bg-surface text-on-surface border border-outline/30 rounded-lg py-2.5 focus:ring-2 focus:ring-primary focus:border-primary transition-colors appearance-none"
                   >
                     <option value="" disabled>Selecione o Perfil</option>
-                    <option value="microarea">Microárea (Microárea, Equipe, Unidade)</option>
-                    <option value="equipe">Equipe (Equipe, Unidade)</option>
-                    <option value="unidade">Unidade (Unidade)</option>
-                    <option value="cap">CAP (Todas as Unidades)</option>
+                    <option value="microarea">Microárea (Perfil de Agente Comunitário de Saúde)</option>
+                    <option value="equipe">Equipe (Perfil de Enfermeiro/Médico de Equipe)</option>
+                    <option value="unidade">Unidade (Perfil de Gestor de Unidade)</option>
+                    <option value="cap">Cap (Perfil de Coordenação)</option>
                   </select>
                   <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                     <svg className="h-5 w-5 text-on-surface/40" viewBox="0 0 20 20" fill="currentColor">
