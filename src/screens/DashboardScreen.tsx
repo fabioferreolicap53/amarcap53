@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, Activity, HeartPulse, Calendar, BadgeCheck, TrendingUp, Phone, MessageSquare, ClipboardList, PieChart, BarChart3, MapPin } from 'lucide-react';
+import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, Activity, HeartPulse, Calendar, BadgeCheck, TrendingUp, Phone, MessageSquare, ClipboardList, PieChart, BarChart3, MapPin, LayoutDashboard, Filter, CheckCircle, AlertCircle, Target, Building2, Building, X } from 'lucide-react';
+import { Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  PointElement,
+  LineElement,
+  ArcElement
+} from 'chart.js';
 import { Header } from '../components/Header';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { MultiSelect } from '../components/MultiSelect';
@@ -7,10 +20,122 @@ import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  PointElement,
+  LineElement,
+  ArcElement
+);
+
 interface DashboardScreenProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
+
+// Helper Components
+const SimpleProgressBar: React.FC<{ label: string; value: number; total: number; color: string }> = ({ label, value, total, color }) => (
+  <div className="space-y-3">
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-[11px] md:text-xs font-black uppercase tracking-widest text-primary/70 truncate max-w-[220px]">{label}</span>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-sm md:text-base font-black text-primary">{value}</span>
+        <span className="text-[10px] md:text-[11px] font-black text-primary/50 uppercase bg-primary/5 px-2.5 py-1 rounded-full border border-primary/10">
+          {total > 0 ? Math.round((value / total) * 100) : 0}%
+        </span>
+      </div>
+    </div>
+    <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden border border-outline-variant/10 shadow-inner">
+      <div 
+        className={`h-full ${color} transition-all duration-1000 ease-out shadow-lg rounded-full`} 
+        style={{ width: `${total > 0 ? (value / total) * 100 : 0}%` }}
+      />
+    </div>
+  </div>
+);
+
+const ColumnChart: React.FC<{ data: { label: string; value: number; color: string }[] }> = ({ data }) => {
+  const max = Math.max(...data.map(d => d.value), 1);
+  return (
+    <div className="relative h-56 pt-8 w-full">
+      <div className="absolute inset-x-0 bottom-8 h-px bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
+      <div className="flex items-end justify-between h-full gap-4">
+      {data.map((d, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-3 group">
+          <div className="relative w-full flex flex-col items-center justify-end h-full pb-8">
+            <div 
+              className={`w-full max-w-[52px] ${d.color} rounded-t-[1rem] transition-all duration-1000 ease-out shadow-xl relative group-hover:brightness-110 group-hover:scale-[1.03]`}
+              style={{ height: `${(d.value / max) * 100}%` }}
+            >
+              <div className="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-white/20 to-transparent rounded-t-[1rem]" />
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[11px] px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-black z-20 shadow-xl">
+                {d.value}
+              </div>
+            </div>
+          </div>
+          <span className="text-[10px] md:text-[11px] font-black text-primary/80 uppercase tracking-tight truncate w-full text-center leading-tight">
+            {d.label}
+          </span>
+        </div>
+      ))}
+      </div>
+    </div>
+  );
+};
+
+const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ data }) => {
+  const max = Math.max(...data.map(d => d.value), 1);
+  return (
+    <div className="relative h-56 pt-8 w-full">
+      <div className="absolute inset-x-0 bottom-8 h-px bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
+      <div className="absolute inset-0 flex items-end justify-between px-3">
+        {data.map((d, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center justify-end h-full relative group pb-8">
+            <div 
+              className="w-4.5 h-4.5 bg-primary rounded-full border-[3px] border-white shadow-xl z-10 transition-transform group-hover:scale-125"
+              style={{ marginBottom: `${(d.value / max) * 100}%` }}
+            />
+            {i < data.length - 1 && (
+              <div 
+                className="absolute h-1 bg-primary/45 origin-left rounded-full"
+                style={{ 
+                  left: '50%', 
+                  bottom: `${(d.value / max) * 100}%`,
+                  width: '100%',
+                  transform: `rotate(${Math.atan2((data[i+1].value - d.value) * 48 / max, 100) * 180 / Math.PI}deg)`
+                }}
+              />
+            )}
+            <span className="mt-5 text-[10px] md:text-[11px] font-black text-primary/70 uppercase tracking-tight">
+              {d.label}
+            </span>
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[11px] px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-black z-20 shadow-xl">
+              {d.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const StatCard: React.FC<{ title: string; value: number | string; icon: React.ReactNode; color: string }> = ({ title, value, icon, color }) => (
+  <div className="bg-white p-8 md:p-9 rounded-[2.75rem] shadow-xl border border-primary/5 hover:border-primary/20 transition-all duration-500 group relative overflow-hidden">
+    <div className={`absolute top-0 right-0 w-28 h-28 ${color.replace('bg-', 'bg-')}/5 rounded-full blur-2xl`} />
+    <div className="flex justify-between items-start mb-7 relative z-10">
+      <div className={`w-16 h-16 rounded-[1.4rem] ${color.replace('bg-', 'bg-')}/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-inner`}>
+        {React.cloneElement(icon as React.ReactElement, { className: 'w-8 h-8 ' + color.replace('bg-', 'text-'), strokeWidth: 2.5 })}
+      </div>
+      <span className="text-[11px] font-black uppercase tracking-[0.24em] text-on-surface-variant/40">Geral</span>
+    </div>
+    <div className={`text-5xl md:text-6xl font-black ${color.replace('bg-', 'text-')} tracking-tighter mb-3 relative z-10`}>{value}</div>
+    <p className="text-sm font-bold text-on-surface-variant/60 uppercase tracking-wide relative z-10">{title}</p>
+  </div>
+);
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, setActiveTab }) => {
   const { user, isAdmin } = useAuth();
@@ -269,90 +394,23 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     fetchStats();
   }, [user, isAdmin, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea]);
 
-  const ColumnChart: React.FC<{ data: { label: string; value: number; color: string }[] }> = ({ data }) => {
-    const max = Math.max(...data.map(d => d.value), 1);
-    return (
-      <div className="relative h-56 pt-8">
-        <div className="absolute inset-x-0 bottom-8 h-px bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
-        <div className="flex items-end justify-between h-full gap-4">
-        {data.map((d, i) => (
-          <div key={i} className="flex-1 flex flex-col items-center gap-3 group">
-            <div className="relative w-full flex flex-col items-center justify-end h-full pb-8">
-              <div 
-                className={`w-full max-w-[52px] ${d.color} rounded-t-[1rem] transition-all duration-1000 ease-out shadow-xl relative group-hover:brightness-110 group-hover:scale-[1.03]`}
-                style={{ height: `${(d.value / max) * 100}%` }}
-              >
-                <div className="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-white/20 to-transparent rounded-t-[1rem]" />
-                <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[11px] px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-black z-20 shadow-xl">
-                  {d.value}
-                </div>
-              </div>
-            </div>
-            <span className="text-[10px] md:text-[11px] font-black text-primary/80 uppercase tracking-tight truncate w-full text-center leading-tight">
-              {d.label}
-            </span>
-          </div>
-        ))}
-        </div>
-      </div>
-    );
+  const chartData = {
+    labels: stats.examTrend.map(t => t.month),
+    datasets: [
+      {
+        label: 'Citopatológico',
+        data: stats.examTrend.map(t => t.cito),
+        backgroundColor: 'rgba(16, 185, 129, 0.8)',
+        borderRadius: 8,
+      },
+      {
+        label: 'Molecular DNA',
+        data: stats.examTrend.map(t => t.hpv),
+        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+        borderRadius: 8,
+      }
+    ]
   };
-
-  const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ data }) => {
-    const max = Math.max(...data.map(d => d.value), 1);
-    return (
-      <div className="relative h-56 pt-8">
-        <div className="absolute inset-x-0 bottom-8 h-px bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
-        <div className="absolute inset-0 flex items-end justify-between px-3">
-          {data.map((d, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center justify-end h-full relative group pb-8">
-              <div 
-                className="w-4.5 h-4.5 bg-primary rounded-full border-[3px] border-white shadow-xl z-10 transition-transform group-hover:scale-125"
-                style={{ marginBottom: `${(d.value / max) * 100}%` }}
-              />
-              {i < data.length - 1 && (
-                <div 
-                  className="absolute h-1 bg-primary/45 origin-left rounded-full"
-                  style={{ 
-                    left: '50%', 
-                    bottom: `${(d.value / max) * 100}%`,
-                    width: '100%',
-                    transform: `rotate(${Math.atan2((data[i+1].value - d.value) * 48 / max, 100) * 180 / Math.PI}deg)`
-                  }}
-                />
-              )}
-              <span className="mt-5 text-[10px] md:text-[11px] font-black text-primary/70 uppercase tracking-tight">
-                {d.label}
-              </span>
-              <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[11px] px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-black z-20 shadow-xl">
-                {d.value}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const SimpleProgressBar: React.FC<{ label: string; value: number; total: number; color: string }> = ({ label, value, total, color }) => (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-4">
-        <span className="text-[11px] md:text-xs font-black uppercase tracking-widest text-primary/70 truncate max-w-[220px]">{label}</span>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-sm md:text-base font-black text-primary">{value}</span>
-          <span className="text-[10px] md:text-[11px] font-black text-primary/50 uppercase bg-primary/5 px-2.5 py-1 rounded-full border border-primary/10">
-            {total > 0 ? Math.round((value / total) * 100) : 0}%
-          </span>
-        </div>
-      </div>
-      <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden border border-outline-variant/10 shadow-inner">
-        <div 
-          className={`h-full ${color} transition-all duration-1000 ease-out shadow-lg rounded-full`} 
-          style={{ width: `${total > 0 ? (value / total) * 100 : 0}%` }}
-        />
-      </div>
-    </div>
-  );
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-surface">
@@ -366,284 +424,294 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
       <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-11 no-scrollbar relative">
         <div className="max-w-[1500px] mx-auto space-y-14 md:space-y-16">
           
-          <div className="flex flex-col lg:flex-row items-stretch gap-6">
-            <div className="flex-1 bg-gradient-to-br from-[#001b3d] via-[#002555] to-[#00346d] p-10 md:p-12 rounded-[3.25rem] shadow-2xl flex flex-col md:flex-row items-center justify-between gap-10 md:gap-12 relative overflow-hidden group border border-white/10">
-              <div className="absolute -top-32 -right-32 w-96 h-96 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all duration-1000"></div>
-              <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all duration-1000"></div>
-
-              <div className="relative z-10 flex flex-col md:flex-row items-center gap-10 text-center md:text-left">
-                <div className="w-20 h-20 md:w-24 md:h-24 rounded-[2.5rem] bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
-                  <Activity className="w-10 h-10 md:w-12 md:h-12 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-xl md:text-2xl font-black text-white/40 uppercase tracking-[0.45em] mb-4">Dashboard Geral</h2>
-                  <p className="text-3xl md:text-4xl font-black text-white leading-tight tracking-tight">
-                    Bem-vindo, <span className="text-blue-300">{user?.name?.split(' ')[0] || 'Profissional'}</span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="relative z-10 flex gap-4 shrink-0">
-                <div className="bg-white/10 px-6 py-4 rounded-[1.75rem] border border-white/10 backdrop-blur-sm shadow-xl">
-                  <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-1">Status Global</p>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                    <span className="text-sm font-black text-white uppercase">Online</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Seletor de Período e Regional Profissional */}
-            <div className="lg:w-[600px] bg-white p-8 rounded-[3.25rem] shadow-2xl border border-primary/5 relative flex flex-col justify-center">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shadow-inner">
-                  <Calendar className="w-7 h-7 text-primary" strokeWidth={2.5} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-primary uppercase tracking-tighter">Filtros Avançados</h3>
-                  <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Análise Geográfica e Temporal</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 mb-4">
-                <DatePickerPTBR 
-                  label="Início"
-                  value={filterDataInicio}
-                  onChange={setFilterDataInicio}
-                />
-                <DatePickerPTBR 
-                  label="Fim"
-                  value={filterDataFim}
-                  onChange={setFilterDataFim}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {(isAdmin || user?.role === 'cap') && (
-                  <MultiSelect 
-                    label="Unidades"
-                    placeholder="Todas as Unidades"
-                    options={Object.keys(UNIDADES_EQUIPES)}
-                    value={filterUnidade}
-                    onChange={(val) => {
-                      setFilterUnidade(val);
-                      setFilterEquipe([]);
-                      setFilterMicroarea([]);
-                    }}
-                  />
-                )}
-
-                {(isAdmin || user?.role === 'cap' || user?.role === 'unidade') && (
-                  <MultiSelect 
-                    label="Equipes"
-                    placeholder="Todas as Equipes"
-                    options={
-                      filterUnidade.length > 0 
-                        ? Array.from(new Set(filterUnidade.flatMap(u => UNIDADES_EQUIPES[u] || [])))
-                        : user?.role === 'unidade' 
-                          ? UNIDADES_EQUIPES[user.unidade_saude] || []
-                          : []
-                    }
-                    value={filterEquipe}
-                    onChange={(val) => {
-                      setFilterEquipe(val);
-                      setFilterMicroarea([]);
-                    }}
-                    disabled={filterUnidade.length === 0 && (isAdmin || user?.role === 'cap')}
-                  />
-                )}
-
-                {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe') && (
-                  <MultiSelect 
-                    label="Microáreas"
-                    placeholder="Todas as Microáreas"
-                    options={MICROAREAS.map(ma => ma.toString())}
-                    value={filterMicroarea}
-                    onChange={setFilterMicroarea}
-                    disabled={filterEquipe.length === 0 && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
-                  />
-                )}
-              </div>
+          <div className="flex flex-col gap-8 mb-12 items-center lg:items-stretch justify-center">
+            {/* Card Principal de Boas-vindas */}
+            <div className="w-full bg-gradient-to-br from-[#051934] via-[#0a2347] to-[#112d5a] p-8 md:p-12 rounded-[3.25rem] text-white relative overflow-hidden group shadow-2xl flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl group-hover:bg-white/10 transition-all duration-700"></div>
               
-              {(filterDataInicio || filterDataFim || filterUnidade.length > 0 || filterEquipe.length > 0 || filterMicroarea.length > 0) && (
-                <button 
-                  onClick={() => { 
-                    setFilterDataInicio(''); 
-                    setFilterDataFim('');
-                    setFilterUnidade([]);
-                    setFilterEquipe([]);
-                    setFilterMicroarea([]);
-                  }}
-                  className="mt-6 text-[10px] font-black text-rose-600 uppercase tracking-widest hover:text-rose-700 transition-colors flex items-center gap-2 justify-center py-3 bg-rose-50 rounded-2xl border border-rose-100 shadow-sm"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Limpar Todos os Filtros
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Seção de Cards Principais */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-7 md:gap-8">
-            <div className="bg-white p-8 md:p-9 rounded-[2.75rem] shadow-xl border border-primary/5 hover:border-primary/20 transition-all duration-500 group relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-28 h-28 bg-primary/5 rounded-full blur-2xl" />
-              <div className="flex justify-between items-start mb-7 relative z-10">
-                <div className="w-16 h-16 rounded-[1.4rem] bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-inner">
-                  <Users className="w-8 h-8 text-primary" strokeWidth={2.5} />
-                </div>
-                <span className="text-[11px] font-black uppercase tracking-[0.24em] text-on-surface-variant/40">Microárea</span>
-              </div>
-              <div className="text-5xl md:text-6xl font-black text-primary tracking-tighter mb-3 relative z-10">{stats.totalPacientes}</div>
-              <p className="text-sm font-bold text-on-surface-variant/60 uppercase tracking-wide relative z-10">Mulheres Ativas</p>
-            </div>
-
-            <div className="bg-white p-8 md:p-9 rounded-[2.75rem] shadow-xl border border-primary/5 hover:border-tertiary/20 transition-all duration-500 group relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-28 h-28 bg-tertiary/5 rounded-full blur-2xl" />
-              <div className="flex justify-between items-start mb-7 relative z-10">
-                <div className="w-16 h-16 rounded-[1.4rem] bg-tertiary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-inner">
-                  <Clock className="w-8 h-8 text-tertiary" strokeWidth={2.5} />
-                </div>
-                <span className="text-[11px] font-black uppercase tracking-[0.24em] text-on-surface-variant/40">Pendências</span>
-              </div>
-              <div className="text-5xl md:text-6xl font-black text-tertiary tracking-tighter mb-3 relative z-10">{stats.coletasAtrasadas}</div>
-              <p className="text-sm font-bold text-on-surface-variant/60 uppercase tracking-wide relative z-10">Busca Ativa</p>
-            </div>
-
-            <div className="bg-white p-8 md:p-9 rounded-[2.75rem] shadow-xl border border-primary/5 hover:border-secondary/20 transition-all duration-500 group relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-28 h-28 bg-secondary/5 rounded-full blur-2xl" />
-              <div className="flex justify-between items-start mb-7 relative z-10">
-                <div className="w-16 h-16 rounded-[1.4rem] bg-secondary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-inner">
-                  <CheckCircle2 className="w-8 h-8 text-secondary" strokeWidth={2.5} />
-                </div>
-                <span className="text-[11px] font-black uppercase tracking-[0.24em] text-on-surface-variant/40">Cobertura</span>
-              </div>
-              <div className="text-5xl md:text-6xl font-black text-secondary tracking-tighter mb-3 relative z-10">{stats.coberturaPercent}%</div>
-              <p className="text-sm font-bold text-on-surface-variant/60 uppercase tracking-wide relative z-10">Exames em Dia</p>
-            </div>
-
-            <div className="bg-white p-8 md:p-9 rounded-[2.75rem] shadow-xl border border-error/10 hover:border-error/30 transition-all duration-500 group relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-28 h-28 bg-error/5 rounded-full blur-2xl" />
-              <div className="flex justify-between items-start mb-7 relative z-10">
-                <div className="w-16 h-16 rounded-[1.4rem] bg-error/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-inner">
-                  <AlertTriangle className="w-8 h-8 text-error" strokeWidth={2.5} />
-                </div>
-                <span className="text-[11px] font-black uppercase tracking-[0.24em] text-error/40">Crítico</span>
-              </div>
-              <div className="text-5xl md:text-6xl font-black text-error tracking-tighter mb-3 relative z-10">{stats.resultadosAlterados}</div>
-              <p className="text-sm font-bold text-error/60 uppercase tracking-wide relative z-10">Casos Alterados</p>
-            </div>
-          </div>
-
-          {/* Nova Seção de Levantamentos Estatísticos Criativos */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-10">
-            
-            {/* Gráfico Geográfico Condicional */}
-            {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe') && (
-              <div className="bg-white p-9 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden lg:col-span-2">
-                <div className="absolute top-0 right-0 w-40 h-40 bg-primary/5 rounded-full blur-3xl" />
-                <div className="flex items-center justify-between mb-10 relative z-10">
-                  <div>
-                    <h3 className="text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight flex items-center gap-4">
-                      <MapPin className="w-7 h-7 text-primary" />
-                      Análise Regional
-                    </h3>
-                    <p className="text-sm font-bold text-on-surface-variant/45 uppercase tracking-widest mt-2">Distribuição por Unidade, Equipe ou Microárea</p>
+              <div className="relative z-10 flex-1">
+                <div className="flex items-center justify-center md:justify-start gap-4 mb-6">
+                  <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center ring-1 ring-white/20 shadow-inner">
+                    <LayoutDashboard className="w-7 h-7 text-blue-300" />
                   </div>
+                  <h1 className="text-3xl md:text-4xl font-black tracking-tight uppercase">Resumo <span className="text-blue-300 opacity-50">Geral</span></h1>
                 </div>
+                <p className="text-lg md:text-xl text-white/70 font-medium leading-relaxed max-w-xl mx-auto md:mx-0">
+                  Olá, <span className="text-white font-black">{user?.name || 'Profissional'}</span>! Acompanhe aqui o panorama atualizado dos rastreamentos e metas territoriais.
+                </p>
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-10 relative z-10">
+              {/* Botão de Filtro */}
+              <div className="relative z-10">
+                <button 
+                  onClick={() => setIsFilterVisible(!isFilterVisible)}
+                  className={`flex items-center gap-3 px-8 h-16 rounded-[1.5rem] text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
+                    isFilterVisible || filterUnidade.length > 0 || filterEquipe.length > 0 || filterMicroarea.length > 0 || filterDataInicio || filterDataFim
+                      ? 'bg-primary text-white border-primary shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]' 
+                      : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+                  }`}
+                >
+                  <Filter className="w-5 h-5" />
+                  <span>Filtros</span>
+                  {(filterUnidade.length > 0 || filterEquipe.length > 0 || filterMicroarea.length > 0 || filterDataInicio || filterDataFim) && (
+                    <div className="w-6 h-6 flex items-center justify-center bg-white text-primary text-[10px] rounded-full font-black animate-pulse">
+                      {[filterUnidade, filterEquipe, filterMicroarea].filter(f => f.length > 0).length + (filterDataInicio || filterDataFim ? 1 : 0)}
+                    </div>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Painel de Filtros Avançados - Colapsável */}
+            {isFilterVisible && (
+              <div className="w-full bg-white p-8 md:p-10 rounded-[3.25rem] shadow-2xl border border-primary/5 relative animate-in slide-in-from-top-6 fade-in duration-500">
+                <div className="flex items-center justify-between gap-4 mb-8 w-full">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-primary/5 rounded-2xl text-primary">
+                      <Filter className="w-6 h-6" />
+                    </div>
+                    <h2 className="text-xl font-black text-primary uppercase tracking-tighter">Filtros Avançados</h2>
+                  </div>
+                  <button 
+                    onClick={() => setIsFilterVisible(false)}
+                    className="p-2 rounded-full hover:bg-slate-100 text-slate-400 transition-all"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                  <div className="lg:col-span-2 space-y-3">
+                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                      <Calendar className="w-3.5 h-3.5" />
+                      Período de Referência
+                    </label>
+                    <div className="flex gap-4">
+                      <DatePickerPTBR 
+                        placeholder="Início"
+                        value={filterDataInicio}
+                        onChange={setFilterDataInicio}
+                      />
+                      <DatePickerPTBR 
+                        placeholder="Fim"
+                        value={filterDataFim}
+                        onChange={setFilterDataFim}
+                      />
+                    </div>
+                  </div>
+
                   {(isAdmin || user?.role === 'cap') && (
-                    <div className="space-y-6">
-                      <p className="text-xs font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-2">Top Unidades</p>
-                      {Object.entries(acompStats.unidadeBreakdown)
-                        .sort(([, a], [, b]) => b - a)
-                        .slice(0, 5)
-                        .map(([label, val]) => (
-                          <SimpleProgressBar 
-                            key={label}
-                            label={label} 
-                            value={val} 
-                            total={stats.totalPacientes} 
-                            color="bg-primary" 
-                          />
-                        ))}
+                    <div className="space-y-3">
+                      <MultiSelect 
+                        label="Unidades"
+                        placeholder="Todas as Unidades"
+                        options={Object.keys(UNIDADES_EQUIPES)}
+                        value={filterUnidade}
+                        onChange={(val) => {
+                          setFilterUnidade(val);
+                          setFilterEquipe([]);
+                          setFilterMicroarea([]);
+                        }}
+                      />
                     </div>
                   )}
 
                   {(isAdmin || user?.role === 'cap' || user?.role === 'unidade') && (
-                    <div className="space-y-6">
-                      <p className="text-xs font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-2">Top Equipes</p>
-                      {Object.entries(acompStats.equipeBreakdown)
-                        .sort(([, a], [, b]) => b - a)
-                        .slice(0, 5)
-                        .map(([label, val]) => (
-                          <SimpleProgressBar 
-                            key={label}
-                            label={label} 
-                            value={val} 
-                            total={stats.totalPacientes} 
-                            color="bg-blue-600" 
-                          />
-                        ))}
+                    <div className="space-y-3">
+                      <MultiSelect 
+                        label="Equipes"
+                        placeholder="Todas as Equipes"
+                        options={
+                          filterUnidade.length > 0 
+                            ? Array.from(new Set(filterUnidade.flatMap(u => UNIDADES_EQUIPES[u] || [])))
+                            : user?.role === 'unidade' 
+                              ? UNIDADES_EQUIPES[user.unidade_saude] || []
+                              : []
+                        }
+                        value={filterEquipe}
+                        onChange={(val) => {
+                          setFilterEquipe(val);
+                          setFilterMicroarea([]);
+                        }}
+                        disabled={filterUnidade.length === 0 && (isAdmin || user?.role === 'cap')}
+                      />
                     </div>
                   )}
 
                   {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe') && (
-                    <div className="space-y-6">
-                      <p className="text-xs font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-2">Top Microáreas</p>
-                      {Object.entries(acompStats.microareaBreakdown)
-                        .sort(([, a], [, b]) => b - a)
-                        .slice(0, 5)
-                        .map(([label, val]) => (
-                          <SimpleProgressBar 
-                            key={label}
-                            label={label} 
-                            value={val} 
-                            total={stats.totalPacientes} 
-                            color="bg-emerald-600" 
-                          />
-                        ))}
+                    <div className="space-y-3">
+                      <MultiSelect 
+                        label="Microáreas"
+                        placeholder="Todas as Microáreas"
+                        options={MICROAREAS.map(ma => ma.toString())}
+                        value={filterMicroarea}
+                        onChange={setFilterMicroarea}
+                        disabled={filterEquipe.length === 0 && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
+                      />
                     </div>
                   )}
+
+                  <div className="flex items-end gap-4 lg:col-span-4">
+                    <button 
+                      onClick={() => { 
+                        setFilterDataInicio(''); 
+                        setFilterDataFim('');
+                        setFilterUnidade([]);
+                        setFilterEquipe([]);
+                        setFilterMicroarea([]);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 py-4 bg-rose-50 text-rose-600 text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-rose-100 transition-all border border-rose-100"
+                    >
+                      <AlertTriangle className="w-4 h-4" />
+                      Limpar Filtros
+                    </button>
+                    <button 
+                      onClick={() => setIsFilterVisible(false)}
+                      className="flex-1 py-4 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-primary/20"
+                    >
+                      Aplicar
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
+          </div>
 
-            {/* Gráfico de Grupos de Idade */}
-            <div className="bg-white p-9 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-primary/5 rounded-full blur-3xl" />
-              <div className="flex items-center justify-between mb-10 relative z-10">
+        {/* Grid de Estatísticas Principais */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 mb-16">
+            <StatCard 
+              title="Total Pacientes" 
+              value={stats.totalPacientes} 
+              icon={<Users className="w-6 h-6" />}
+              color="bg-blue-500"
+            />
+            <StatCard 
+              title="Busca Ativa" 
+              value={stats.coletasAtrasadas} 
+              icon={<Clock className="w-6 h-6" />}
+              color="bg-amber-500"
+            />
+            <StatCard 
+              title="Exames em Dia" 
+              value={`${stats.coberturaPercent}%`} 
+              icon={<CheckCircle2 className="w-6 h-6" />}
+              color="bg-emerald-500"
+            />
+            <StatCard 
+              title="Casos Alterados" 
+              value={stats.resultadosAlterados} 
+              icon={<AlertTriangle className="w-6 h-6" />}
+              color="bg-rose-500"
+            />
+          </div>
+
+          {/* Gráficos e Tabelas */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Gráfico de Meta Territorial */}
+            <div className="lg:col-span-7 bg-white p-6 sm:p-8 md:p-10 rounded-[3.25rem] shadow-2xl border border-primary/5 flex flex-col items-center lg:items-stretch text-center lg:text-left">
+              <div className="flex items-center justify-center lg:justify-start gap-4 mb-8 sm:mb-10 w-full">
+                <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl shadow-inner">
+                  <Target className="w-7 h-7" />
+                </div>
                 <div>
-                  <h3 className="text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight flex items-center gap-4">
-                    <Users className="w-7 h-7 text-primary" />
-                    Perfil por Faixa Etária
-                  </h3>
-                  <p className="text-sm font-bold text-on-surface-variant/45 uppercase tracking-widest mt-2">Distribuição das Mulheres</p>
+                  <h3 className="text-xl sm:text-2xl font-black text-slate-800 uppercase tracking-tight">Meta <span className="text-emerald-500">Territorial</span></h3>
+                  <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Status de Rastreamento (%)</p>
                 </div>
               </div>
-
-              <div className="space-y-7 relative z-10">
-                {Object.entries(stats.grupoBreakdown)
-                  .sort(([, a], [, b]) => b - a)
-                  .map(([label, val]) => (
-                    <SimpleProgressBar 
-                      key={label}
-                      label={label} 
-                      value={val} 
-                      total={stats.totalPacientes} 
-                      color="bg-primary" 
-                    />
-                  ))}
+              
+              <div 
+                key={`meta-territorial-chart-wrapper-${stats.totalPacientes}`}
+                className="flex-1 w-full min-h-[350px] sm:min-h-[400px] flex items-center justify-center"
+              >
+                <div className="w-full h-full max-w-[600px] mx-auto">
+                  <Bar 
+                    data={chartData} 
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                          backgroundColor: '#051934',
+                          titleFont: { size: 13, weight: 'bold' },
+                          bodyFont: { size: 12 },
+                          padding: 16,
+                          cornerRadius: 16,
+                          displayColors: false
+                        }
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          max: 100,
+                          ticks: {
+                            callback: (value) => `${value}%`,
+                            font: { weight: 'bold', size: 11 },
+                            color: '#94a3b8'
+                          },
+                          grid: { color: '#f1f5f9' },
+                          border: { display: false }
+                        },
+                        x: {
+                          grid: { display: false },
+                          border: { display: false },
+                          ticks: {
+                            font: { weight: 'bold', size: 10 },
+                            color: '#64748b',
+                            maxRotation: 45,
+                            minRotation: 45
+                          }
+                        }
+                      }
+                    }} 
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Gráfico de Status de Rastreamento Real */}
-            <div className="bg-white p-9 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl" />
-              <div className="flex items-center justify-between mb-10 relative z-10">
+            {/* Distribuição por Unidade / Equipe */}
+            <div className="lg:col-span-5 bg-white p-6 sm:p-8 md:p-10 rounded-[3.25rem] shadow-2xl border border-primary/5 flex flex-col items-center lg:items-stretch text-center lg:text-left">
+              <div className="flex items-center justify-center lg:justify-start gap-4 mb-8 sm:mb-10 w-full">
+                <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl shadow-inner">
+                  <Building2 className="w-7 h-7" />
+                </div>
                 <div>
-                  <h3 className="text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight flex items-center gap-4">
+                  <h3 className="text-xl sm:text-2xl font-black text-slate-800 uppercase tracking-tight">Ranking <span className="text-blue-500">Regional</span></h3>
+                  <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Desempenho por Unidade</p>
+                </div>
+              </div>
+
+              <div className="flex-1 w-full overflow-y-auto no-scrollbar max-h-[500px]">
+                <div className="space-y-4 md:space-y-6">
+                {(isAdmin || user?.role === 'cap') && (
+                  <div className="space-y-6">
+                    <p className="text-xs font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-2">Top Unidades</p>
+                    {Object.entries(acompStats.unidadeBreakdown)
+                      .sort((a, b) => (b[1] as number) - (a[1] as number))
+                      .slice(0, 5)
+                      .map(([label, val]) => (
+                        <SimpleProgressBar 
+                          key={label}
+                          label={label} 
+                          value={val} 
+                          total={stats.totalPacientes} 
+                          color="bg-primary" 
+                        />
+                      ))}
+                  </div>
+                )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-10">
+            {/* Gráfico de Status de Rastreamento Real */}
+            <div className="bg-white p-6 sm:p-9 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl" />
+              <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-10 relative z-10 text-center sm:text-left">
+                <div className="flex flex-col items-center sm:items-start">
+                  <h3 className="text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight flex flex-col sm:flex-row items-center gap-4">
                     <BadgeCheck className="w-7 h-7 text-emerald-500" />
                     Status Clínico Atual
                   </h3>
@@ -685,18 +753,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               </div>
             </div>
 
-            {/* Gráfico de Acompanhamentos */}
-            <div className="bg-white p-9 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden">
+            {/* Performance de Busca Ativa */}
+            <div className="bg-white p-6 sm:p-9 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl" />
-              <div className="flex items-center justify-between mb-10 relative z-10 gap-4">
-                <div>
-                  <h3 className="text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-10 relative z-10 gap-6 sm:gap-4 text-center sm:text-left">
+                <div className="flex flex-col items-center sm:items-start">
+                  <h3 className="text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight flex flex-col sm:flex-row items-center gap-4">
                     <PieChart className="w-7 h-7 text-tertiary" />
-                    Performance de Busca Ativa
+                    Performance de Busca
                   </h3>
                   <p className="text-sm font-bold text-on-surface-variant/45 uppercase tracking-widest mt-2">Resultados dos contatos</p>
                 </div>
-                <div className="bg-primary/5 px-5 py-3 rounded-[1.4rem] border border-primary/10 shadow-sm shrink-0">
+                <div className="bg-primary/5 px-5 py-3 rounded-[1.4rem] border border-primary/10 shadow-sm shrink-0 mx-auto sm:mx-0">
                   <span className="text-2xl font-black text-primary">{acompStats.total}</span>
                   <span className="text-[11px] font-bold text-primary/40 uppercase ml-2">Total</span>
                 </div>
@@ -722,145 +790,50 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                   color="bg-rose-600" 
                 />
               </div>
-
-              <div className="mt-12 pt-8 border-t border-outline-variant/10 grid grid-cols-3 gap-4 md:gap-5 text-center relative z-10">
-                <div className="bg-primary/5 rounded-[1.4rem] px-4 py-5 border border-primary/10">
-                  <p className="text-[11px] font-black text-on-surface-variant/40 uppercase mb-2 tracking-widest">Conversão</p>
-                  <p className="text-3xl font-black text-primary">
-                    {acompStats.total > 0 ? Math.round((acompStats.sucesso / acompStats.total) * 100) : 0}%
-                  </p>
-                </div>
-                <div className="bg-blue-50 rounded-[1.4rem] px-4 py-5 border border-blue-100">
-                  <p className="text-[11px] font-black text-on-surface-variant/40 uppercase mb-2 tracking-widest">Eficiência</p>
-                  <p className="text-3xl font-black text-blue-500">
-                    {acompStats.total > 0 ? Math.round((acompStats.contatos / acompStats.total) * 100) : 0}%
-                  </p>
-                </div>
-                <div className="bg-rose-50 rounded-[1.4rem] px-4 py-5 border border-rose-100">
-                  <p className="text-[11px] font-black text-on-surface-variant/40 uppercase mb-2 tracking-widest">Taxa Falha</p>
-                  <p className="text-3xl font-black text-rose-500">
-                    {acompStats.total > 0 ? Math.round(((acompStats.total - acompStats.contatos) / acompStats.total) * 100) : 0}%
-                  </p>
-                </div>
-              </div>
             </div>
-
-            {/* Gráfico de Entraves e Métodos */}
-            <div className="bg-white p-9 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/5 rounded-full blur-3xl" />
-              <div className="flex items-center justify-between mb-10 relative z-10">
-                <div>
-                  <h3 className="text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight flex items-center gap-4">
-                    <BarChart3 className="w-7 h-7 text-secondary" />
-                    Métodos & Entraves
-                  </h3>
-                  <p className="text-sm font-bold text-on-surface-variant/45 uppercase tracking-widest mt-2">Análise qualitativa das ações</p>
-                </div>
-              </div>
-
-              <div className="space-y-10 relative z-10">
-                <div>
-                  <p className="text-xs font-black text-primary uppercase tracking-[0.25em] mb-5 flex items-center gap-3">
-                    <Phone className="w-4 h-4" /> Métodos de Busca (Top 2)
-                  </p>
-                  <div className="grid grid-cols-1 gap-4">
-                    {Object.entries(acompStats.tipoBusca)
-                      .sort(([, a], [, b]) => b - a)
-                      .slice(0, 2)
-                      .map(([label, val], idx) => (
-                        <div key={label} className="bg-surface-container-low p-5 rounded-[1.5rem] border border-outline-variant/10 flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm ${idx === 0 ? 'bg-primary' : 'bg-primary/40'}`}>
-                              {idx + 1}
-                            </div>
-                            <span className="text-xs md:text-sm font-bold text-on-surface-variant uppercase truncate max-w-[240px]">
-                              {formatEnumLabel(label)}
-                            </span>
-                          </div>
-                          <span className="text-lg font-black text-primary">{val}</span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-xs font-black text-rose-500 uppercase tracking-[0.25em] mb-5 flex items-center gap-3">
-                    <AlertTriangle className="w-4 h-4" /> Entraves Críticos (Top 2)
-                  </p>
-                  <div className="grid grid-cols-1 gap-4">
-                    {Object.entries(acompStats.entraves)
-                      .sort(([, a], [, b]) => b - a)
-                      .slice(0, 2)
-                      .map(([label, val], idx) => (
-                        <div key={label} className="bg-rose-50 p-5 rounded-[1.5rem] border border-rose-100 flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-rose-500 flex items-center justify-center text-white font-black text-sm shadow-sm">
-                              !
-                            </div>
-                            <span className="text-xs md:text-sm font-bold text-rose-700 uppercase truncate max-w-[240px]">
-                              {formatEnumLabel(label)}
-                            </span>
-                          </div>
-                          <span className="text-lg font-black text-rose-600">{val}</span>
-                        </div>
-                      ))}
-                    {Object.keys(acompStats.entraves).length === 0 && (
-                      <div className="bg-emerald-50 p-5 rounded-[1.5rem] border border-emerald-100 text-center">
-                        <p className="text-xs font-bold text-emerald-700 uppercase tracking-widest">Nenhum entrave identificado</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
           </div>
 
           <div className="space-y-8">
-            <div className="flex justify-between items-center px-2 md:px-4">
-              <h3 className="text-xl md:text-2xl font-black text-primary flex items-center gap-4 uppercase tracking-tight">
-                <TrendingUp className="w-7 h-7 text-tertiary" />
-                Tendências e Volumetria
-              </h3>
-            </div>
+            <h3 className="text-xl md:text-2xl font-black text-primary flex items-center gap-4 uppercase tracking-tight px-2 md:px-4">
+              <TrendingUp className="w-7 h-7 text-tertiary" />
+              Tendências e Volumetria
+            </h3>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-10">
-              {/* Gráfico de Linha - Tendência de Acompanhamentos */}
-              <div className="bg-white p-9 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden">
+              <div className="bg-white p-6 sm:p-8 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden flex flex-col items-center lg:items-stretch text-center lg:text-left">
                 <div className="absolute top-0 right-0 w-40 h-40 bg-primary/5 rounded-full blur-3xl" />
-                <div className="flex items-center justify-between mb-10 relative z-10">
+                <div className="flex items-center justify-center lg:justify-start gap-4 mb-8 md:mb-10 relative z-10 w-full">
+                  <div className="p-3.5 bg-primary/5 text-primary rounded-2xl shadow-inner shrink-0">
+                    <Activity className="w-7 h-7" />
+                  </div>
                   <div>
-                    <h3 className="text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight flex items-center gap-4">
-                      <Activity className="w-7 h-7 text-primary" />
-                      Fluxo de Acompanhamentos
-                    </h3>
-                    <p className="text-sm font-bold text-on-surface-variant/45 uppercase tracking-widest mt-2">Tendência Mensal</p>
+                    <h3 className="text-xl sm:text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight">Fluxo Mensal</h3>
+                    <p className="text-[10px] sm:text-sm font-bold text-on-surface-variant/45 uppercase tracking-widest mt-1 sm:mt-2">Tendência de Acompanhamentos</p>
                   </div>
                 </div>
-                <LineChart 
-                  data={stats.acompTrend.map(t => ({ label: t.month, value: t.total }))} 
-                />
+                <div className="flex-1 w-full min-h-[300px] flex items-center justify-center">
+                  <LineChart data={stats.acompTrend.map(t => ({ label: t.month, value: t.total }))} />
+                </div>
               </div>
 
-              {/* Gráfico de Colunas - Volume por Tipo de Exame */}
-              <div className="bg-white p-9 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden">
+              <div className="bg-white p-6 sm:p-8 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden flex flex-col items-center lg:items-stretch text-center lg:text-left">
                 <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/5 rounded-full blur-3xl" />
-                <div className="flex items-center justify-between mb-10 relative z-10">
+                <div className="flex items-center justify-center lg:justify-start gap-4 mb-8 md:mb-10 relative z-10 w-full">
+                  <div className="p-3.5 bg-secondary/5 text-secondary rounded-2xl shadow-inner shrink-0">
+                    <BarChart3 className="w-7 h-7" />
+                  </div>
                   <div>
-                    <h3 className="text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight flex items-center gap-4">
-                      <BarChart3 className="w-7 h-7 text-secondary" />
-                      Volume por Tipo de Exame
-                    </h3>
-                    <p className="text-sm font-bold text-on-surface-variant/45 uppercase tracking-widest mt-2">Comparativo Cito vs Molecular</p>
+                    <h3 className="text-xl sm:text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight">Volume de Exames</h3>
+                    <p className="text-[10px] sm:text-sm font-bold text-on-surface-variant/45 uppercase tracking-widest mt-1 sm:mt-2">Cito vs Molecular</p>
                   </div>
                 </div>
-                <ColumnChart 
-                data={[
-                  { label: 'Citopatológico', value: stats.examVolume.cito, color: 'bg-emerald-600' },
-                  { label: 'Molecular DNA', value: stats.examVolume.hpv, color: 'bg-blue-600' },
-                  { label: 'Pendente', value: stats.examVolume.pendente, color: 'bg-rose-600' },
-                ]} 
-              />
+                <div className="flex-1 w-full min-h-[300px] flex items-center justify-center">
+                  <ColumnChart data={[
+                    { label: 'Citopatológico', value: stats.examVolume.cito, color: 'bg-emerald-600' },
+                    { label: 'Molecular DNA', value: stats.examVolume.hpv, color: 'bg-blue-600' },
+                    { label: 'Pendente', value: stats.examVolume.pendente, color: 'bg-rose-600' },
+                  ]} />
+                </div>
               </div>
             </div>
           </div>

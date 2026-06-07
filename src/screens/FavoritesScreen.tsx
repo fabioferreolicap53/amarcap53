@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Header } from '../components/Header';
+import { ScrollIndicator } from '../components/ScrollIndicator';
 import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
@@ -675,8 +676,9 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
               </button>
             </div>
           ) : (
-            <div className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-[0px_20px_50px_rgba(0,0,0,0.06)] border border-outline-variant/15">
-              <div className="w-full overflow-x-auto custom-scrollbar-horizontal">
+            <div className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-[0px_20px_50px_rgba(0,0,0,0.06)] border border-outline-variant/15 relative">
+            <ScrollIndicator />
+            <div className="w-full overflow-x-auto custom-scrollbar-horizontal">
                 <table className="w-full text-center border-collapse">
                   <thead>
                     <tr className="bg-[#001b3d] border-b border-white/10 shadow-sm">

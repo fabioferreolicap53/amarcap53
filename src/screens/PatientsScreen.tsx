@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
+import { ScrollIndicator } from '../components/ScrollIndicator';
 import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
@@ -874,7 +875,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             )}
           </div>
 
-          <div className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-[0px_20px_50px_rgba(0,0,0,0.06)] border border-outline-variant/15">
+          <div className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-[0px_20px_50px_rgba(0,0,0,0.06)] border border-outline-variant/15 relative">
+            <ScrollIndicator />
             <div className="w-full overflow-x-auto custom-scrollbar-horizontal">
               <table className="w-full text-center border-collapse">
                 <thead>
@@ -1240,6 +1242,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   onChange={setModalTipoBusca}
                   required
                   icon={<Search className="w-3.5 h-3.5" />}
+                  showSearch={false}
                 />
 
                 {/* Tipo de Contato */}
@@ -1255,6 +1258,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   onChange={setModalTipoContato}
                   required
                   icon={<Phone className="w-3.5 h-3.5" />}
+                  showSearch={false}
                 />
 
                 {/* Situação Pós Busca */}
@@ -1278,6 +1282,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   onChange={setModalSituacao}
                   required
                   icon={<Info className="w-3.5 h-3.5" />}
+                  showSearch={false}
                 />
 
                 {/* Entraves Identificados */}
@@ -1299,6 +1304,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   ]}
                   value={modalEntraves}
                   onChange={setModalEntraves}
+                  showSearch={false}
                 />
 
                 {/* Entraves Informado Por */}
@@ -1313,6 +1319,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   value={modalEntravesInformadoPor}
                   onChange={setModalEntravesInformadoPor}
                   icon={<Info className="w-3.5 h-3.5" />}
+                  showSearch={false}
                 />
 
                 {/* Observações */}

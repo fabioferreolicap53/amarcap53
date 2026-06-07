@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from '../components/Header';
+import { ScrollIndicator } from '../components/ScrollIndicator';
 import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2, RotateCcw, Users, MapPin } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
@@ -603,7 +604,8 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
             </div>
           </div>
 
-          <div className="bg-white rounded-[2rem] overflow-hidden shadow-2xl border border-outline-variant/10">
+          <div className="bg-white rounded-[2rem] overflow-hidden shadow-2xl border border-outline-variant/10 relative">
+            <ScrollIndicator />
             <div className="overflow-x-auto custom-scrollbar-horizontal">
               <table className="w-full text-center border-collapse min-w-[900px] lg:min-w-full">
                 <thead>
@@ -826,6 +828,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, tipo_busca: val})}
                     required
                     icon={<Search className="w-3.5 h-3.5" />}
+                    showSearch={false}
                   />
 
                   {/* Tipo de Contato */}
@@ -841,6 +844,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, tipo_contato: val})}
                     required
                     icon={<Phone className="w-3.5 h-3.5" />}
+                    showSearch={false}
                   />
 
                   {/* Situação Pós Busca */}
@@ -864,6 +868,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, situacao_pos_busca: val})}
                     required
                     icon={<Info className="w-3.5 h-3.5" />}
+                    showSearch={false}
                   />
 
                   {/* Entraves Identificados */}
@@ -885,6 +890,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     ]}
                     value={selectedAcompanhamento.entraves_identificados || []}
                     onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_identificados: val})}
+                    showSearch={false}
                   />
 
                   {/* Entraves Informado Por */}
@@ -899,6 +905,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     value={selectedAcompanhamento.entraves_informado_por || ''}
                     onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_informado_por: val})}
                     icon={<Info className="w-3.5 h-3.5" />}
+                    showSearch={false}
                   />
 
                   <div className="col-span-2 space-y-2 group/field">

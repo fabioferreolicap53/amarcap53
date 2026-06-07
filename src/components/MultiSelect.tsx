@@ -15,6 +15,7 @@ interface MultiSelectProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  showSearch?: boolean;
 }
 
 export const MultiSelect: React.FC<MultiSelectProps> = ({
@@ -24,7 +25,8 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
   label,
   placeholder = "Selecionar...",
   className = "",
-  disabled = false
+  disabled = false,
+  showSearch = true
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -161,17 +163,19 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
           }}
         >
           <div className="bg-white border border-primary/10 rounded-[2rem] shadow-[0px_25px_70px_rgba(0,0,0,0.2)] p-4 backdrop-blur-xl bg-white/95 ring-1 ring-black/5">
-            <div className="relative mb-4">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar..."
-                className="w-full bg-slate-50 border border-slate-100 p-3 pl-11 rounded-2xl text-xs font-bold outline-none focus:border-primary/20 transition-all"
-                autoFocus
-              />
-            </div>
+            {showSearch && (
+              <div className="relative mb-4">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar..."
+                  className="w-full bg-slate-50 border border-slate-100 p-3 pl-11 rounded-2xl text-xs font-bold outline-none focus:border-primary/20 transition-all"
+                  autoFocus
+                />
+              </div>
+            )}
 
             <div className="max-h-[250px] overflow-y-auto no-scrollbar space-y-1">
               {filteredOptions.length === 0 ? (
