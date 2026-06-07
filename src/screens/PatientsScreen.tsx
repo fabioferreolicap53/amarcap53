@@ -213,6 +213,11 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [patientForDetails, setPatientDetails] = useState<Paciente | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
+
+  // Garantir que os detalhes sejam sempre do dado mais recente no estado
+  const activePatientForDetails = patientForDetails 
+    ? (pacientes.find(p => p.id === patientForDetails.id) || patientForDetails) 
+    : null;
   
   // Estados para os campos do modal de acompanhamento
   const [modalTipoBusca, setModalTipoBusca] = useState('');
@@ -1247,82 +1252,81 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   showSearch={false}
                 />
 
-                {/* Tipo de Contato */}
-                <SingleSelect 
-                  label="Tipo de Contato"
-                  placeholder="Selecione uma modalidade"
-                  options={[
-                    "Contato direto (conversa)",
-                    "Contato indireto (mensagem)",
-                    "Não houve contato ( não localizada, ligação não atendida...)"
-                  ]}
-                  value={modalTipoContato}
-                  onChange={setModalTipoContato}
-                  required
-                  icon={<Phone className="w-3.5 h-3.5" />}
-                  showSearch={false}
-                />
+                  {/* Tipo de Contato */}
+                  <SingleSelect 
+                    label="Tipo de Contato"
+                    placeholder="Selecione uma modalidade"
+                    options={[
+                      "Contato direto (conversa)",
+                      "Contato indireto (mensagem)",
+                      "Não houve contato ( não localizada, ligação não atendida...)"
+                    ]}
+                    value={modalTipoContato}
+                    onChange={setModalTipoContato}
+                    required
+                    icon={<Phone className="w-3.5 h-3.5" />}
+                    showSearch={false}
+                  />
 
-                {/* Situação Pós Busca */}
-                <SingleSelect 
-                  label="Situação Pós Busca Ativa"
-                  placeholder="Selecione o desfecho da busca"
-                  className="col-span-1 md:col-span-2"
-                  options={[
-                    "1- Agendamento após contato direto",
-                    "2 - Convite para demanda livre",
-                    "3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP",
-                    "4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP",
-                    "5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP",
-                    "6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP",
-                    "7 - Mudança de território (situação atualizada no PEP)",
-                    "8 - Óbito (situação atualizada no PEP)",
-                    "9 - Não localizada",
-                    "10 - Recusa"
-                  ]}
-                  value={modalSituacao}
-                  onChange={setModalSituacao}
-                  required
-                  icon={<Info className="w-3.5 h-3.5" />}
-                  showSearch={false}
-                />
+                  {/* Entraves Informado Por */}
+                  <SingleSelect 
+                    label="Entrave(s) Informado Por"
+                    placeholder="Selecione (Opcional)"
+                    options={[
+                      "1 - Informado por paciente",
+                      "2 - Identificado por profissional"
+                    ]}
+                    value={modalEntravesInformadoPor}
+                    onChange={setModalEntravesInformadoPor}
+                    icon={<Info className="w-3.5 h-3.5" />}
+                    showSearch={false}
+                  />
 
-                {/* Entraves Identificados */}
-                <MultiSelect 
-                  label="Entraves Identificados"
-                  placeholder="Selecione (Opcional)"
-                  className="col-span-1 md:col-span-2"
-                  options={[
-                    "1 - Horários incompatíveis com a rotina de trabalho",
-                    "2 - Vergonha ou constrangimento durante o exame",
-                    "3 - Ideia equivocada sobre a necessidade de fazer exame",
-                    "4 - Faz o rastreamento pela rede privada",
-                    "5 - Dificuldade de locomoção ( ex: acamada)",
-                    "6 - Distância da Unidade",
-                    "7 - Se recusa a fazer o exame com o profissional da equipe",
-                    "8 - Esquece a data do agendamento",
-                    "9 - Indisponibilidade de tempo",
-                    "10 - Não identificado entrave"
-                  ]}
-                  value={modalEntraves}
-                  onChange={setModalEntraves}
-                  showSearch={false}
-                />
+                  {/* Situação Pós Busca */}
+                  <SingleSelect 
+                    label="Situação Pós Busca Ativa"
+                    placeholder="Selecione o desfecho da busca"
+                    className="col-span-1 md:col-span-2"
+                    options={[
+                      "1- Agendamento após contato direto",
+                      "2 - Convite para demanda livre",
+                      "3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP",
+                      "4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP",
+                      "5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP",
+                      "6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP",
+                      "7 - Mudança de território (situação atualizada no PEP)",
+                      "8 - Óbito (situação atualizada no PEP)",
+                      "9 - Não localizada",
+                      "10 - Recusa"
+                    ]}
+                    value={modalSituacao}
+                    onChange={setModalSituacao}
+                    required
+                    icon={<Info className="w-3.5 h-3.5" />}
+                    showSearch={false}
+                  />
 
-                {/* Entraves Informado Por */}
-                <SingleSelect 
-                  label="Entrave(s) Informado Por"
-                  placeholder="Selecione (Opcional)"
-                  className="col-span-1 md:col-span-2"
-                  options={[
-                    "1 - Informado por paciente",
-                    "2 - Identificado por profissional"
-                  ]}
-                  value={modalEntravesInformadoPor}
-                  onChange={setModalEntravesInformadoPor}
-                  icon={<Info className="w-3.5 h-3.5" />}
-                  showSearch={false}
-                />
+                  {/* Entraves Identificados */}
+                  <MultiSelect 
+                    label="Entraves Identificados"
+                    placeholder="Selecione (Opcional)"
+                    className="col-span-1 md:col-span-2"
+                    options={[
+                      "1 - Horários incompatíveis com a rotina de trabalho",
+                      "2 - Vergonha ou constrangimento durante o exame",
+                      "3 - Ideia equivocada sobre a necessidade de fazer exame",
+                      "4 - Faz o rastreamento pela rede privada",
+                      "5 - Dificuldade de locomoção ( ex: acamada)",
+                      "6 - Distância da Unidade",
+                      "7 - Se recusa a fazer o exame com o profissional da equipe",
+                      "8 - Esquece a data do agendamento",
+                      "9 - Indisponibilidade de tempo",
+                      "10 - Não identificado entrave"
+                    ]}
+                    value={modalEntraves}
+                    onChange={setModalEntraves}
+                    showSearch={false}
+                  />
 
                 {/* Observações */}
                 <div className="col-span-1 md:col-span-2 space-y-2 group/field">
@@ -1372,7 +1376,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         </div>
       )}
       {/* Modal de Detalhes do Paciente */}
-      {isDetailsModalOpen && patientForDetails && (
+      {isDetailsModalOpen && activePatientForDetails && (
         <div className="fixed inset-0 bg-primary/20 backdrop-blur-md z-[110] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
           <div className="bg-surface-container-lowest w-full max-w-2xl rounded-2xl shadow-[0px_24px_48px_rgba(0,0,0,0.15)] overflow-hidden border border-white/20 animate-in zoom-in-95 duration-300">
             <div className="bg-gradient-to-r from-[#001b3d] to-[#002b5c] px-6 py-5 flex justify-between items-center">
@@ -1395,58 +1399,80 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                 <div className="space-y-4">
                   <div>
                     <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Nome Completo</p>
-                    <p className="text-sm font-bold text-primary">{patientForDetails.nome}</p>
+                    <p className="text-sm font-bold text-primary">{activePatientForDetails.nome}</p>
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Cartão Nacional de Saúde (CNS)</p>
-                    <code className="text-xs font-bold text-on-surface-variant bg-surface-container-high px-2 py-1 rounded">{patientForDetails.cns}</code>
+                    <code className="text-xs font-bold text-on-surface-variant bg-surface-container-high px-2 py-1 rounded inline-block">{activePatientForDetails.cns}</code>
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Data de Nascimento / Idade</p>
-                    <p className="text-sm font-bold text-primary">{formatarData(patientForDetails.data_nascimento)} ({patientForDetails.idade} anos)</p>
+                    <p className="text-sm font-bold text-primary">{formatarData(activePatientForDetails.data_nascimento)} ({activePatientForDetails.idade} anos)</p>
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Grupo</p>
-                    <p className="text-sm font-bold text-primary">{patientForDetails.grupo}</p>
+                    <p className="text-sm font-bold text-primary">{activePatientForDetails.grupo}</p>
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   <div>
                     <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Unidade de Saúde</p>
-                    <p className="text-sm font-bold text-primary">{patientForDetails.unidade}</p>
+                    <p className="text-sm font-bold text-primary">{activePatientForDetails.unidade}</p>
                   </div>
                   <div className="flex gap-8">
                     <div>
                       <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Equipe</p>
-                      <p className="text-sm font-bold text-primary">{patientForDetails.equipe}</p>
+                      <p className="text-sm font-bold text-primary">{activePatientForDetails.equipe}</p>
                     </div>
                     <div>
                       <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Microárea</p>
-                      <p className="text-sm font-bold text-primary">{patientForDetails.microarea}</p>
+                      <p className="text-sm font-bold text-primary">{activePatientForDetails.microarea}</p>
                     </div>
                   </div>
                   <div className="pt-4 border-t border-outline-variant/10">
                     <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-2">Status de Rastreamento</p>
-                    <div className="flex flex-wrap gap-2">
-                      {patientForDetails.cito_lab !== '--' && (
-                        <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black">CITO LAB: {formatarData(patientForDetails.cito_lab)}</span>
+                    <div className="flex flex-col gap-3">
+                      {/* Badge de Status Principal */}
+                      {activePatientForDetails.alertas && ALERT_CONFIGS[activePatientForDetails.alertas] ? (
+                        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 shadow-lg ${ALERT_CONFIGS[activePatientForDetails.alertas].bg}`}>
+                          <div className="p-2 bg-white/20 rounded-lg">
+                            {React.createElement(ALERT_CONFIGS[activePatientForDetails.alertas].icon, { className: "w-4 h-4 text-white" })}
+                          </div>
+                          <span className="text-[10px] font-black uppercase leading-tight text-white">
+                            {ALERT_CONFIGS[activePatientForDetails.alertas].label}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="px-4 py-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-400 text-[10px] font-black uppercase italic">
+                          Status não identificado
+                        </div>
                       )}
-                      {patientForDetails.cito_pep !== '--' && (
-                        <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-black">CITO PEP: {formatarData(patientForDetails.cito_pep)}</span>
-                      )}
-                      {patientForDetails.dna_hpv !== '--' && (
-                        <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black">DNA-HPV: {formatarData(patientForDetails.dna_hpv)}</span>
-                      )}
+
+                      {/* Datas de Exames */}
+                      <div className="flex flex-wrap gap-2">
+                        {activePatientForDetails.cito_laboratorio && activePatientForDetails.cito_laboratorio !== '--' && (
+                          <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-black uppercase">DNA-HPV (PEP): {formatarData(activePatientForDetails.cito_laboratorio)}</span>
+                        )}
+                        {activePatientForDetails.dna_hpv !== '--' && (
+                          <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase">DNA-HPV (GAL): {formatarData(activePatientForDetails.dna_hpv)}</span>
+                        )}
+                        {activePatientForDetails.cito_pep !== '--' && (
+                          <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase">CITO (PEP): {formatarData(activePatientForDetails.cito_pep)}</span>
+                        )}
+                        {activePatientForDetails.cito_lab !== '--' && (
+                          <span className="px-2 py-1 rounded-md bg-yellow-50 text-yellow-700 border border-yellow-100 text-[9px] font-black uppercase">CITO (LAB): {formatarData(activePatientForDetails.cito_lab)}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {patientForDetails.alertas_rastreamento && patientForDetails.alertas_rastreamento !== '--' && (
+              {activePatientForDetails.alertas_rastreamento && activePatientForDetails.alertas_rastreamento !== '--' && (
                 <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
                   <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-1">Observações de Alerta (Coluna N)</p>
-                  <p className="text-xs font-bold text-amber-900">{patientForDetails.alertas_rastreamento}</p>
+                  <p className="text-xs font-bold text-amber-900">{activePatientForDetails.alertas_rastreamento}</p>
                 </div>
               )}
             </div>

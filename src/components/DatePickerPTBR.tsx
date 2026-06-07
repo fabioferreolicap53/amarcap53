@@ -43,22 +43,11 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
   const updatePosition = () => {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      const isMobile = window.innerWidth < 768;
-      
-      if (isMobile) {
-        // Centralizado no mobile
-        setDropdownPosition({
-          top: rect.bottom + window.scrollY + 8,
-          left: (window.innerWidth - 300) / 2, // Centraliza calendário de 300px
-          width: 300
-        });
-      } else {
-        setDropdownPosition({
-          top: rect.bottom + window.scrollY + 12,
-          left: rect.left + window.scrollX,
-          width: Math.max(rect.width, 280)
-        });
-      }
+      setDropdownPosition({
+        top: rect.bottom + window.scrollY + 12,
+        left: rect.left + window.scrollX,
+        width: Math.max(rect.width, 280)
+      });
     }
   };
 
@@ -188,6 +177,8 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
         <input
           type="text"
           inputMode="numeric"
+          enterKeyHint="done"
+          autoComplete="off"
           value={displayValue}
           onChange={handleTextChange}
           onFocus={handleOpen}
@@ -219,8 +210,8 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
           >
             <CalendarIcon className="w-4 h-4" />
           </button>
-          <div className="p-2 bg-primary/5 text-primary rounded-xl lg:hidden flex">
-            <CalendarIcon className="w-4 h-4" />
+          <div className="px-2.5 py-1.5 bg-slate-100 text-slate-400 rounded-xl lg:hidden flex items-center">
+            <span className="text-[10px] font-black tracking-widest">123</span>
           </div>
         </div>
       </div>

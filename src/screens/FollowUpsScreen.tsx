@@ -805,10 +805,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
               </button>
             </div>
             
-            <div className="overflow-y-auto custom-scrollbar-modal flex-1 p-10">
+            <div className="overflow-y-auto custom-scrollbar-modal flex-1 p-5 sm:p-8 md:p-10">
               <form id="edit-acompanhamento-form" onSubmit={handleSaveEdit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                  <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5 sm:gap-y-6">
+                  <div className="space-y-2 group/field">
                     <DatePickerPTBR 
                       label="Data da Busca"
                       value={selectedAcompanhamento.data_busca_formatada} 
@@ -836,7 +836,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                   {/* Tipo de Contato */}
                   <SingleSelect 
                     label="Tipo de Contato"
-                    placeholder="Selecione"
+                    placeholder="Selecione uma modalidade"
                     options={[
                       "Contato direto (conversa)",
                       "Contato indireto (mensagem)",
@@ -849,11 +849,25 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     showSearch={false}
                   />
 
+                  {/* Entraves Informado Por */}
+                  <SingleSelect 
+                    label="Entrave(s) Informado Por"
+                    placeholder="Selecione (Opcional)"
+                    options={[
+                      "1 - Informado por paciente",
+                      "2 - Identificado por profissional"
+                    ]}
+                    value={selectedAcompanhamento.entraves_informado_por || ''}
+                    onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_informado_por: val})}
+                    icon={<Info className="w-3.5 h-3.5" />}
+                    showSearch={false}
+                  />
+
                   {/* Situação Pós Busca */}
                   <SingleSelect 
-                    label="Situação Pós Busca"
-                    placeholder="Selecione"
-                    className="col-span-2"
+                    label="Situação Pós Busca Ativa"
+                    placeholder="Selecione o desfecho da busca"
+                    className="col-span-1 md:col-span-2"
                     options={[
                       "1- Agendamento após contato direto",
                       "2 - Convite para demanda livre",
@@ -876,8 +890,8 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                   {/* Entraves Identificados */}
                   <MultiSelect 
                     label="Entraves Identificados"
-                    placeholder="Nenhum"
-                    className="col-span-2"
+                    placeholder="Selecione (Opcional)"
+                    className="col-span-1 md:col-span-2"
                     options={[
                       "1 - Horários incompatíveis com a rotina de trabalho",
                       "2 - Vergonha ou constrangimento durante o exame",
@@ -895,33 +909,19 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     showSearch={false}
                   />
 
-                  {/* Entraves Informado Por */}
-                  <SingleSelect 
-                    label="Entrave(s) Informado Por"
-                    placeholder="Selecione (Opcional)"
-                    className="col-span-2"
-                    options={[
-                      "1 - Informado por paciente",
-                      "2 - Identificado por profissional"
-                    ]}
-                    value={selectedAcompanhamento.entraves_informado_por || ''}
-                    onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_informado_por: val})}
-                    icon={<Info className="w-3.5 h-3.5" />}
-                    showSearch={false}
-                  />
-
-                  <div className="col-span-2 space-y-2 group/field">
+                  {/* Observações */}
+                  <div className="col-span-1 md:col-span-2 space-y-2 group/field">
                     <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
                       <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
                         <MessageSquare className="w-3.5 h-3.5" />
                       </div>
-                      Observações
+                      Observações Detalhadas
                     </label>
                     <textarea 
                       name="observacoes" 
                       value={selectedAcompanhamento.observacoes || ''} 
                       onChange={(e) => setSelectedAcompanhamento({...selectedAcompanhamento, observacoes: e.target.value})}
-                      className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium p-4 resize-none outline-none focus:border-primary min-h-[120px] shadow-sm hover:border-primary/40 transition-all" 
+                      className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-4 resize-none transition-all outline-none placeholder:text-outline-variant/60 shadow-sm hover:border-primary/40 min-h-[120px]" 
                       rows={4}
                       placeholder="Informações adicionais relevantes..."
                     ></textarea>
@@ -930,10 +930,26 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
               </form>
             </div>
               
-            <div className="flex justify-end gap-4 p-6 border-t border-outline-variant/10 bg-surface-container-lowest shrink-0">
-              <button type="button" onClick={handleCloseModal} disabled={isSaving} className="px-8 py-3 rounded-xl text-sm font-bold text-primary hover:bg-primary/5 transition-all disabled:opacity-50">Descartar</button>
-              <button form="edit-acompanhamento-form" type="submit" disabled={isSaving} className="px-10 py-3 rounded-xl text-sm font-black text-white bg-gradient-to-r from-[#1c2e4a] to-[#253c61] shadow-lg transition-all flex items-center gap-2 disabled:opacity-50">
-                {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <CheckCircle2 className="w-4 h-4" />}
+            <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 p-5 sm:p-6 md:px-10 md:py-6 border-t border-outline-variant/10 bg-surface-container-lowest shrink-0 z-10">
+              <button 
+                type="button" 
+                onClick={handleCloseModal}
+                disabled={isSaving}
+                className="px-6 sm:px-8 py-3 rounded-xl text-sm font-bold text-primary hover:bg-primary/5 transition-all border border-transparent hover:border-primary/10 w-full sm:w-auto order-2 sm:order-1 disabled:opacity-50"
+              >
+                Descartar
+              </button>
+              <button 
+                form="edit-acompanhamento-form"
+                type="submit" 
+                disabled={isSaving}
+                className="px-6 sm:px-10 py-3 rounded-xl text-sm font-black text-white bg-gradient-to-r from-[#1c2e4a] to-[#253c61] shadow-[0_10px_20px_rgba(28,46,74,0.3)] hover:shadow-[0_15px_30px_rgba(28,46,74,0.4)] hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 group w-full sm:w-auto order-1 sm:order-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                )}
                 {isSaving ? 'Salvando...' : 'Salvar Alterações'}
               </button>
             </div>

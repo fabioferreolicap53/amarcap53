@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
 import { ScrollIndicator } from '../components/ScrollIndicator';
 import { Footer } from '../components/Footer';
@@ -240,6 +241,19 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
   const [selectedDate, setSelectedDate] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Garantir que os detalhes sejam sempre do dado mais recente no estado
+  const activePatientForDetails = patientForDetails 
+    ? (pacientes.find(p => p.id === patientForDetails.id) || patientForDetails) 
+    : null;
+
+  // Estados para os campos do modal de acompanhamento
+  const [modalTipoBusca, setModalTipoBusca] = useState('');
+  const [modalTipoContato, setModalTipoContato] = useState('');
+  const [modalSituacao, setModalSituacao] = useState('');
+  const [modalEntraves, setModalEntraves] = useState<string[]>([]);
+  const [modalEntravesInformadoPor, setModalEntravesInformadoPor] = useState('');
+  const [modalObservacoes, setModalObservacoes] = useState('');
+
   const [favorites, setFavorites] = useState<string[]>(() => {
     const saved = localStorage.getItem('amarcap53_favorites');
     return saved ? JSON.parse(saved) : [];
@@ -388,6 +402,13 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedPaciente(null);
+    setSelectedDate('');
+    setModalTipoBusca('');
+    setModalTipoContato('');
+    setModalSituacao('');
+    setModalEntraves([]);
+    setModalEntravesInformadoPor('');
+    setModalObservacoes('');
   };
 
   const handleSaveFollowUp = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -935,6 +956,20 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                     showSearch={false}
                   />
 
+                  {/* Entraves Informado Por */}
+                  <SingleSelect 
+                    label="Entrave(s) Informado Por"
+                    placeholder="Selecione (Opcional)"
+                    options={[
+                      "1 - Informado por paciente",
+                      "2 - Identificado por profissional"
+                    ]}
+                    value={modalEntravesInformadoPor}
+                    onChange={setModalEntravesInformadoPor}
+                    icon={<Info className="w-3.5 h-3.5" />}
+                    showSearch={false}
+                  />
+
                   {/* Situação Pós Busca */}
                   <SingleSelect 
                     label="Situação Pós Busca Ativa"
@@ -978,21 +1013,6 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                     ]}
                     value={modalEntraves}
                     onChange={setModalEntraves}
-                    showSearch={false}
-                  />
-
-                  {/* Entraves Informado Por */}
-                  <SingleSelect 
-                    label="Entrave(s) Informado Por"
-                    placeholder="Selecione (Opcional)"
-                    className="col-span-1 md:col-span-2"
-                    options={[
-                      "1 - Informado por paciente",
-                      "2 - Identificado por profissional"
-                    ]}
-                    value={modalEntravesInformadoPor}
-                    onChange={setModalEntravesInformadoPor}
-                    icon={<Info className="w-3.5 h-3.5" />}
                     showSearch={false}
                   />
 
@@ -1044,32 +1064,108 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
         </div>
       )}
 
-      {isDetailsModalOpen && patientForDetails && (
+      {isDetailsModalOpen && activePatientForDetails && (
         <div className="fixed inset-0 bg-primary/20 backdrop-blur-md z-[110] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
-          <div className="bg-surface-container-lowest w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-white/20 animate-in zoom-in-95 duration-300">
+          <div className="bg-surface-container-lowest w-full max-w-2xl rounded-2xl shadow-[0px_24px_48px_rgba(0,0,0,0.15)] overflow-hidden border border-white/20 animate-in zoom-in-95 duration-300">
             <div className="bg-gradient-to-r from-[#001b3d] to-[#002b5c] px-6 py-5 flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
                   <Users className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-white text-lg font-black uppercase">Detalhes do Paciente</h3>
+                <div>
+                  <h3 className="text-white text-lg font-black tracking-tight leading-tight">Detalhes do Paciente</h3>
+                  <p className="text-white/60 text-[10px] uppercase tracking-widest mt-1">Informações Cadastrais</p>
+                </div>
               </div>
-              <button onClick={handleCloseDetails} className="p-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-all"><X className="w-6 h-6" /></button>
+              <button onClick={handleCloseDetails} className="p-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-all">
+                <X className="w-6 h-6" />
+              </button>
             </div>
+
             <div className="p-8">
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <div><p className="text-[10px] font-black text-primary/50 uppercase mb-1">Nome</p><p className="text-sm font-bold text-primary">{patientForDetails.nome}</p></div>
-                  <div><p className="text-[10px] font-black text-primary/50 uppercase mb-1">CNS</p><p className="text-xs font-bold text-on-surface-variant bg-surface-container-high px-2 py-1 rounded inline-block">{patientForDetails.cns}</p></div>
+                  <div>
+                    <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Nome Completo</p>
+                    <p className="text-sm font-bold text-primary">{activePatientForDetails.nome}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Cartão Nacional de Saúde (CNS)</p>
+                    <code className="text-xs font-bold text-on-surface-variant bg-surface-container-high px-2 py-1 rounded inline-block">{activePatientForDetails.cns}</code>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Data de Nascimento / Idade</p>
+                    <p className="text-sm font-bold text-primary">{formatarData(activePatientForDetails.data_nascimento)} ({calcularIdade(activePatientForDetails.data_nascimento)} anos)</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Grupo</p>
+                    <p className="text-sm font-bold text-primary">{activePatientForDetails.grupo}</p>
+                  </div>
                 </div>
+
                 <div className="space-y-4">
-                  <div><p className="text-[10px] font-black text-primary/50 uppercase mb-1">Unidade</p><p className="text-sm font-bold text-primary">{patientForDetails.unidade}</p></div>
-                  <div><p className="text-[10px] font-black text-primary/50 uppercase mb-1">Equipe/MA</p><p className="text-sm font-bold text-primary">{patientForDetails.equipe} / MA: {patientForDetails.microarea}</p></div>
+                  <div>
+                    <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Unidade de Saúde</p>
+                    <p className="text-sm font-bold text-primary">{activePatientForDetails.unidade}</p>
+                  </div>
+                  <div className="flex gap-8">
+                    <div>
+                      <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Equipe</p>
+                      <p className="text-sm font-bold text-primary">{activePatientForDetails.equipe}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Microárea</p>
+                      <p className="text-sm font-bold text-primary">{activePatientForDetails.microarea}</p>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-outline-variant/10">
+                    <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-2">Status de Rastreamento</p>
+                    <div className="flex flex-col gap-3">
+                      {/* Badge de Status Principal */}
+                      {activePatientForDetails.alertas && ALERT_CONFIGS[activePatientForDetails.alertas] ? (
+                        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 shadow-lg ${ALERT_CONFIGS[activePatientForDetails.alertas].bg}`}>
+                          <div className="p-2 bg-white/20 rounded-lg">
+                            {React.createElement(ALERT_CONFIGS[activePatientForDetails.alertas].icon, { className: "w-4 h-4 text-white" })}
+                          </div>
+                          <span className="text-[10px] font-black uppercase leading-tight text-white">
+                            {ALERT_CONFIGS[activePatientForDetails.alertas].label}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="px-4 py-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-400 text-[10px] font-black uppercase italic">
+                          Status não identificado
+                        </div>
+                      )}
+
+                      {/* Datas de Exames */}
+                      <div className="flex flex-wrap gap-2">
+                        {activePatientForDetails.cito_laboratorio && activePatientForDetails.cito_laboratorio !== '--' && (
+                          <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-black uppercase">DNA-HPV (PEP): {formatarData(activePatientForDetails.cito_laboratorio)}</span>
+                        )}
+                        {activePatientForDetails.dna_hpv !== '--' && (
+                          <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase">DNA-HPV (GAL): {formatarData(activePatientForDetails.dna_hpv)}</span>
+                        )}
+                        {activePatientForDetails.cito_pep !== '--' && (
+                          <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase">CITO (PEP): {formatarData(activePatientForDetails.cito_pep)}</span>
+                        )}
+                        {activePatientForDetails.cito_lab !== '--' && (
+                          <span className="px-2 py-1 rounded-md bg-yellow-50 text-yellow-700 border border-yellow-100 text-[9px] font-black uppercase">CITO (LAB): {formatarData(activePatientForDetails.cito_lab)}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              {activePatientForDetails.alertas_rastreamento && activePatientForDetails.alertas_rastreamento !== '--' && (
+                <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-1">Observações de Alerta (Coluna N)</p>
+                  <p className="text-xs font-bold text-amber-900">{activePatientForDetails.alertas_rastreamento}</p>
+                </div>
+              )}
             </div>
             <div className="p-6 border-t border-outline-variant/10 bg-surface-container-lowest flex justify-end">
-              <button onClick={handleCloseDetails} className="px-8 py-2.5 rounded-xl text-sm font-black text-white bg-[#001b3d] shadow-lg transition-all">Fechar</button>
+              <button onClick={handleCloseDetails} className="px-8 py-2.5 rounded-xl text-sm font-black text-white bg-[#001b3d] shadow-lg transition-all hover:bg-[#002b5c] active:scale-95">Fechar</button>
             </div>
           </div>
         </div>

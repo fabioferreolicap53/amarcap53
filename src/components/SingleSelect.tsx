@@ -153,7 +153,7 @@ export const SingleSelect: React.FC<SingleSelectProps> = ({
           )}
           <ChevronDown className={`w-4 h-4 text-primary/40 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
         </div>
-      </div>
+      </button>
 
       {isOpen && dropdownPosition && createPortal(
         <div 

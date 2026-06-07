@@ -125,16 +125,16 @@ const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ dat
 };
 
 const StatCard: React.FC<{ title: string; value: number | string; icon: React.ReactNode; color: string }> = ({ title, value, icon, color }) => (
-  <div className="bg-white p-8 md:p-9 rounded-[2.75rem] shadow-xl border border-primary/5 hover:border-primary/20 transition-all duration-500 group relative overflow-hidden">
-    <div className={`absolute top-0 right-0 w-28 h-28 ${color.replace('bg-', 'bg-')}/5 rounded-full blur-2xl`} />
-    <div className="flex justify-between items-start mb-7 relative z-10">
-      <div className={`w-16 h-16 rounded-[1.4rem] ${color.replace('bg-', 'bg-')}/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-inner`}>
-        {React.cloneElement(icon as React.ReactElement, { className: 'w-8 h-8 ' + color.replace('bg-', 'text-'), strokeWidth: 2.5 })}
+  <div className="bg-white p-6 md:p-7 rounded-[2.5rem] shadow-lg border border-primary/5 hover:border-primary/10 transition-all duration-500 group relative overflow-hidden">
+    <div className={`absolute top-0 right-0 w-24 h-24 ${color.replace('bg-', 'bg-')}/5 rounded-full blur-2xl`} />
+    <div className="flex justify-between items-start mb-5 relative z-10">
+      <div className={`w-14 h-14 rounded-[1.25rem] ${color.replace('bg-', 'bg-')}/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-inner`}>
+        {React.cloneElement(icon as React.ReactElement, { className: 'w-7 h-7 ' + color.replace('bg-', 'text-'), strokeWidth: 2.5 })}
       </div>
-      <span className="text-[11px] font-black uppercase tracking-[0.24em] text-on-surface-variant/40">Geral</span>
+      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/30">Geral</span>
     </div>
-    <div className={`text-5xl md:text-6xl font-black ${color.replace('bg-', 'text-')} tracking-tighter mb-3 relative z-10`}>{value}</div>
-    <p className="text-sm font-bold text-on-surface-variant/60 uppercase tracking-wide relative z-10">{title}</p>
+    <div className={`text-4xl md:text-5xl font-black ${color.replace('bg-', 'text-')} tracking-tighter mb-2 relative z-10`}>{value}</div>
+    <p className="text-[11px] font-black text-on-surface-variant/50 uppercase tracking-widest relative z-10">{title}</p>
   </div>
 );
 
@@ -422,23 +422,23 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         setActiveTab={setActiveTab} 
       />
       
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-11 no-scrollbar relative">
-        <div className="max-w-[1500px] mx-auto space-y-14 md:space-y-16">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 no-scrollbar relative">
+        <div className="max-w-[1600px] mx-auto space-y-8 md:space-y-10">
           
-          <div className="flex flex-col gap-8 mb-12 items-center lg:items-stretch justify-center">
+          <div className="flex flex-col gap-6 mb-8 items-center lg:items-stretch justify-center">
             {/* Card Principal de Boas-vindas */}
-            <div className="w-full bg-gradient-to-br from-[#051934] via-[#0a2347] to-[#112d5a] p-8 md:p-12 rounded-[3.25rem] text-white relative overflow-hidden group shadow-2xl flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left">
+            <div className="w-full bg-gradient-to-br from-[#051934] via-[#0a2347] to-[#112d5a] p-6 md:p-10 rounded-[2.5rem] text-white relative overflow-hidden group shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl group-hover:bg-white/10 transition-all duration-700"></div>
               
               <div className="relative z-10 flex-1">
-                <div className="flex items-center justify-center md:justify-start gap-4 mb-6">
-                  <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center ring-1 ring-white/20 shadow-inner">
-                    <LayoutDashboard className="w-7 h-7 text-blue-300" />
+                <div className="flex items-center justify-center md:justify-start gap-3 mb-4">
+                  <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center ring-1 ring-white/20 shadow-inner">
+                    <LayoutDashboard className="w-6 h-6 text-blue-300" />
                   </div>
-                  <h1 className="text-3xl md:text-4xl font-black tracking-tight uppercase">Resumo <span className="text-blue-300 opacity-50">Geral</span></h1>
+                  <h1 className="text-2xl md:text-3xl font-black tracking-tight uppercase">Resumo <span className="text-blue-300 opacity-50">Geral</span></h1>
                 </div>
-                <p className="text-lg md:text-xl text-white/70 font-medium leading-relaxed max-w-xl mx-auto md:mx-0">
-                  Olá, <span className="text-white font-black">{user?.name || 'Profissional'}</span>! Acompanhe aqui o panorama atualizado dos rastreamentos e metas territoriais.
+                <p className="text-base md:text-lg text-white/70 font-medium leading-relaxed max-w-xl mx-auto md:mx-0">
+                  Olá, <span className="text-white font-black">{user?.name || 'Profissional'}</span>! Acompanhe o panorama atualizado do seu território.
                 </p>
               </div>
 
@@ -446,16 +446,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               <div className="relative z-10">
                 <button 
                   onClick={() => setIsFilterVisible(!isFilterVisible)}
-                  className={`flex items-center gap-3 px-8 h-16 rounded-[1.5rem] text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
+                  className={`flex items-center gap-3 px-6 h-14 rounded-[1.25rem] text-[11px] font-black uppercase tracking-widest transition-all duration-500 border ${
                     isFilterVisible || filterUnidade.length > 0 || filterEquipe.length > 0 || filterMicroarea.length > 0 || filterDataInicio || filterDataFim
-                      ? 'bg-primary text-white border-primary shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]' 
+                      ? 'bg-primary text-white border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)]' 
                       : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
                   }`}
                 >
-                  <Filter className="w-5 h-5" />
+                  <Filter className="w-4 h-4" />
                   <span>Filtros</span>
                   {(filterUnidade.length > 0 || filterEquipe.length > 0 || filterMicroarea.length > 0 || filterDataInicio || filterDataFim) && (
-                    <div className="w-6 h-6 flex items-center justify-center bg-white text-primary text-[10px] rounded-full font-black animate-pulse">
+                    <div className="w-5 h-5 flex items-center justify-center bg-white text-primary text-[9px] rounded-full font-black animate-pulse">
                       {[filterUnidade, filterEquipe, filterMicroarea].filter(f => f.length > 0).length + (filterDataInicio || filterDataFim ? 1 : 0)}
                     </div>
                   )}
@@ -465,23 +465,23 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
             {/* Painel de Filtros Avançados - Colapsável */}
             {isFilterVisible && (
-              <div className="w-full bg-white p-8 md:p-10 rounded-[3.25rem] shadow-2xl border border-primary/5 relative animate-in slide-in-from-top-6 fade-in duration-500">
-                <div className="flex items-center justify-between gap-4 mb-8 w-full">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-primary/5 rounded-2xl text-primary">
-                      <Filter className="w-6 h-6" />
+              <div className="w-full bg-white p-6 md:p-8 rounded-[2.5rem] shadow-xl border border-primary/5 relative animate-in slide-in-from-top-6 fade-in duration-500">
+                <div className="flex items-center justify-between gap-4 mb-6 w-full">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-primary/5 rounded-xl text-primary">
+                      <Filter className="w-5 h-5" />
                     </div>
-                    <h2 className="text-xl font-black text-primary uppercase tracking-tighter">Filtros Avançados</h2>
+                    <h2 className="text-lg font-black text-primary uppercase tracking-tighter">Filtros Avançados</h2>
                   </div>
                   <button 
                     onClick={() => setIsFilterVisible(false)}
                     className="p-2 rounded-full hover:bg-slate-100 text-slate-400 transition-all"
                   >
-                    <X className="w-6 h-6" />
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div className="lg:col-span-2 space-y-3">
                     <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
                       <Calendar className="w-3.5 h-3.5" />
@@ -607,22 +607,23 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           </div>
 
           {/* Gráficos e Tabelas */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 items-stretch">
             {/* Gráfico de Meta Territorial */}
-            <div className="lg:col-span-7 bg-white p-6 sm:p-8 md:p-10 rounded-[3.25rem] shadow-2xl border border-primary/5 flex flex-col items-center lg:items-stretch text-center lg:text-left">
-              <div className="flex items-center justify-center lg:justify-start gap-4 mb-8 sm:mb-10 w-full">
-                <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl shadow-inner">
-                  <Target className="w-7 h-7" />
-                </div>
-                <div>
-                  <h3 className="text-xl sm:text-2xl font-black text-slate-800 uppercase tracking-tight">Meta <span className="text-emerald-500">Territorial</span></h3>
-                  <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Status de Rastreamento (%)</p>
+            <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden flex flex-col">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl" />
+              <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-8 relative z-10 text-center sm:text-left">
+                <div className="flex flex-col items-center sm:items-start">
+                  <h3 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight flex items-center gap-3">
+                    <Target className="w-6 h-6 text-emerald-500" />
+                    Meta Territorial
+                  </h3>
+                  <p className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Status de Rastreamento (%)</p>
                 </div>
               </div>
               
               <div 
                 key={`meta-territorial-chart-wrapper-${stats.totalPacientes}`}
-                className="flex-1 w-full min-h-[350px] sm:min-h-[400px] flex items-center justify-center"
+                className="flex-1 w-full min-h-[250px] flex items-center justify-center relative z-10"
               >
                 <div className="w-full h-full max-w-[600px] mx-auto">
                   <Bar 
@@ -634,10 +635,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                         legend: { display: false },
                         tooltip: {
                           backgroundColor: '#051934',
-                          titleFont: { size: 13, weight: 'bold' },
-                          bodyFont: { size: 12 },
-                          padding: 16,
-                          cornerRadius: 16,
+                          titleFont: { size: 12, weight: 'bold' },
+                          bodyFont: { size: 11 },
+                          padding: 12,
+                          cornerRadius: 12,
                           displayColors: false
                         }
                       },
@@ -647,17 +648,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                           max: 100,
                           ticks: {
                             callback: (value) => `${value}%`,
-                            font: { weight: 'bold', size: 11 },
+                            font: { weight: 'bold', size: 10 },
                             color: '#94a3b8'
                           },
-                          grid: { color: '#f1f5f9' },
+                          grid: { color: '#f8fafc' },
                           border: { display: false }
                         },
                         x: {
                           grid: { display: false },
                           border: { display: false },
                           ticks: {
-                            font: { weight: 'bold', size: 10 },
+                            font: { weight: 'bold', size: 9 },
                             color: '#64748b',
                             maxRotation: 45,
                             minRotation: 45
@@ -671,25 +672,26 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             </div>
 
             {/* Distribuição por Unidade / Equipe */}
-            <div className="lg:col-span-5 bg-white p-6 sm:p-8 md:p-10 rounded-[3.25rem] shadow-2xl border border-primary/5 flex flex-col items-center lg:items-stretch text-center lg:text-left">
-              <div className="flex items-center justify-center lg:justify-start gap-4 mb-8 sm:mb-10 w-full">
-                <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl shadow-inner">
-                  <Building2 className="w-7 h-7" />
-                </div>
-                <div>
-                  <h3 className="text-xl sm:text-2xl font-black text-slate-800 uppercase tracking-tight">Ranking <span className="text-blue-500">Regional</span></h3>
-                  <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Desempenho por Unidade</p>
+            <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden flex flex-col">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl" />
+              <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-8 relative z-10 text-center sm:text-left">
+                <div className="flex flex-col items-center sm:items-start">
+                  <h3 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight flex items-center gap-3">
+                    <Building2 className="w-6 h-6 text-blue-500" />
+                    Ranking Regional
+                  </h3>
+                  <p className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Desempenho por Unidade</p>
                 </div>
               </div>
 
-              <div className="flex-1 w-full overflow-y-auto no-scrollbar max-h-[500px]">
-                <div className="space-y-4 md:space-y-8">
+              <div className="flex-1 w-full overflow-y-auto no-scrollbar max-h-[300px] relative z-10">
+                <div className="space-y-6">
                 {(isAdmin || user?.role === 'cap') && (
-                  <div className="space-y-6">
-                    <p className="text-[10px] font-black text-primary/40 uppercase tracking-[0.2em] border-b border-primary/5 pb-2">Ranking de Unidades</p>
+                  <div className="space-y-4">
+                    <p className="text-[9px] font-black text-primary/30 uppercase tracking-[0.2em] border-b border-primary/5 pb-1.5">Unidades</p>
                     {Object.entries(acompStats.unidadeBreakdown)
                       .sort((a, b) => (b[1] as number) - (a[1] as number))
-                      .slice(0, 10)
+                      .slice(0, 5)
                       .map(([label, val]) => (
                         <SimpleProgressBar 
                           key={label}
@@ -703,11 +705,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 )}
 
                 {(isAdmin || user?.role === 'cap' || user?.role === 'unidade') && (
-                  <div className="space-y-6">
-                    <p className="text-[10px] font-black text-blue-500/40 uppercase tracking-[0.2em] border-b border-blue-500/5 pb-2">Ranking de Equipes</p>
+                  <div className="space-y-4">
+                    <p className="text-[9px] font-black text-blue-500/30 uppercase tracking-[0.2em] border-b border-blue-500/5 pb-1.5">Equipes</p>
                     {Object.entries(acompStats.equipeBreakdown)
                       .sort((a, b) => (b[1] as number) - (a[1] as number))
-                      .slice(0, 10)
+                      .slice(0, 5)
                       .map(([label, val]) => (
                         <SimpleProgressBar 
                           key={label}
@@ -719,17 +721,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                       ))}
                   </div>
                 )}
-
-                {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
-                  <div className="space-y-6">
-                    <p className="text-[10px] font-black text-emerald-500/40 uppercase tracking-[0.2em] border-b border-emerald-500/5 pb-2">Ranking de Microáreas</p>
+                {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && Object.keys(acompStats.microareaBreakdown).length > 0 && (
+                  <div className="space-y-4">
+                    <p className="text-[9px] font-black text-emerald-500/30 uppercase tracking-[0.2em] border-b border-emerald-500/5 pb-1.5">Microáreas</p>
                     {Object.entries(acompStats.microareaBreakdown)
                       .sort((a, b) => (b[1] as number) - (a[1] as number))
-                      .slice(0, 10)
+                      .slice(0, 5)
                       .map(([label, val]) => (
                         <SimpleProgressBar 
                           key={label}
-                          label={`Microárea ${label}`} 
+                          label={`MA ${label}`} 
                           value={val} 
                           total={stats.totalPacientes} 
                           color="bg-emerald-500" 
@@ -742,23 +743,23 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             {/* Gráfico de Status de Rastreamento Real */}
-            <div className="bg-white p-6 sm:p-9 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl" />
-              <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-10 relative z-10 text-center sm:text-left">
+            <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl" />
+              <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-8 relative z-10 text-center sm:text-left">
                 <div className="flex flex-col items-center sm:items-start">
-                  <h3 className="text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight flex flex-col sm:flex-row items-center gap-4">
-                    <BadgeCheck className="w-7 h-7 text-emerald-500" />
-                    Status Clínico Atual
+                  <h3 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight flex items-center gap-3">
+                    <BadgeCheck className="w-6 h-6 text-emerald-500" />
+                    Status Clínico
                   </h3>
-                  <p className="text-sm font-bold text-on-surface-variant/45 uppercase tracking-widest mt-2">Nível de Rastreamento</p>
+                  <p className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Nível de Rastreamento</p>
                 </div>
               </div>
 
-              <div className="space-y-7 relative z-10">
+              <div className="space-y-6 relative z-10">
                 <SimpleProgressBar 
-                  label="Resultado PEP Molecular" 
+                  label="PEP Molecular" 
                   value={stats.alertBreakdown['PEP_MOLECULAR'] || 0} 
                   total={stats.totalPacientes} 
                   color="bg-blue-600" 
@@ -767,108 +768,108 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                   label="Coleta Molecular" 
                   value={stats.alertBreakdown['COLETA_MOLECULAR'] || 0} 
                   total={stats.totalPacientes} 
-                  color="bg-orange-600" 
+                  color="bg-orange-500" 
                 />
                 <SimpleProgressBar 
-                  label="Resultado PEP Cito" 
+                  label="PEP Cito" 
                   value={stats.alertBreakdown['PEP_CITO'] || 0} 
                   total={stats.totalPacientes} 
                   color="bg-emerald-600" 
                 />
                 <SimpleProgressBar 
-                  label="Coleta Cito (Lab)" 
+                  label="Coleta Cito" 
                   value={stats.alertBreakdown['COLETA_CITO'] || 0} 
                   total={stats.totalPacientes} 
-                  color="bg-yellow-600" 
+                  color="bg-yellow-500" 
                 />
                 <SimpleProgressBar 
-                  label="Não Identificado" 
+                  label="Pendente" 
                   value={stats.alertBreakdown['NAO_IDENTIFICADO'] || 0} 
                   total={stats.totalPacientes} 
-                  color="bg-red-600" 
+                  color="bg-red-500" 
                 />
               </div>
             </div>
 
             {/* Performance de Busca Ativa */}
-            <div className="bg-white p-6 sm:p-9 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl" />
-              <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-10 relative z-10 gap-6 sm:gap-4 text-center sm:text-left">
+            <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl" />
+              <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-8 relative z-10 gap-4 text-center sm:text-left">
                 <div className="flex flex-col items-center sm:items-start">
-                  <h3 className="text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight flex flex-col sm:flex-row items-center gap-4">
-                    <PieChart className="w-7 h-7 text-tertiary" />
-                    Performance de Busca
+                  <h3 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight flex items-center gap-3">
+                    <PieChart className="w-6 h-6 text-tertiary" />
+                    Performance
                   </h3>
-                  <p className="text-sm font-bold text-on-surface-variant/45 uppercase tracking-widest mt-2">Resultados dos contatos</p>
+                  <p className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Resultados das Buscas</p>
                 </div>
-                <div className="bg-primary/5 px-5 py-3 rounded-[1.4rem] border border-primary/10 shadow-sm shrink-0 mx-auto sm:mx-0">
-                  <span className="text-2xl font-black text-primary">{acompStats.total}</span>
-                  <span className="text-[11px] font-bold text-primary/40 uppercase ml-2">Total</span>
+                <div className="bg-primary/5 px-4 py-2 rounded-xl border border-primary/10 shadow-sm shrink-0">
+                  <span className="text-xl font-black text-primary">{acompStats.total}</span>
+                  <span className="text-[10px] font-bold text-primary/40 uppercase ml-2">Total</span>
                 </div>
               </div>
 
-              <div className="space-y-8 relative z-10">
+              <div className="space-y-6 relative z-10">
                 <SimpleProgressBar 
-                  label="Sucesso no Agendamento" 
+                  label="Sucesso" 
                   value={acompStats.sucesso} 
                   total={acompStats.total} 
-                  color="bg-emerald-600" 
+                  color="bg-emerald-500" 
                 />
                 <SimpleProgressBar 
-                  label="Contatos Efetivos" 
+                  label="Efetivos" 
                   value={acompStats.contatos} 
                   total={acompStats.total} 
-                  color="bg-blue-600" 
+                  color="bg-blue-500" 
                 />
                 <SimpleProgressBar 
-                  label="Buscas Infrutíferas" 
+                  label="Infrutíferas" 
                   value={acompStats.total - acompStats.contatos} 
                   total={acompStats.total} 
-                  color="bg-rose-600" 
+                  color="bg-rose-500" 
                 />
               </div>
             </div>
           </div>
 
-          <div className="space-y-8">
-            <h3 className="text-xl md:text-2xl font-black text-primary flex items-center gap-4 uppercase tracking-tight px-2 md:px-4">
-              <TrendingUp className="w-7 h-7 text-tertiary" />
-              Tendências e Volumetria
+          <div className="space-y-6">
+            <h3 className="text-lg md:text-xl font-black text-primary flex items-center gap-3 uppercase tracking-tight px-2">
+              <TrendingUp className="w-6 h-6 text-tertiary" />
+              Tendências
             </h3>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-10">
-              <div className="bg-white p-6 sm:p-8 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden flex flex-col items-center lg:items-stretch text-center lg:text-left">
-                <div className="absolute top-0 right-0 w-40 h-40 bg-primary/5 rounded-full blur-3xl" />
-                <div className="flex items-center justify-center lg:justify-start gap-4 mb-8 md:mb-10 relative z-10 w-full">
-                  <div className="p-3.5 bg-primary/5 text-primary rounded-2xl shadow-inner shrink-0">
-                    <Activity className="w-7 h-7" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+              <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden flex flex-col items-center lg:items-stretch text-center lg:text-left">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl" />
+                <div className="flex items-center justify-center lg:justify-start gap-3 mb-6 relative z-10 w-full">
+                  <div className="p-3 bg-primary/5 text-primary rounded-xl shadow-inner shrink-0">
+                    <Activity className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-xl sm:text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight">Fluxo Mensal</h3>
-                    <p className="text-[10px] sm:text-sm font-bold text-on-surface-variant/45 uppercase tracking-widest mt-1 sm:mt-2">Tendência de Acompanhamentos</p>
+                    <h3 className="text-lg md:text-xl font-black text-primary uppercase tracking-tight">Fluxo Mensal</h3>
+                    <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Buscas Ativas</p>
                   </div>
                 </div>
-                <div className="flex-1 w-full min-h-[300px] flex items-center justify-center">
+                <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
                   <LineChart data={stats.acompTrend.map(t => ({ label: t.month, value: t.total }))} />
                 </div>
               </div>
 
-              <div className="bg-white p-6 sm:p-8 md:p-11 rounded-[3rem] shadow-2xl border border-primary/5 relative overflow-hidden flex flex-col items-center lg:items-stretch text-center lg:text-left">
-                <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/5 rounded-full blur-3xl" />
-                <div className="flex items-center justify-center lg:justify-start gap-4 mb-8 md:mb-10 relative z-10 w-full">
-                  <div className="p-3.5 bg-secondary/5 text-secondary rounded-2xl shadow-inner shrink-0">
-                    <BarChart3 className="w-7 h-7" />
+              <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden flex flex-col items-center lg:items-stretch text-center lg:text-left">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/5 rounded-full blur-3xl" />
+                <div className="flex items-center justify-center lg:justify-start gap-3 mb-6 relative z-10 w-full">
+                  <div className="p-3 bg-secondary/5 text-secondary rounded-xl shadow-inner shrink-0">
+                    <BarChart3 className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-xl sm:text-2xl md:text-[1.7rem] font-black text-primary uppercase tracking-tight">Volume de Exames</h3>
-                    <p className="text-[10px] sm:text-sm font-bold text-on-surface-variant/45 uppercase tracking-widest mt-1 sm:mt-2">Cito vs Molecular</p>
+                    <h3 className="text-lg md:text-xl font-black text-primary uppercase tracking-tight">Volumetria</h3>
+                    <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Cito vs Molecular</p>
                   </div>
                 </div>
-                <div className="flex-1 w-full min-h-[300px] flex items-center justify-center">
+                <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
                   <ColumnChart data={[
-                    { label: 'Citopatológico', value: stats.examVolume.cito, color: 'bg-emerald-600' },
-                    { label: 'Molecular DNA', value: stats.examVolume.hpv, color: 'bg-blue-600' },
-                    { label: 'Pendente', value: stats.examVolume.pendente, color: 'bg-rose-600' },
+                    { label: 'Cito', value: stats.examVolume.cito, color: 'bg-emerald-500' },
+                    { label: 'DNA', value: stats.examVolume.hpv, color: 'bg-blue-500' },
+                    { label: 'Pendente', value: stats.examVolume.pendente, color: 'bg-rose-500' },
                   ]} />
                 </div>
               </div>
