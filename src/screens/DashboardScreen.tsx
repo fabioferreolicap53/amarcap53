@@ -482,7 +482,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className="lg:col-span-2 space-y-3">
+                  <div className="md:col-span-2 space-y-3">
                     <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
                       <Calendar className="w-3.5 h-3.5" />
                       Período de Referência
@@ -552,7 +552,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     </div>
                   )}
 
-                  <div className="flex items-end gap-4 lg:col-span-4">
+                  <div className={`flex items-end gap-4 ${
+                    // Se apenas o período estiver visível (2 colunas), botões ocupam as outras 2 colunas
+                    !(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe') 
+                    ? 'md:col-span-2' 
+                    : 'md:col-span-2 lg:col-span-4'
+                  }`}>
                     <button 
                       onClick={() => { 
                         setFilterDataInicio(''); 
@@ -564,13 +569,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                       className="flex-1 flex items-center justify-center gap-2 py-4 bg-rose-50 text-rose-600 text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-rose-100 transition-all border border-rose-100"
                     >
                       <AlertTriangle className="w-4 h-4" />
-                      Limpar Filtros
+                      Limpar
                     </button>
                     <button 
                       onClick={() => setIsFilterVisible(false)}
                       className="flex-1 py-4 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-primary/20"
                     >
-                      Aplicar
+                      Aplicar Filtros
                     </button>
                   </div>
                 </div>

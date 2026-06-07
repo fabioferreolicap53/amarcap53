@@ -524,9 +524,9 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
             {/* Painel de Filtros Avançados */}
             {isFilterVisible && (
               <div className="bg-white p-8 rounded-3xl shadow-2xl border border-primary/5 animate-in slide-in-from-top-6 fade-in duration-500">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6">
                   {/* Período de Busca (Acomp.) */}
-                  <div className="lg:col-span-2 space-y-3">
+                  <div className="md:col-span-2 space-y-3">
                     <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
                       <Calendar className="w-3.5 h-3.5" />
                       Período da Busca (Acomp.)
@@ -556,6 +556,17 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                       }))}
                       value={filterStatus}
                       onChange={setFilterStatus}
+                    />
+                  </div>
+
+                  {/* Filtro de Grupo */}
+                  <div className="space-y-3">
+                    <MultiSelect 
+                      label="Grupo de Idade"
+                      placeholder="Todos os Grupos"
+                      options={availableGroups}
+                      value={filterGrupo}
+                      onChange={setFilterGrupo}
                     />
                   </div>
 
@@ -610,17 +621,6 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                       />
                     </div>
                   )}
-
-                  {/* Filtro de Grupo */}
-                  <div className="space-y-3">
-                    <MultiSelect 
-                      label="Grupo de Idade"
-                      placeholder="Todos os Grupos"
-                      options={availableGroups}
-                      value={filterGrupo}
-                      onChange={setFilterGrupo}
-                    />
-                  </div>
 
                   {/* Filtro de Tipo de Busca */}
                   <div className="space-y-3">
@@ -697,7 +697,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                   </div>
 
                   {/* Botões de Ação */}
-                  <div className="flex items-end gap-4 lg:col-span-3">
+                  <div className="flex items-end gap-4 md:col-span-2 lg:col-span-4 mt-2">
                     <button 
                       onClick={resetFilters}
                       className="flex-1 flex items-center justify-center gap-2 py-4 bg-surface-container-high text-on-surface-variant text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-surface-container-highest transition-all duration-300"
@@ -709,7 +709,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                       onClick={() => setIsFilterVisible(false)}
                       className="flex-1 py-4 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all duration-300 shadow-lg shadow-primary/20"
                     >
-                      Aplicar
+                      Aplicar Filtros
                     </button>
                   </div>
                 </div>

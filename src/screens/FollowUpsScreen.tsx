@@ -374,7 +374,27 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
             {/* Painel de Filtros Avançados */}
             {isFilterVisible && (
               <div className="col-span-1 md:col-span-2 lg:col-span-4 bg-white p-8 rounded-[2rem] shadow-2xl border border-primary/5 animate-in slide-in-from-top-6 fade-in duration-500">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6">
+                  {/* Período de Busca */}
+                  <div className="md:col-span-2 space-y-3">
+                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
+                      <Calendar className="w-3.5 h-3.5" />
+                      Período da Busca (Início e Fim)
+                    </label>
+                    <div className="flex gap-4">
+                      <DatePickerPTBR 
+                        placeholder="Data Inicial"
+                        value={filterDataInicio}
+                        onChange={setFilterDataInicio}
+                      />
+                      <DatePickerPTBR 
+                        placeholder="Data Final"
+                        value={filterDataFim}
+                        onChange={setFilterDataFim}
+                      />
+                    </div>
+                  </div>
+
                   {/* Filtros Regionais Condicionais */}
                   {(isAdmin || user?.role === 'cap') && (
                     <div className="space-y-3">
@@ -427,26 +447,6 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     </div>
                   )}
 
-                  {/* Período de Busca */}
-                  <div className="lg:col-span-2 space-y-3">
-                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                      <Calendar className="w-3.5 h-3.5" />
-                      Período da Busca (Início e Fim)
-                    </label>
-                    <div className="flex gap-4">
-                      <DatePickerPTBR 
-                        placeholder="Data Inicial"
-                        value={filterDataInicio}
-                        onChange={setFilterDataInicio}
-                      />
-                      <DatePickerPTBR 
-                        placeholder="Data Final"
-                        value={filterDataFim}
-                        onChange={setFilterDataFim}
-                      />
-                    </div>
-                  </div>
-
                   <div className="space-y-3">
                     <MultiSelect 
                       label="Tipo de Busca"
@@ -475,7 +475,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     />
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="md:col-span-2 space-y-3">
                     <MultiSelect 
                       label="Situação Pós Busca"
                       placeholder="Todas as Situações"
@@ -496,7 +496,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     />
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="md:col-span-2 space-y-3">
                     <MultiSelect 
                       label="Entraves Identificados"
                       placeholder="Todos os Entraves"
@@ -517,7 +517,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     />
                   </div>
 
-                  <div className="flex items-end gap-4 lg:col-span-2">
+                  <div className="flex items-end gap-4 md:col-span-2 lg:col-span-4 mt-2">
                     <button 
                       onClick={resetFilters}
                       className="flex-1 flex items-center justify-center gap-2 py-4 bg-surface-container-high text-on-surface-variant text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-surface-container-highest transition-all duration-300"
@@ -529,7 +529,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                       onClick={() => setIsFilterVisible(false)}
                       className="flex-1 py-4 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all duration-300 shadow-lg shadow-primary/20"
                     >
-                      Aplicar
+                      Aplicar Filtros
                     </button>
                   </div>
                 </div>

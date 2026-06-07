@@ -1,7 +1,7 @@
 {
-  "name": "AMAR - SISTEMA DE RASTREIO",
-  "short_name": "AMAR RASTREIO",
-  "description": "AMAR - SISTEMA DE RASTREIO - Acompanhamento e rastreamento de saúde",
+  "name": "AMAR - SISTEMA DE RASTREIO CAP5.3",
+  "short_name": "AMAR CAP5.3",
+  "description": "AMAR - SISTEMA DE RASTREIO CAP5.3 - Acompanhamento e rastreamento de saúde",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#051934",

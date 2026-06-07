@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Share, Activity } from 'lucide-react';
+import { X, Share, HeartPulse } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -73,17 +73,17 @@ export const InstallBanner: React.FC = () => {
 
         <div className="flex items-start gap-4 relative z-10">
           <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-900 rounded-2xl flex items-center justify-center shadow-lg shrink-0 border border-white/10 ring-4 ring-blue-500/10">
-            {isIOS ? <Share className="w-6 h-6 text-white" /> : <Activity className="w-6 h-6 text-white" />}
+            {isIOS ? <Share className="w-6 h-6 text-white" /> : <HeartPulse className="w-6 h-6 text-white" />}
           </div>
           
           <div className="flex-1 pr-6">
             <h4 className="text-white font-black text-sm uppercase tracking-tight mb-1">
-              {isIOS ? 'AMAR - RASTREIO' : 'AMAR - SISTEMA DE RASTREIO'}
+              AMAR - CAP 5.3
             </h4>
             <p className="text-white/60 text-[11px] leading-relaxed font-medium">
               {isIOS 
-                ? 'Toque em "Compartilhar" e depois em "Adicionar à Tela de Início" para instalar o sistema.' 
-                : 'Instale o AMAR - RASTREIO para acesso rápido e seguro aos dados de saúde.'}
+                ? 'Toque em "Compartilhar" e depois em "Adicionar à Tela de Início" para instalar o AMAR - CAP 5.3.' 
+                : 'Instale o AMAR - SISTEMA DE RASTREIO CAP 5.3 para acesso rápido aos dados.'}
             </p>
             
             {!isIOS && (

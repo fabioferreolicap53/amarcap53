@@ -61,7 +61,8 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      (e.target as HTMLInputElement).blur(); // Fecha teclado no Enter
+      setIsOpen(false); // Fecha calendário flutuante no Desktop
+      (e.target as HTMLInputElement).blur(); // Fecha teclado no Mobile e tira o foco
     }
   };
 
