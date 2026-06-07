@@ -44,8 +44,19 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
   const updatePosition = () => {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
+      const dropdownHeight = 300; // Altura máxima estimada
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      
+      let top = rect.bottom + window.scrollY + 8;
+      
+      // Se não houver espaço embaixo e houver mais espaço em cima, inverte
+      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+        top = rect.top + window.scrollY - dropdownHeight - 8;
+      }
+
       setDropdownPosition({
-        top: rect.bottom + window.scrollY + 12,
+        top: top,
         left: rect.left + window.scrollX,
         width: rect.width
       });
@@ -155,14 +166,14 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
 
       {isOpen && dropdownPosition && createPortal(
         <div 
-          className="multiselect-portal-content fixed z-[9999] animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-300 origin-top"
+          className="multiselect-portal-content fixed z-[9999] animate-in fade-in slide-in-from-top-1 duration-200 origin-top"
           style={{ 
             top: dropdownPosition.top, 
             left: dropdownPosition.left, 
             width: dropdownPosition.width 
           }}
         >
-          <div className="bg-white border border-primary/10 rounded-[2rem] shadow-[0px_25px_70px_rgba(0,0,0,0.2)] p-4 backdrop-blur-xl bg-white/95 ring-1 ring-black/5">
+          <div className="bg-white border border-primary/10 rounded-2xl shadow-[0px_15px_40px_rgba(0,0,0,0.15)] p-3 backdrop-blur-xl bg-white/98 ring-1 ring-black/5">
             {showSearch && (
               <div className="relative mb-4">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
