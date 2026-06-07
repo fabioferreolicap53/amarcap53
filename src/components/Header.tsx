@@ -61,27 +61,38 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Informações Centrais (Mobile) - Ajustado para evitar sobreposição */}
       {user && (
         <div className="flex lg:hidden flex-1 flex-col items-center justify-center px-2 overflow-hidden min-w-0">
-          <div className="flex items-center gap-1.5 max-w-full">
-            <Building className="w-3.5 h-3.5 text-blue-300 shrink-0" />
-            <span className="text-[10px] md:text-[12px] font-black text-white uppercase tracking-tight truncate">
-              {user.unidade_saude}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 md:gap-4 mt-1">
-            <div className="flex items-center gap-1.5">
-              <Users className="w-3 h-3 text-white/50 shrink-0" />
-              <span className="text-[9px] md:text-[11px] font-bold text-white/80 uppercase truncate max-w-[60px] md:max-w-none">
-                {user.equipe}
+          {/* Unidade - Sempre visível para todos exceto talvez CAP se vazio */}
+          {user.unidade_saude && (
+            <div className="flex items-center gap-1.5 w-full justify-center">
+              <Building className="w-3.5 h-3.5 text-blue-300 shrink-0" />
+              <span className="text-[10px] md:text-[12px] font-black text-white uppercase tracking-tight text-center">
+                {user.unidade_saude}
               </span>
             </div>
-            <div className="w-1 h-1 rounded-full bg-white/20"></div>
-            <div className="flex items-center gap-1.5">
-              <MapPin className="w-3 h-3 text-white/50 shrink-0" />
-              <span className="text-[9px] md:text-[11px] font-bold text-white/80 uppercase">
-                MA: {user.microarea}
-              </span>
+          )}
+          
+          {(user.role === 'equipe' || user.role === 'microarea') && user.equipe && (
+            <div className="flex items-center gap-2 md:gap-4 mt-1">
+              <div className="flex items-center gap-1.5">
+                <Users className="w-3 h-3 text-white/50 shrink-0" />
+                <span className="text-[9px] md:text-[11px] font-bold text-white/80 uppercase">
+                  {user.equipe}
+                </span>
+              </div>
+              
+              {user.role === 'microarea' && user.microarea && (
+                <>
+                  <div className="w-1 h-1 rounded-full bg-white/20"></div>
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="w-3 h-3 text-white/50 shrink-0" />
+                    <span className="text-[9px] md:text-[11px] font-bold text-white/80 uppercase">
+                      MA: {user.microarea}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -111,33 +122,53 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div className="w-px h-8 bg-white/10 mx-1 xl:mx-2 shrink-0"></div>
 
-        {/* Informações do Usuário - Adaptável */}
+        {/* Informações do Usuário - Adaptável conforme Perfil */}
         <div className="hidden xl:flex items-center gap-6 border-l border-white/10 pl-6 ml-1 min-w-0">
           {user && (
             <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2.5 group/info min-w-0">
-                <Building className="w-4 h-4 text-blue-300 shrink-0 group-hover/info:scale-110 transition-transform" />
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[8px] uppercase tracking-[0.2em] text-white/40 font-black leading-none mb-1 group-hover/info:text-blue-300 transition-colors">Unidade</span>
-                  <span className="text-[12px] font-black text-white uppercase tracking-wide truncate max-w-[120px]" title={user.unidade_saude}>{user.unidade_saude}</span>
+              {/* Unidade - Visível para Unidade, Equipe e Microárea */}
+              {user.unidade_saude && (
+                <div className="flex items-center gap-2.5 group/info min-w-0">
+                  <Building className="w-4 h-4 text-blue-300 shrink-0 group-hover/info:scale-110 transition-transform" />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[8px] uppercase tracking-[0.2em] text-white/40 font-black leading-none mb-1 group-hover/info:text-blue-300 transition-colors">Unidade</span>
+                    <span className="text-[12px] font-black text-white uppercase tracking-wide whitespace-normal leading-tight max-w-[200px]">{user.unidade_saude}</span>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="flex items-center gap-2.5 group/info min-w-0">
-                <Users className="w-4 h-4 text-purple-300 shrink-0 group-hover/info:scale-110 transition-transform" />
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[8px] uppercase tracking-[0.2em] text-white/40 font-black leading-none mb-1 group-hover/info:text-purple-300 transition-colors">Equipe</span>
-                  <span className="text-[12px] font-black text-white uppercase tracking-wide truncate max-w-[100px]" title={user.equipe}>{user.equipe}</span>
+              {/* Equipe - Visível para Equipe e Microárea */}
+              {(user.role === 'equipe' || user.role === 'microarea') && user.equipe && (
+                <div className="flex items-center gap-2.5 group/info min-w-0">
+                  <Users className="w-4 h-4 text-purple-300 shrink-0 group-hover/info:scale-110 transition-transform" />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[8px] uppercase tracking-[0.2em] text-white/40 font-black leading-none mb-1 group-hover/info:text-purple-300 transition-colors">Equipe</span>
+                    <span className="text-[12px] font-black text-white uppercase tracking-wide whitespace-normal leading-tight max-w-[150px]">{user.equipe}</span>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="flex items-center gap-2.5 group/info shrink-0">
-                <MapPin className="w-4 h-4 text-emerald-300 group-hover/info:scale-110 transition-transform" />
-                <div className="flex flex-col">
-                  <span className="text-[8px] uppercase tracking-[0.2em] text-white/40 font-black leading-none mb-1 group-hover/info:text-emerald-300 transition-colors">MA</span>
-                  <span className="text-[12px] font-black text-white uppercase tracking-wide">{user.microarea}</span>
+              {/* Microárea - Visível apenas para Microárea */}
+              {user.role === 'microarea' && user.microarea && (
+                <div className="flex items-center gap-2.5 group/info shrink-0">
+                  <MapPin className="w-4 h-4 text-emerald-300 group-hover/info:scale-110 transition-transform" />
+                  <div className="flex flex-col">
+                    <span className="text-[8px] uppercase tracking-[0.2em] text-white/40 font-black leading-none mb-1 group-hover/info:text-emerald-300 transition-colors">MA</span>
+                    <span className="text-[12px] font-black text-white uppercase tracking-wide">{user.microarea}</span>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* CAP - Exibir apenas identificação se for coordenação */}
+              {user.role === 'cap' && (
+                <div className="flex items-center gap-2.5 group/info shrink-0">
+                  <Building className="w-4 h-4 text-amber-300 shrink-0 group-hover/info:scale-110 transition-transform" />
+                  <div className="flex flex-col">
+                    <span className="text-[8px] uppercase tracking-[0.2em] text-white/40 font-black leading-none mb-1 group-hover/info:text-amber-300 transition-colors">Perfil</span>
+                    <span className="text-[12px] font-black text-white uppercase tracking-wide">COORDENAÇÃO CAP</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -150,7 +181,6 @@ export const Header: React.FC<HeaderProps> = ({
             <p className="text-xs md:text-sm font-bold text-white leading-tight truncate max-w-[100px] md:max-w-[150px]">
               {user?.name || user?.email?.split('@')[0]}
             </p>
-            <p className="text-[9px] md:text-[10px] text-white/50 font-medium uppercase tracking-tighter">Saúde</p>
           </div>
           <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-white/20 to-white/5 flex items-center justify-center text-white font-black text-sm ring-1 ring-white/20 shadow-lg shrink-0">
             {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}

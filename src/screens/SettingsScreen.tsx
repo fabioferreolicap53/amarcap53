@@ -390,7 +390,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                   <div className="space-y-6">
                     {/* Nome */}
                     <div className="space-y-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Nome Completo</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">NOME</label>
                       <div className="flex gap-3">
                         <div className="flex-1 relative">
                           <input 

@@ -4,6 +4,7 @@ import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, Messa
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
+import { MultiSelect } from '../components/MultiSelect';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 
 interface Paciente {
@@ -159,17 +160,32 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
-  const [filterStatus, setFilterStatus] = useState('ALL');
-  const [filterGrupo, setFilterGrupo] = useState('ALL');
-  const [filterTipoBusca, setFilterTipoBusca] = useState('ALL');
-  const [filterTipoContato, setFilterTipoContato] = useState('ALL');
-  const [filterSituacao, setFilterSituacao] = useState('ALL');
-  const [filterEntraves, setFilterEntraves] = useState('ALL');
+  const [filterStatus, setFilterStatus] = useState<string[]>([]);
+  const [filterGrupo, setFilterGrupo] = useState<string[]>([]);
+  const [filterTipoBusca, setFilterTipoBusca] = useState<string[]>([]);
+  const [filterTipoContato, setFilterTipoContato] = useState<string[]>([]);
+  const [filterSituacao, setFilterSituacao] = useState<string[]>([]);
+  const [filterEntraves, setFilterEntraves] = useState<string[]>([]);
   const [filterDataInicio, setFilterDataInicio] = useState('');
   const [filterDataFim, setFilterDataFim] = useState('');
-  const [filterUnidade, setFilterUnidade] = useState('');
-  const [filterEquipe, setFilterEquipe] = useState('');
-  const [filterMicroarea, setFilterMicroarea] = useState('');
+  const [filterUnidade, setFilterUnidade] = useState<string[]>([]);
+  const [filterEquipe, setFilterEquipe] = useState<string[]>([]);
+  const [filterMicroarea, setFilterMicroarea] = useState<string[]>([]);
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setFilterStatus([]);
+    setFilterGrupo([]);
+    setFilterTipoBusca([]);
+    setFilterTipoContato([]);
+    setFilterSituacao([]);
+    setFilterEntraves([]);
+    setFilterDataInicio('');
+    setFilterDataFim('');
+    setFilterUnidade([]);
+    setFilterEquipe([]);
+    setFilterMicroarea([]);
+  };
 
   const [availableGroups, setAvailableGroups] = useState<string[]>([]);
 
@@ -269,6 +285,47 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     }
   };
 
+  const filteredPacientes = pacientes.filter(p => {
+    const matchesSearch = p.nome.toLowerCase().includes(searchTerm.toLowerCase()) || p.cns.includes(searchTerm);
+    const matchesStatus = filterStatus.length === 0 || (p.alertas && filterStatus.includes(p.alertas));
+    const matchesGrupo = filterGrupo.length === 0 || filterGrupo.includes(p.grupo);
+    
+    // Regional filters
+    const matchesUnidade = filterUnidade.length === 0 || filterUnidade.includes(p.unidade);
+    const matchesEquipe = filterEquipe.length === 0 || filterEquipe.includes(p.equipe);
+    const matchesMicroarea = filterMicroarea.length === 0 || filterMicroarea.includes(String(p.microarea));
+
+    // Filtros de acompanhamento (baseados no último registro)
+    const matchesTipoBusca = filterTipoBusca.length === 0 || filterTipoBusca.includes(p.lastAcomp?.tipo_busca || '');
+    const matchesTipoContato = filterTipoContato.length === 0 || filterTipoContato.includes(p.lastAcomp?.tipo_contato || '');
+    const matchesSituacao = filterSituacao.length === 0 || filterSituacao.includes(p.lastAcomp?.situacao_pos_busca || '');
+    const matchesEntraves = filterEntraves.length === 0 || filterEntraves.includes(p.lastAcomp?.entraves_identificados || '');
+
+    // Filtro de Data (baseado no último registro)
+    let matchesData = true;
+    if (filterDataInicio || filterDataFim) {
+      if (p.lastAcomp?.data_busca) {
+        const dataAcomp = new Date(p.lastAcomp.data_busca);
+        dataAcomp.setHours(0, 0, 0, 0);
+
+        if (filterDataInicio) {
+          const dInicio = new Date(filterDataInicio);
+          dInicio.setHours(0, 0, 0, 0);
+          if (dataAcomp < dInicio) matchesData = false;
+        }
+        if (filterDataFim) {
+          const dFim = new Date(filterDataFim);
+          dFim.setHours(0, 0, 0, 0);
+          if (dataAcomp > dFim) matchesData = false;
+        }
+      } else {
+        matchesData = false;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesGrupo && matchesTipoBusca && matchesTipoContato && matchesSituacao && matchesEntraves && matchesData && matchesUnidade && matchesEquipe && matchesMicroarea;
+  });
+
   const handleOpenDetails = (paciente: Paciente) => {
     setPatientDetails(paciente);
     setIsDetailsModalOpen(true);
@@ -327,62 +384,6 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     }
   };
 
-  const resetFilters = () => {
-    setSearchTerm('');
-    setFilterStatus('ALL');
-    setFilterGrupo('ALL');
-    setFilterTipoBusca('ALL');
-    setFilterTipoContato('ALL');
-    setFilterSituacao('ALL');
-    setFilterEntraves('ALL');
-    setFilterDataInicio('');
-    setFilterDataFim('');
-    setFilterUnidade('');
-    setFilterEquipe('');
-    setFilterMicroarea('');
-  };
-
-  const filteredPacientes = pacientes.filter(p => {
-    const matchesSearch = p.nome.toLowerCase().includes(searchTerm.toLowerCase()) || p.cns.includes(searchTerm);
-    const matchesStatus = filterStatus === 'ALL' || p.alertas === filterStatus;
-    const matchesGrupo = filterGrupo === 'ALL' || p.grupo === filterGrupo;
-    
-    // Regional filters
-    const matchesUnidade = !filterUnidade || p.unidade === filterUnidade;
-    const matchesEquipe = !filterEquipe || p.equipe === filterEquipe;
-    const matchesMicroarea = !filterMicroarea || String(p.microarea) === filterMicroarea;
-
-    // Filtros de acompanhamento (baseados no último registro)
-    const matchesTipoBusca = filterTipoBusca === 'ALL' || p.lastAcomp?.tipo_busca === filterTipoBusca;
-    const matchesTipoContato = filterTipoContato === 'ALL' || p.lastAcomp?.tipo_contato === filterTipoContato;
-    const matchesSituacao = filterSituacao === 'ALL' || p.lastAcomp?.situacao_pos_busca === filterSituacao;
-    const matchesEntraves = filterEntraves === 'ALL' || p.lastAcomp?.entraves_identificados === filterEntraves;
-
-    // Filtro de Data (baseado no último registro)
-    let matchesData = true;
-    if (filterDataInicio || filterDataFim) {
-      if (p.lastAcomp?.data_busca) {
-        const dataAcomp = new Date(p.lastAcomp.data_busca);
-        dataAcomp.setHours(0, 0, 0, 0);
-
-        if (filterDataInicio) {
-          const dInicio = new Date(filterDataInicio);
-          dInicio.setHours(0, 0, 0, 0);
-          if (dataAcomp < dInicio) matchesData = false;
-        }
-        if (filterDataFim) {
-          const dFim = new Date(filterDataFim);
-          dFim.setHours(0, 0, 0, 0);
-          if (dataAcomp > dFim) matchesData = false;
-        }
-      } else {
-        matchesData = false;
-      }
-    }
-    
-    return matchesSearch && matchesStatus && matchesGrupo && matchesTipoBusca && matchesTipoContato && matchesSituacao && matchesEntraves && matchesData && matchesUnidade && matchesEquipe && matchesMicroarea;
-  });
-
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-surface">
       <Header title="Favoritos" pageTitle="Pacientes Favoritos" activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -423,16 +424,16 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                 <button 
                   onClick={() => setIsFilterVisible(!isFilterVisible)}
                   className={`flex items-center gap-3 px-8 h-14 rounded-2xl text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
-                    isFilterVisible || filterStatus !== 'ALL' || filterGrupo !== 'ALL' || filterTipoBusca !== 'ALL' || filterTipoContato !== 'ALL' || filterSituacao !== 'ALL' || filterEntraves !== 'ALL'
+                    isFilterVisible || filterStatus.length > 0 || filterGrupo.length > 0 || filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0
                       ? 'bg-primary text-white border-primary shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]' 
                       : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
                   }`}
                 >
                   <Filter className="w-5 h-5" />
                   <span>Filtros</span>
-                  {(filterStatus !== 'ALL' || filterGrupo !== 'ALL' || filterTipoBusca !== 'ALL' || filterTipoContato !== 'ALL' || filterSituacao !== 'ALL' || filterEntraves !== 'ALL') && (
+                  {(filterStatus.length > 0 || filterGrupo.length > 0 || filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0) && (
                     <div className="w-6 h-6 flex items-center justify-center bg-white text-primary text-[10px] rounded-full font-black animate-pulse">
-                      {[filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves].filter(f => f !== 'ALL').length}
+                      {[filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves].filter(f => f.length > 0).length}
                     </div>
                   )}
                 </button>
@@ -482,189 +483,153 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
 
                   {/* Filtro de Status */}
                   <div className="space-y-3">
-                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                      <Info className="w-3.5 h-3.5" />
-                      Status de Rastreamento
-                    </label>
-                    <select 
+                    <MultiSelect 
+                      label="Status de Rastreamento"
+                      placeholder="Todos os Status"
+                      options={Object.entries(ALERT_CONFIGS).map(([key, config]) => ({
+                        label: config.label,
+                        value: key
+                      }))}
                       value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="ALL">Todos os Status</option>
-                      {Object.entries(ALERT_CONFIGS).map(([key, config]) => (
-                        <option key={key} value={key}>{config.label}</option>
-                      ))}
-                    </select>
+                      onChange={setFilterStatus}
+                    />
                   </div>
 
                   {/* Filtros Regionais Condicionais */}
                   {(isAdmin || user?.role === 'cap') && (
                     <div className="space-y-3">
-                      <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                        <Building className="w-3.5 h-3.5" />
-                        Unidade
-                      </label>
-                      <select 
+                      <MultiSelect 
+                        label="Unidade"
+                        placeholder="Todas as Unidades"
+                        options={Object.keys(UNIDADES_EQUIPES)}
                         value={filterUnidade}
-                        onChange={(e) => {
-                          setFilterUnidade(e.target.value);
-                          setFilterEquipe('');
-                          setFilterMicroarea('');
+                        onChange={(val) => {
+                          setFilterUnidade(val);
+                          setFilterEquipe([]);
+                          setFilterMicroarea([]);
                         }}
-                        className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                      >
-                        <option value="">Todas</option>
-                        {Object.keys(UNIDADES_EQUIPES).map(u => <option key={u} value={u}>{u}</option>)}
-                      </select>
+                      />
                     </div>
                   )}
 
                   {(isAdmin || user?.role === 'cap' || user?.role === 'unidade') && (
                     <div className="space-y-3">
-                      <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                        <Users className="w-3.5 h-3.5" />
-                        Equipe
-                      </label>
-                      <select 
+                      <MultiSelect 
+                        label="Equipe"
+                        placeholder="Todas as Equipes"
+                        options={
+                          filterUnidade.length > 0 
+                            ? Array.from(new Set(filterUnidade.flatMap(u => UNIDADES_EQUIPES[u] || [])))
+                            : user?.role === 'unidade' 
+                              ? UNIDADES_EQUIPES[user.unidade_saude] || []
+                              : []
+                        }
                         value={filterEquipe}
-                        onChange={(e) => {
-                          setFilterEquipe(e.target.value);
-                          setFilterMicroarea('');
+                        onChange={(val) => {
+                          setFilterEquipe(val);
+                          setFilterMicroarea([]);
                         }}
-                        disabled={!filterUnidade && (isAdmin || user?.role === 'cap')}
-                        className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer disabled:opacity-30"
-                      >
-                        <option value="">Todas</option>
-                        {filterUnidade ? UNIDADES_EQUIPES[filterUnidade]?.map(eq => (
-                          <option key={eq} value={eq}>{eq}</option>
-                        )) : user?.role === 'unidade' ? UNIDADES_EQUIPES[user.unidade_saude]?.map(eq => (
-                          <option key={eq} value={eq}>{eq}</option>
-                        )) : null}
-                      </select>
+                        disabled={filterUnidade.length === 0 && (isAdmin || user?.role === 'cap')}
+                      />
                     </div>
                   )}
 
                   {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe') && (
                     <div className="space-y-3">
-                      <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                        <MapPin className="w-3.5 h-3.5" />
-                        Microárea
-                      </label>
-                      <select 
+                      <MultiSelect 
+                        label="Microárea"
+                        placeholder="Todas as Microáreas"
+                        options={MICROAREAS.map(ma => ma.toString())}
                         value={filterMicroarea}
-                        onChange={(e) => setFilterMicroarea(e.target.value)}
-                        disabled={!filterEquipe && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
-                        className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer disabled:opacity-30"
-                      >
-                        <option value="">Todas</option>
-                        {MICROAREAS.map(ma => <option key={ma} value={ma}>{ma}</option>)}
-                      </select>
+                        onChange={setFilterMicroarea}
+                        disabled={filterEquipe.length === 0 && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
+                      />
                     </div>
                   )}
 
                   {/* Filtro de Grupo */}
                   <div className="space-y-3">
-                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                      <Users className="w-3.5 h-3.5" />
-                      Grupo de Idade
-                    </label>
-                    <select 
+                    <MultiSelect 
+                      label="Grupo de Idade"
+                      placeholder="Todos os Grupos"
+                      options={availableGroups}
                       value={filterGrupo}
-                      onChange={(e) => setFilterGrupo(e.target.value)}
-                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="ALL">Todos os Grupos</option>
-                      {availableGroups.map(grupo => (
-                        <option key={grupo} value={grupo}>{grupo}</option>
-                      ))}
-                    </select>
+                      onChange={setFilterGrupo}
+                    />
                   </div>
 
                   {/* Filtro de Tipo de Busca */}
                   <div className="space-y-3">
-                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                      <Search className="w-3.5 h-3.5" />
-                      Tipo de Busca (Acomp.)
-                    </label>
-                    <select 
+                    <MultiSelect 
+                      label="Tipo de Busca (Acomp.)"
+                      placeholder="Todos os Tipos"
+                      options={[
+                        "1 - Busca ativa- Visita domiciliar registrada em prontuário",
+                        "2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário",
+                        "3 - Busca ativa - Mensagem registrada em prontuário"
+                      ]}
                       value={filterTipoBusca}
-                      onChange={(e) => setFilterTipoBusca(e.target.value)}
-                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="ALL">Todos os Tipos</option>
-                      <option value="1 - Busca ativa- Visita domiciliar registrada em prontuário">1 - Busca ativa- Visita domiciliar registrada em prontuário</option>
-                      <option value="2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário">2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário</option>
-                      <option value="3 - Busca ativa - Mensagem registrada em prontuário">3 - Busca ativa - Mensagem registrada em prontuário</option>
-                    </select>
+                      onChange={setFilterTipoBusca}
+                    />
                   </div>
 
                   {/* Filtro de Tipo de Contato */}
                   <div className="space-y-3">
-                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                      <Phone className="w-3.5 h-3.5" />
-                      Tipo de Contato (Acomp.)
-                    </label>
-                    <select 
+                    <MultiSelect 
+                      label="Tipo de Contato (Acomp.)"
+                      placeholder="Todos os Contatos"
+                      options={[
+                        "Contato direto (conversa)",
+                        "Contato indireto (mensagem)",
+                        "Não houve contato ( não localizada, ligação não atendida...)"
+                      ]}
                       value={filterTipoContato}
-                      onChange={(e) => setFilterTipoContato(e.target.value)}
-                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="ALL">Todos os Contatos</option>
-                      <option value="Contato direto (conversa)">Contato direto (conversa)</option>
-                      <option value="Contato indireto (mensagem)">Contato indireto (mensagem)</option>
-                      <option value="Não houve contato ( não localizada, ligação não atendida...)">Não houve contato ( não localizada, ligação não atendida...)</option>
-                    </select>
+                      onChange={setFilterTipoContato}
+                    />
                   </div>
 
                   {/* Filtro de Situação */}
                   <div className="space-y-3">
-                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                      <BadgeCheck className="w-3.5 h-3.5" />
-                      Situação Pós Busca (Acomp.)
-                    </label>
-                    <select 
+                    <MultiSelect 
+                      label="Situação Pós Busca (Acomp.)"
+                      placeholder="Todas as Situações"
+                      options={[
+                        "1- Agendamento após contato direto",
+                        "2 - Convite para demanda livre",
+                        "3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP",
+                        "4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP",
+                        "5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP",
+                        "6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP",
+                        "7 - Mudança de território (situação atualizada no PEP)",
+                        "8 - Óbito (situação atualizada no PEP)",
+                        "9 - Não localizada",
+                        "10 - Recusa"
+                      ]}
                       value={filterSituacao}
-                      onChange={(e) => setFilterSituacao(e.target.value)}
-                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="ALL">Todas as Situações</option>
-                      <option value="1- Agendamento após contato direto">1- Agendamento após contato direto</option>
-                      <option value="2 - Convite para demanda livre">2 - Convite para demanda livre</option>
-                      <option value="3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP">3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP</option>
-                      <option value="4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP">4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP</option>
-                      <option value="5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP">5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP</option>
-                      <option value="6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP">6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP</option>
-                      <option value="7 - Mudança de território (situação atualizada no PEP)">7 - Mudança de território (situação atualizada no PEP)</option>
-                      <option value="8 - Óbito (situação atualizada no PEP)">8 - Óbito (situação atualizada no PEP)</option>
-                      <option value="9 - Não localizada">9 - Não localizada</option>
-                      <option value="10 - Recusa">10 - Recusa</option>
-                    </select>
+                      onChange={setFilterSituacao}
+                    />
                   </div>
 
                   {/* Filtro de Entraves */}
                   <div className="space-y-3">
-                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      Entraves (Acomp.)
-                    </label>
-                    <select 
+                    <MultiSelect 
+                      label="Entraves (Acomp.)"
+                      placeholder="Todos os Entraves"
+                      options={[
+                        "1 - Horários incompatíveis com a rotina de trabalho",
+                        "2 - Vergonha ou constrangimento durante o exame",
+                        "3 - Ideia equivocada sobre a necessidade de fazer exame",
+                        "4 - Faz o rastreamento pela rede privada",
+                        "5 - Dificuldade de locomoção ( ex: acamada)",
+                        "6 - Distância da Unidade",
+                        "7 - Se recusa a fazer o exame com o profissional da equipe",
+                        "8 - Esquece a data do agendamento",
+                        "9 - Indisponibilidade de tempo",
+                        "10 - Não identificado entrave"
+                      ]}
                       value={filterEntraves}
-                      onChange={(e) => setFilterEntraves(e.target.value)}
-                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="ALL">Todos os Entraves</option>
-                      <option value="1 - Horários incompatíveis com a rotina de trabalho">1 - Horários incompatíveis com a rotina de trabalho</option>
-                      <option value="2 - Vergonha ou constrangimento durante o exame">2 - Vergonha ou constrangimento durante o exame</option>
-                      <option value="3 - Ideia equivocada sobre a necessidade de fazer exame">3 - Ideia equivocada sobre a necessidade de fazer exame</option>
-                      <option value="4 - Faz o rastreamento pela rede privada">4 - Faz o rastreamento pela rede privada</option>
-                      <option value="5 - Dificuldade de locomoção ( ex: acamada)">5 - Dificuldade de locomoção ( ex: acamada)</option>
-                      <option value="6 - Distância da Unidade">6 - Distância da Unidade</option>
-                      <option value="7 - Se recusa a fazer o exame com o profissional da equipe">7 - Se recusa a fazer o exame com o profissional da equipe</option>
-                      <option value="8 - Esquece a data do agendamento">8 - Esquece a data do agendamento</option>
-                      <option value="9 - Indisponibilidade de tempo">9 - Indisponibilidade de tempo</option>
-                      <option value="10 - Não identificado entrave">10 - Não identificado entrave</option>
-                    </select>
+                      onChange={setFilterEntraves}
+                    />
                   </div>
 
                   {/* Botões de Ação */}
@@ -698,15 +663,15 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
               <Star className="w-20 h-20 text-slate-200 mx-auto mb-6" />
               <h3 className="text-xl font-black text-primary uppercase mb-2">Nenhum favorito encontrado</h3>
               <p className="text-on-surface-variant font-medium max-w-md mx-auto">
-                {searchTerm || filterStatus !== 'ALL' || filterGrupo !== 'ALL' 
+                {searchTerm || filterStatus.length > 0 || filterGrupo.length > 0 
                   ? 'Nenhum paciente favorito corresponde aos filtros aplicados.'
                   : 'Adicione pacientes aos seus favoritos na página principal para acessá-los rapidamente aqui.'}
               </p>
               <button 
-                onClick={searchTerm || filterStatus !== 'ALL' || filterGrupo !== 'ALL' ? resetFilters : () => setActiveTab('pacientes')}
+                onClick={searchTerm || filterStatus.length > 0 || filterGrupo.length > 0 ? resetFilters : () => setActiveTab('pacientes')}
                 className="mt-8 px-8 py-4 bg-primary text-white font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-primary/20"
               >
-                {searchTerm || filterStatus !== 'ALL' || filterGrupo !== 'ALL' ? 'Limpar Filtros' : 'Ir para Meus Pacientes'}
+                {searchTerm || filterStatus.length > 0 || filterGrupo.length > 0 ? 'Limpar Filtros' : 'Ir para Meus Pacientes'}
               </button>
             </div>
           ) : (

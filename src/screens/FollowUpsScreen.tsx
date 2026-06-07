@@ -4,6 +4,7 @@ import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText
 import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
+import { MultiSelect } from '../components/MultiSelect';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 
 interface Acompanhamento {
@@ -46,27 +47,27 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
-  const [filterTipoBusca, setFilterTipoBusca] = useState('ALL');
-  const [filterTipoContato, setFilterTipoContato] = useState('ALL');
-  const [filterSituacao, setFilterSituacao] = useState('ALL');
-  const [filterEntraves, setFilterEntraves] = useState('ALL');
+  const [filterTipoBusca, setFilterTipoBusca] = useState<string[]>([]);
+  const [filterTipoContato, setFilterTipoContato] = useState<string[]>([]);
+  const [filterSituacao, setFilterSituacao] = useState<string[]>([]);
+  const [filterEntraves, setFilterEntraves] = useState<string[]>([]);
   const [filterDataInicio, setFilterDataInicio] = useState('');
   const [filterDataFim, setFilterDataFim] = useState('');
-  const [filterUnidade, setFilterUnidade] = useState('');
-  const [filterEquipe, setFilterEquipe] = useState('');
-  const [filterMicroarea, setFilterMicroarea] = useState('');
+  const [filterUnidade, setFilterUnidade] = useState<string[]>([]);
+  const [filterEquipe, setFilterEquipe] = useState<string[]>([]);
+  const [filterMicroarea, setFilterMicroarea] = useState<string[]>([]);
 
   const resetFilters = () => {
     setSearchTerm('');
-    setFilterTipoBusca('ALL');
-    setFilterTipoContato('ALL');
-    setFilterSituacao('ALL');
-    setFilterEntraves('ALL');
+    setFilterTipoBusca([]);
+    setFilterTipoContato([]);
+    setFilterSituacao([]);
+    setFilterEntraves([]);
     setFilterDataInicio('');
     setFilterDataFim('');
-    setFilterUnidade('');
-    setFilterEquipe('');
-    setFilterMicroarea('');
+    setFilterUnidade([]);
+    setFilterEquipe([]);
+    setFilterMicroarea([]);
   };
 
   const normalizeCanalLabel = (value?: string) => value || '';
@@ -148,9 +149,36 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         }
 
         // Regional UI Filters
-        if (filterUnidade) acompFilters.push(`paciente.unidade = "${filterUnidade}"`);
-        if (filterEquipe) acompFilters.push(`paciente.equipe = "${filterEquipe}"`);
-        if (filterMicroarea) acompFilters.push(`paciente.microarea ~ "${filterMicroarea}"`);
+        if (filterUnidade.length > 0) {
+          acompFilters.push(`(${filterUnidade.map(u => `paciente.unidade = "${u}"`).join(' || ')})`);
+        }
+        if (filterEquipe.length > 0) {
+          acompFilters.push(`(${filterEquipe.map(e => `paciente.equipe = "${e}"`).join(' || ')})`);
+        }
+        if (filterMicroarea.length > 0) {
+          acompFilters.push(`(${filterMicroarea.map(m => `paciente.microarea ~ "${m}"`).join(' || ')})`);
+        }
+
+        // Outros Filtros UI
+        if (filterTipoBusca.length > 0) {
+          acompFilters.push(`(${filterTipoBusca.map(v => `tipo_busca = "${v}"`).join(' || ')})`);
+        }
+        if (filterTipoContato.length > 0) {
+          acompFilters.push(`(${filterTipoContato.map(v => `tipo_contato = "${v}"`).join(' || ')})`);
+        }
+        if (filterSituacao.length > 0) {
+          acompFilters.push(`(${filterSituacao.map(v => `situacao_pos_busca = "${v}"`).join(' || ')})`);
+        }
+        if (filterEntraves.length > 0) {
+          acompFilters.push(`(${filterEntraves.map(v => `entraves_identificados = "${v}"`).join(' || ')})`);
+        }
+
+        if (filterDataInicio) {
+          acompFilters.push(`data_busca >= "${filterDataInicio} 00:00:00"`);
+        }
+        if (filterDataFim) {
+          acompFilters.push(`data_busca <= "${filterDataFim} 23:59:59"`);
+        }
 
         const filterString = acompFilters.join(' && ');
 
@@ -170,7 +198,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     };
 
     fetchAcompanhamentos();
-  }, [user, filterUnidade, filterEquipe, filterMicroarea]);
+  }, [user, filterUnidade, filterEquipe, filterMicroarea, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este registro?')) {
@@ -303,16 +331,16 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                 <button 
                   onClick={() => setIsFilterVisible(!isFilterVisible)}
                   className={`flex items-center gap-4 px-10 h-16 rounded-[1.5rem] text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
-                    isFilterVisible || filterTipoBusca !== 'ALL' || filterTipoContato !== 'ALL' || filterSituacao !== 'ALL' || filterEntraves !== 'ALL' || filterDataInicio || filterDataFim
+                    isFilterVisible || filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDataInicio || filterDataFim
                       ? 'bg-primary text-white border-primary shadow-[0_0_25px_rgba(var(--primary-rgb),0.4)]' 
                       : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
                   }`}
                 >
                   <Filter className="w-6 h-6" />
                   <span>Filtros</span>
-                  {(filterTipoBusca !== 'ALL' || filterTipoContato !== 'ALL' || filterSituacao !== 'ALL' || filterEntraves !== 'ALL' || filterDataInicio || filterDataFim) && (
+                  {(filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDataInicio || filterDataFim) && (
                     <div className="w-7 h-7 flex items-center justify-center bg-white text-primary text-[11px] rounded-full font-black animate-pulse">
-                      {[filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim].filter(f => f && f !== 'ALL').length}
+                      {[filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves].filter(f => f.length > 0).length + (filterDataInicio || filterDataFim ? 1 : 0)}
                     </div>
                   )}
                 </button>
@@ -343,65 +371,52 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                   {/* Filtros Regionais Condicionais */}
                   {(isAdmin || user?.role === 'cap') && (
                     <div className="space-y-3">
-                      <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                        <Building className="w-3.5 h-3.5" />
-                        Unidade
-                      </label>
-                      <select 
+                      <MultiSelect 
+                        label="Unidade"
+                        placeholder="Todas as Unidades"
+                        options={Object.keys(UNIDADES_EQUIPES)}
                         value={filterUnidade}
-                        onChange={(e) => {
-                          setFilterUnidade(e.target.value);
-                          setFilterEquipe('');
-                          setFilterMicroarea('');
+                        onChange={(val) => {
+                          setFilterUnidade(val);
+                          setFilterEquipe([]);
+                          setFilterMicroarea([]);
                         }}
-                        className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                      >
-                        <option value="">Todas</option>
-                        {Object.keys(UNIDADES_EQUIPES).map(u => <option key={u} value={u}>{u}</option>)}
-                      </select>
+                      />
                     </div>
                   )}
 
                   {(isAdmin || user?.role === 'cap' || user?.role === 'unidade') && (
                     <div className="space-y-3">
-                      <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                        <Users className="w-3.5 h-3.5" />
-                        Equipe
-                      </label>
-                      <select 
+                      <MultiSelect 
+                        label="Equipe"
+                        placeholder="Todas as Equipes"
+                        options={
+                          filterUnidade.length > 0 
+                            ? Array.from(new Set(filterUnidade.flatMap(u => UNIDADES_EQUIPES[u] || [])))
+                            : user?.role === 'unidade' 
+                              ? UNIDADES_EQUIPES[user.unidade_saude] || []
+                              : []
+                        }
                         value={filterEquipe}
-                        onChange={(e) => {
-                          setFilterEquipe(e.target.value);
-                          setFilterMicroarea('');
+                        onChange={(val) => {
+                          setFilterEquipe(val);
+                          setFilterMicroarea([]);
                         }}
-                        disabled={!filterUnidade && (isAdmin || user?.role === 'cap')}
-                        className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer disabled:opacity-30"
-                      >
-                        <option value="">Todas</option>
-                        {filterUnidade ? UNIDADES_EQUIPES[filterUnidade]?.map(eq => (
-                          <option key={eq} value={eq}>{eq}</option>
-                        )) : user?.role === 'unidade' ? UNIDADES_EQUIPES[user.unidade_saude]?.map(eq => (
-                          <option key={eq} value={eq}>{eq}</option>
-                        )) : null}
-                      </select>
+                        disabled={filterUnidade.length === 0 && (isAdmin || user?.role === 'cap')}
+                      />
                     </div>
                   )}
 
                   {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe') && (
                     <div className="space-y-3">
-                      <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                        <MapPin className="w-3.5 h-3.5" />
-                        Microárea
-                      </label>
-                      <select 
+                      <MultiSelect 
+                        label="Microárea"
+                        placeholder="Todas as Microáreas"
+                        options={MICROAREAS.map(ma => ma.toString())}
                         value={filterMicroarea}
-                        onChange={(e) => setFilterMicroarea(e.target.value)}
-                        disabled={!filterEquipe && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
-                        className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer disabled:opacity-30"
-                      >
-                        <option value="">Todas</option>
-                        {MICROAREAS.map(ma => <option key={ma} value={ma}>{ma}</option>)}
-                      </select>
+                        onChange={setFilterMicroarea}
+                        disabled={filterEquipe.length === 0 && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
+                      />
                     </div>
                   )}
 
@@ -426,85 +441,73 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                   </div>
 
                   <div className="space-y-3">
-                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                      <FileText className="w-3.5 h-3.5" />
-                      Tipo de Busca
-                    </label>
-                    <select 
+                    <MultiSelect 
+                      label="Tipo de Busca"
+                      placeholder="Todos os Tipos"
+                      options={[
+                        "1 - Busca ativa- Visita domiciliar registrada em prontuário",
+                        "2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário",
+                        "3 - Busca ativa - Mensagem registrada em prontuário"
+                      ]}
                       value={filterTipoBusca}
-                      onChange={(e) => setFilterTipoBusca(e.target.value)}
-                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="ALL">Todos os Tipos</option>
-                      <option value="1 - Busca ativa- Visita domiciliar registrada em prontuário">1 - Busca ativa- Visita domiciliar registrada em prontuário</option>
-                      <option value="2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário">2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário</option>
-                      <option value="3 - Busca ativa - Mensagem registrada em prontuário">3 - Busca ativa - Mensagem registrada em prontuário</option>
-                    </select>
+                      onChange={setFilterTipoBusca}
+                    />
                   </div>
 
                   <div className="space-y-3">
-                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                      <Phone className="w-3.5 h-3.5" />
-                      Tipo de Contato
-                    </label>
-                    <select 
+                    <MultiSelect 
+                      label="Tipo de Contato"
+                      placeholder="Todos os Contatos"
+                      options={[
+                        "Contato direto (conversa)",
+                        "Contato indireto (mensagem)",
+                        "Não houve contato ( não localizada, ligação não atendida...)"
+                      ]}
                       value={filterTipoContato}
-                      onChange={(e) => setFilterTipoContato(e.target.value)}
-                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="ALL">Todos os Contatos</option>
-                      <option value="Contato direto (conversa)">Contato direto (conversa)</option>
-                      <option value="Contato indireto (mensagem)">Contato indireto (mensagem)</option>
-                      <option value="Não houve contato ( não localizada, ligação não atendida...)">Não houve contato ( não localizada, ligação não atendida...)</option>
-                    </select>
+                      onChange={setFilterTipoContato}
+                    />
                   </div>
 
                   <div className="space-y-3">
-                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                      <BadgeCheck className="w-3.5 h-3.5" />
-                      Situação Pós Busca
-                    </label>
-                    <select 
+                    <MultiSelect 
+                      label="Situação Pós Busca"
+                      placeholder="Todas as Situações"
+                      options={[
+                        "1- Agendamento após contato direto",
+                        "2 - Convite para demanda livre",
+                        "3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP",
+                        "4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP",
+                        "5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP",
+                        "6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP",
+                        "7 - Mudança de território (situação atualizada no PEP)",
+                        "8 - Óbito (situação atualizada no PEP)",
+                        "9 - Não localizada",
+                        "10 - Recusa"
+                      ]}
                       value={filterSituacao}
-                      onChange={(e) => setFilterSituacao(e.target.value)}
-                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="ALL">Todas as Situações</option>
-                      <option value="1- Agendamento após contato direto">1- Agendamento após contato direto</option>
-                      <option value="2 - Convite para demanda livre">2 - Convite para demanda livre</option>
-                      <option value="3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP">3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP</option>
-                      <option value="4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP">4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP</option>
-                      <option value="5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP">5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP</option>
-                      <option value="6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP">6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP</option>
-                      <option value="7 - Mudança de território (situação atualizada no PEP)">7 - Mudança de território (situação atualizada no PEP)</option>
-                      <option value="8 - Óbito (situação atualizada no PEP)">8 - Óbito (situação atualizada no PEP)</option>
-                      <option value="9 - Não localizada">9 - Não localizada</option>
-                      <option value="10 - Recusa">10 - Recusa</option>
-                    </select>
+                      onChange={setFilterSituacao}
+                    />
                   </div>
 
                   <div className="space-y-3">
-                    <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      Entraves Identificados
-                    </label>
-                    <select 
+                    <MultiSelect 
+                      label="Entraves Identificados"
+                      placeholder="Todos os Entraves"
+                      options={[
+                        "1 - Horários incompatíveis com a rotina de trabalho",
+                        "2 - Vergonha ou constrangimento durante o exame",
+                        "3 - Ideia equivocada sobre a necessidade de fazer exame",
+                        "4 - Faz o rastreamento pela rede privada",
+                        "5 - Dificuldade de locomoção ( ex: acamada)",
+                        "6 - Distância da Unidade",
+                        "7 - Se recusa a fazer o exame com o profissional da equipe",
+                        "8 - Esquece a data do agendamento",
+                        "9 - Indisponibilidade de tempo",
+                        "10 - Não identificado entrave"
+                      ]}
                       value={filterEntraves}
-                      onChange={(e) => setFilterEntraves(e.target.value)}
-                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="ALL">Todos os Entraves</option>
-                      <option value="1 - Horários incompatíveis com a rotina de trabalho">1 - Horários incompatíveis com a rotina de trabalho</option>
-                      <option value="2 - Vergonha ou constrangimento durante o exame">2 - Vergonha ou constrangimento durante o exame</option>
-                      <option value="3 - Ideia equivocada sobre a necessidade de fazer exame">3 - Ideia equivocada sobre a necessidade de fazer exame</option>
-                      <option value="4 - Faz o rastreamento pela rede privada">4 - Faz o rastreamento pela rede privada</option>
-                      <option value="5 - Dificuldade de locomoção ( ex: acamada)">5 - Dificuldade de locomoção ( ex: acamada)</option>
-                      <option value="6 - Distância da Unidade">6 - Distância da Unidade</option>
-                      <option value="7 - Se recusa a fazer o exame com o profissional da equipe">7 - Se recusa a fazer o exame com o profissional da equipe</option>
-                      <option value="8 - Esquece a data do agendamento">8 - Esquece a data do agendamento</option>
-                      <option value="9 - Indisponibilidade de tempo">9 - Indisponibilidade de tempo</option>
-                      <option value="10 - Não identificado entrave">10 - Não identificado entrave</option>
-                    </select>
+                      onChange={setFilterEntraves}
+                    />
                   </div>
 
                   <div className="flex items-end gap-4 lg:col-span-2">
@@ -660,10 +663,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                         const date = acomp.data_busca ? new Date(acomp.data_busca).toLocaleDateString('pt-BR').toLowerCase() : '';
                         
                         const matchesSearch = patientName.includes(search) || cns.includes(search) || date.includes(search);
-                        const matchesTipoBusca = filterTipoBusca === 'ALL' || (acomp.tipo_busca && acomp.tipo_busca.includes(filterTipoBusca));
-                        const matchesTipoContato = filterTipoContato === 'ALL' || (acomp.tipo_contato && acomp.tipo_contato.includes(filterTipoContato));
-                        const matchesSituacao = filterSituacao === 'ALL' || (acomp.situacao_pos_busca && acomp.situacao_pos_busca.includes(filterSituacao));
-                        const matchesEntraves = filterEntraves === 'ALL' || (acomp.entraves_identificados && acomp.entraves_identificados.includes(filterEntraves));
+                        const matchesTipoBusca = filterTipoBusca.length === 0 || (acomp.tipo_busca && filterTipoBusca.includes(acomp.tipo_busca));
+                        const matchesTipoContato = filterTipoContato.length === 0 || (acomp.tipo_contato && filterTipoContato.includes(acomp.tipo_contato));
+                        const matchesSituacao = filterSituacao.length === 0 || (acomp.situacao_pos_busca && filterSituacao.includes(acomp.situacao_pos_busca));
+                        const matchesEntraves = filterEntraves.length === 0 || (acomp.entraves_identificados && filterEntraves.includes(acomp.entraves_identificados));
                         
                         // Filtro de Data
                         let matchesData = true;

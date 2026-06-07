@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, Activity, HeartPulse, Calendar, BadgeCheck, TrendingUp, Phone, MessageSquare, ClipboardList, PieChart, BarChart3, MapPin } from 'lucide-react';
 import { Header } from '../components/Header';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
+import { MultiSelect } from '../components/MultiSelect';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
@@ -28,9 +29,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
   const [filterDataInicio, setFilterDataInicio] = useState('');
   const [filterDataFim, setFilterDataFim] = useState('');
-  const [filterUnidade, setFilterUnidade] = useState('');
-  const [filterEquipe, setFilterEquipe] = useState('');
-  const [filterMicroarea, setFilterMicroarea] = useState('');
+  const [filterUnidade, setFilterUnidade] = useState<string[]>([]);
+  const [filterEquipe, setFilterEquipe] = useState<string[]>([]);
+  const [filterMicroarea, setFilterMicroarea] = useState<string[]>([]);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
 
   const [acompStats, setAcompStats] = useState({
@@ -94,9 +95,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         }
 
         // Applied UI filters
-        if (filterUnidade) patientFilterParts.push(`unidade = "${filterUnidade}"`);
-        if (filterEquipe) patientFilterParts.push(`equipe = "${filterEquipe}"`);
-        if (filterMicroarea) patientFilterParts.push(`microarea ~ "${filterMicroarea}"`);
+        if (filterUnidade.length > 0) {
+          patientFilterParts.push(`(${filterUnidade.map(u => `unidade = "${u}"`).join(' || ')})`);
+        }
+        if (filterEquipe.length > 0) {
+          patientFilterParts.push(`(${filterEquipe.map(e => `equipe = "${e}"`).join(' || ')})`);
+        }
+        if (filterMicroarea.length > 0) {
+          patientFilterParts.push(`(${filterMicroarea.map(m => `microarea ~ "${m}"`).join(' || ')})`);
+        }
 
         // Fetch Pacientes
         const records = await pb.collection('amarcap53_pacientes').getFullList({
@@ -185,9 +192,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         }
 
         // Applied UI filters
-        if (filterUnidade) acompFilters.push(`paciente.unidade = "${filterUnidade}"`);
-        if (filterEquipe) acompFilters.push(`paciente.equipe = "${filterEquipe}"`);
-        if (filterMicroarea) acompFilters.push(`paciente.microarea ~ "${filterMicroarea}"`);
+        if (filterUnidade.length > 0) {
+          acompFilters.push(`(${filterUnidade.map(u => `paciente.unidade = "${u}"`).join(' || ')})`);
+        }
+        if (filterEquipe.length > 0) {
+          acompFilters.push(`(${filterEquipe.map(e => `paciente.equipe = "${e}"`).join(' || ')})`);
+        }
+        if (filterMicroarea.length > 0) {
+          acompFilters.push(`(${filterMicroarea.map(m => `paciente.microarea ~ "${m}"`).join(' || ')})`);
+        }
 
         if (filterDataInicio) {
           acompFilters.push(`data_busca >= "${filterDataInicio} 00:00:00"`);
@@ -382,7 +395,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             </div>
 
             {/* Seletor de Período e Regional Profissional */}
-            <div className="lg:w-[600px] bg-white p-8 rounded-[3.25rem] shadow-2xl border border-primary/5 relative overflow-hidden flex flex-col justify-center">
+            <div className="lg:w-[600px] bg-white p-8 rounded-[3.25rem] shadow-2xl border border-primary/5 relative flex flex-col justify-center">
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shadow-inner">
                   <Calendar className="w-7 h-7 text-primary" strokeWidth={2.5} />
@@ -408,69 +421,59 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {(isAdmin || user?.role === 'cap') && (
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest ml-1">Unidade</label>
-                    <select
-                      value={filterUnidade}
-                      onChange={(e) => {
-                        setFilterUnidade(e.target.value);
-                        setFilterEquipe('');
-                        setFilterMicroarea('');
-                      }}
-                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-xs font-bold text-on-surface outline-none focus:border-primary/20 transition-all cursor-pointer appearance-none"
-                    >
-                      <option value="">Todas</option>
-                      {Object.keys(UNIDADES_EQUIPES).map(u => <option key={u} value={u}>{u}</option>)}
-                    </select>
-                  </div>
+                  <MultiSelect 
+                    label="Unidades"
+                    placeholder="Todas as Unidades"
+                    options={Object.keys(UNIDADES_EQUIPES)}
+                    value={filterUnidade}
+                    onChange={(val) => {
+                      setFilterUnidade(val);
+                      setFilterEquipe([]);
+                      setFilterMicroarea([]);
+                    }}
+                  />
                 )}
 
                 {(isAdmin || user?.role === 'cap' || user?.role === 'unidade') && (
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest ml-1">Equipe</label>
-                    <select
-                      value={filterEquipe}
-                      onChange={(e) => {
-                        setFilterEquipe(e.target.value);
-                        setFilterMicroarea('');
-                      }}
-                      disabled={!filterUnidade && (isAdmin || user?.role === 'cap')}
-                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-xs font-bold text-on-surface outline-none focus:border-primary/20 transition-all cursor-pointer appearance-none disabled:opacity-30"
-                    >
-                      <option value="">Todas</option>
-                      {filterUnidade ? UNIDADES_EQUIPES[filterUnidade]?.map(eq => (
-                        <option key={eq} value={eq}>{eq}</option>
-                      )) : user?.role === 'unidade' ? UNIDADES_EQUIPES[user.unidade_saude]?.map(eq => (
-                        <option key={eq} value={eq}>{eq}</option>
-                      )) : null}
-                    </select>
-                  </div>
+                  <MultiSelect 
+                    label="Equipes"
+                    placeholder="Todas as Equipes"
+                    options={
+                      filterUnidade.length > 0 
+                        ? Array.from(new Set(filterUnidade.flatMap(u => UNIDADES_EQUIPES[u] || [])))
+                        : user?.role === 'unidade' 
+                          ? UNIDADES_EQUIPES[user.unidade_saude] || []
+                          : []
+                    }
+                    value={filterEquipe}
+                    onChange={(val) => {
+                      setFilterEquipe(val);
+                      setFilterMicroarea([]);
+                    }}
+                    disabled={filterUnidade.length === 0 && (isAdmin || user?.role === 'cap')}
+                  />
                 )}
 
                 {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe') && (
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest ml-1">Microárea</label>
-                    <select
-                      value={filterMicroarea}
-                      onChange={(e) => setFilterMicroarea(e.target.value)}
-                      disabled={!filterEquipe && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
-                      className="w-full p-4 bg-surface-container-low border-2 border-transparent rounded-2xl text-xs font-bold text-on-surface outline-none focus:border-primary/20 transition-all cursor-pointer appearance-none disabled:opacity-30"
-                    >
-                      <option value="">Todas</option>
-                      {MICROAREAS.map(ma => <option key={ma} value={ma}>{ma}</option>)}
-                    </select>
-                  </div>
+                  <MultiSelect 
+                    label="Microáreas"
+                    placeholder="Todas as Microáreas"
+                    options={MICROAREAS.map(ma => ma.toString())}
+                    value={filterMicroarea}
+                    onChange={setFilterMicroarea}
+                    disabled={filterEquipe.length === 0 && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
+                  />
                 )}
               </div>
               
-              {(filterDataInicio || filterDataFim || filterUnidade || filterEquipe || filterMicroarea) && (
+              {(filterDataInicio || filterDataFim || filterUnidade.length > 0 || filterEquipe.length > 0 || filterMicroarea.length > 0) && (
                 <button 
                   onClick={() => { 
                     setFilterDataInicio(''); 
                     setFilterDataFim('');
-                    setFilterUnidade('');
-                    setFilterEquipe('');
-                    setFilterMicroarea('');
+                    setFilterUnidade([]);
+                    setFilterEquipe([]);
+                    setFilterMicroarea([]);
                   }}
                   className="mt-6 text-[10px] font-black text-rose-600 uppercase tracking-widest hover:text-rose-700 transition-colors flex items-center gap-2 justify-center py-3 bg-rose-50 rounded-2xl border border-rose-100 shadow-sm"
                 >
