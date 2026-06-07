@@ -63,8 +63,16 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
   };
 
   const handleOpen = () => {
+    const isMobile = window.innerWidth < 1024;
+    if (isMobile) return; // Não abre calendário no mobile/tablet
     updatePosition();
     setIsOpen(true);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur(); // Fecha teclado no Enter
+    }
   };
 
   useEffect(() => {
@@ -182,6 +190,7 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
           value={displayValue}
           onChange={handleTextChange}
           onFocus={handleOpen}
+          onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className="w-full p-4 pr-12 bg-surface-container-low border-2 border-transparent rounded-2xl text-sm font-bold text-on-surface outline-none focus:border-primary/20 transition-all hover:bg-surface-container placeholder:text-on-surface/20 shadow-sm focus:shadow-md"
         />
@@ -196,11 +205,20 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
             </button>
           )}
           <button
-            onClick={(e) => { e.stopPropagation(); if (isOpen) setIsOpen(false); else handleOpen(); }}
-            className={`p-2 rounded-xl transition-all ${isOpen ? 'bg-primary text-white scale-105' : 'bg-primary/5 text-primary hover:bg-primary/10 group-hover:scale-105'}`}
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              const isMobile = window.innerWidth < 1024;
+              if (isMobile) return; 
+              if (isOpen) setIsOpen(false); 
+              else handleOpen(); 
+            }}
+            className={`p-2 rounded-xl transition-all ${isOpen ? 'bg-primary text-white scale-105' : 'bg-primary/5 text-primary hover:bg-primary/10 group-hover:scale-105'} lg:flex hidden`}
           >
             <CalendarIcon className="w-4 h-4" />
           </button>
+          <div className="p-2 bg-primary/5 text-primary rounded-xl lg:hidden flex">
+            <CalendarIcon className="w-4 h-4" />
+          </div>
         </div>
       </div>
 
