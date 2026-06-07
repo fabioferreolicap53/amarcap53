@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { MultiSelect } from '../components/MultiSelect';
+import { SingleSelect } from '../components/SingleSelect';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 
 interface Paciente {
@@ -210,6 +211,14 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [patientForDetails, setPatientDetails] = useState<Paciente | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
+  
+  // Estados para os campos do modal de acompanhamento
+  const [modalTipoBusca, setModalTipoBusca] = useState('');
+  const [modalTipoContato, setModalTipoContato] = useState('');
+  const [modalSituacao, setModalSituacao] = useState('');
+  const [modalEntraves, setModalEntraves] = useState<string[]>([]);
+  const [modalEntravesInformadoPor, setModalEntravesInformadoPor] = useState('');
+  const [modalObservacoes, setModalObservacoes] = useState('');
 
   // Estados para Busca e Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -286,6 +295,13 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedPaciente(null);
+    setSelectedDate('');
+    setModalTipoBusca('');
+    setModalTipoContato('');
+    setModalSituacao('');
+    setModalEntraves([]);
+    setModalEntravesInformadoPor('');
+    setModalObservacoes('');
   };
 
   const [isSaving, setIsSaving] = useState(false);
@@ -295,29 +311,39 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     if (!selectedPaciente || !user) return;
     
     setIsSaving(true);
-    const formData = new FormData(e.currentTarget);
     
-    const rawDate = formData.get('data_busca') as string;
     let dataBuscaIso = '';
-    if (rawDate && rawDate.includes('/')) {
-      const [d, m, y] = rawDate.split('/');
+    if (selectedDate && selectedDate.includes('/')) {
+      const [d, m, y] = selectedDate.split('/');
       dataBuscaIso = `${y}-${m}-${d} 12:00:00`; // Formato ISO esperado pelo PocketBase para campos Date
     }
 
     const data = {
       paciente: selectedPaciente.id,
       profissional: user.id,
-      data_busca: dataBuscaIso || rawDate,
-      tipo_busca: formData.get('tipo_busca') || '',
-      tipo_contato: formData.get('tipo_contato') || '',
-      situacao_pos_busca: formData.get('situacao_pos_busca') || '',
-      entraves_identificados: formData.get('entraves_identificados') || '',
-      entraves_informado_por: formData.get('entraves_informado_por') || '', // Novo campo
-      observacoes: formData.get('observacoes') || '',
+      data_busca: dataBuscaIso || selectedDate,
+      tipo_busca: modalTipoBusca,
+      tipo_contato: modalTipoContato,
+      situacao_pos_busca: modalSituacao,
+      entraves_identificados: modalEntraves.join('; '),
+      entraves_informado_por: modalEntravesInformadoPor,
+      observacoes: modalObservacoes,
     };
 
     try {
       await pb.collection('amarcap53_acompanhamentos').create(data);
+      
+      // Atualiza o contador de acompanhamentos localmente para feedback instantâneo
+      setPacientes(prev => prev.map(p => {
+        if (p.id === selectedPaciente.id) {
+          return {
+            ...p,
+            total_acompanhamentos: (p.total_acompanhamentos || 0) + 1
+          };
+        }
+        return p;
+      }));
+
       alert('Acompanhamento registrado com sucesso!');
       handleCloseModal();
     } catch (error) {
@@ -1025,7 +1051,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                               <ClipboardList className="w-3.5 h-3.5 text-blue-300" />
                               <span>Acomp.</span>
                               {paciente.total_acompanhamentos !== undefined && paciente.total_acompanhamentos > 0 && (
-                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-5 px-1 flex items-center justify-center bg-blue-500 text-white text-[9px] font-black rounded-full border-2 border-[#001b3d] shadow-md z-10">
+                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-5 px-1 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-full border-2 border-[#001b3d] shadow-md z-10">
                                   {paciente.total_acompanhamentos}
                                 </span>
                               )}
@@ -1193,139 +1219,101 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
               <form id="registro-acompanhamento-form" onSubmit={handleSaveFollowUp}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5 sm:gap-y-6">
                   <div className="space-y-2 group/field">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
-                      <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
-                        <Calendar className="w-3.5 h-3.5" />
-                      </div>
-                      Data da Busca
-                    </label>
-                    <div className="relative">
-                      <DatePickerPTBR 
-                        value={selectedDate} 
-                        isISO={false}
-                        onChange={(val) => setSelectedDate(val)} 
-                      />
-                      <input type="hidden" name="data_busca" value={selectedDate} />
-                    </div>
+                    <DatePickerPTBR 
+                      label="Data da Busca"
+                      value={selectedDate} 
+                      isISO={false}
+                      onChange={(val) => setSelectedDate(val)} 
+                    />
                   </div>
 
                 {/* Tipo de Busca */}
-                <div className="space-y-2 group/field">
-                  <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
-                    <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
-                      <Search className="w-3.5 h-3.5" />
-                    </div>
-                    Tipo de Busca
-                  </label>
-                  <div className="relative">
-                    <select name="tipo_busca" defaultValue="" required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40">
-                      <option value="" disabled>Selecione</option>
-                      <option value="1 - Busca ativa- Visita domiciliar registrada em prontuário">1 - Busca ativa- Visita domiciliar registrada em prontuário</option>
-                      <option value="2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário">2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário</option>
-                      <option value="3 - Busca ativa - Mensagem registrada em prontuário">3 - Busca ativa - Mensagem registrada em prontuário</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-on-surface-variant">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                  </div>
-                </div>
+                <SingleSelect 
+                  label="Tipo de Busca"
+                  placeholder="Selecione"
+                  options={[
+                    "1 - Busca ativa- Visita domiciliar registrada em prontuário",
+                    "2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário",
+                    "3 - Busca ativa - Mensagem registrada em prontuário"
+                  ]}
+                  value={modalTipoBusca}
+                  onChange={setModalTipoBusca}
+                  required
+                  icon={<Search className="w-3.5 h-3.5" />}
+                />
 
                 {/* Tipo de Contato */}
-                <div className="space-y-2 group/field">
-                  <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
-                    <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
-                      <Phone className="w-3.5 h-3.5" />
-                    </div>
-                    Tipo de Contato
-                  </label>
-                  <div className="relative">
-                    <select name="tipo_contato" defaultValue="" required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40">
-                      <option value="" disabled>Selecione uma modalidade</option>
-                      <option value="Contato direto (conversa)">Contato direto (conversa)</option>
-                      <option value="Contato indireto (mensagem)">Contato indireto (mensagem)</option>
-                      <option value="Não houve contato ( não localizada, ligação não atendida...)">Não houve contato ( não localizada, ligação não atendida...)</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-on-surface-variant">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                  </div>
-                </div>
+                <SingleSelect 
+                  label="Tipo de Contato"
+                  placeholder="Selecione uma modalidade"
+                  options={[
+                    "Contato direto (conversa)",
+                    "Contato indireto (mensagem)",
+                    "Não houve contato ( não localizada, ligação não atendida...)"
+                  ]}
+                  value={modalTipoContato}
+                  onChange={setModalTipoContato}
+                  required
+                  icon={<Phone className="w-3.5 h-3.5" />}
+                />
 
                 {/* Situação Pós Busca */}
-                <div className="col-span-1 md:col-span-2 space-y-2 group/field">
-                  <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
-                    <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
-                      <Info className="w-3.5 h-3.5" />
-                    </div>
-                    Situação Pós Busca Ativa
-                  </label>
-                  <div className="relative">
-                    <select name="situacao_pos_busca" defaultValue="" required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40">
-                      <option value="" disabled>Selecione o desfecho da busca</option>
-                      <option value="1- Agendamento após contato direto">1- Agendamento após contato direto</option>
-                      <option value="2 - Convite para demanda livre">2 - Convite para demanda livre</option>
-                      <option value="3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP">3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP</option>
-                      <option value="4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP">4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP</option>
-                      <option value="5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP">5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP</option>
-                      <option value="6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP">6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP</option>
-                      <option value="7 - Mudança de território (situação atualizada no PEP)">7 - Mudança de território (situação atualizada no PEP)</option>
-                      <option value="8 - Óbito (situação atualizada no PEP)">8 - Óbito (situação atualizada no PEP)</option>
-                      <option value="9 - Não localizada">9 - Não localizada</option>
-                      <option value="10 - Recusa">10 - Recusa</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-on-surface-variant">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                  </div>
-                </div>
+                <SingleSelect 
+                  label="Situação Pós Busca Ativa"
+                  placeholder="Selecione o desfecho da busca"
+                  className="col-span-1 md:col-span-2"
+                  options={[
+                    "1- Agendamento após contato direto",
+                    "2 - Convite para demanda livre",
+                    "3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP",
+                    "4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP",
+                    "5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP",
+                    "6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP",
+                    "7 - Mudança de território (situação atualizada no PEP)",
+                    "8 - Óbito (situação atualizada no PEP)",
+                    "9 - Não localizada",
+                    "10 - Recusa"
+                  ]}
+                  value={modalSituacao}
+                  onChange={setModalSituacao}
+                  required
+                  icon={<Info className="w-3.5 h-3.5" />}
+                />
 
                 {/* Entraves Identificados */}
-                <div className="col-span-1 md:col-span-2 space-y-2 group/field">
-                  <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
-                    <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                    </div>
-                    Entraves Identificados
-                  </label>
-                  <div className="relative">
-                    <select name="entraves_identificados" className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40">
-                      <option value="" disabled selected>Selecione (Opcional)</option>
-                      <option value="1 - Horários incompatíveis com a rotina de trabalho">1 - Horários incompatíveis com a rotina de trabalho</option>
-                      <option value="2 - Vergonha ou constrangimento durante o exame">2 - Vergonha ou constrangimento durante o exame</option>
-                      <option value="3 - Ideia equivocada sobre a necessidade de fazer exame">3 - Ideia equivocada sobre a necessidade de fazer exame</option>
-                      <option value="4 - Faz o rastreamento pela rede privada">4 - Faz o rastreamento pela rede privada</option>
-                      <option value="5 - Dificuldade de locomoção ( ex: acamada)">5 - Dificuldade de locomoção ( ex: acamada)</option>
-                      <option value="6 - Distância da Unidade">6 - Distância da Unidade</option>
-                      <option value="7 - Se recusa a fazer o exame com o profissional da equipe">7 - Se recusa a fazer o exame com o profissional da equipe</option>
-                      <option value="8 - Esquece a data do agendamento">8 - Esquece a data do agendamento</option>
-                      <option value="9 - Indisponibilidade de tempo">9 - Indisponibilidade de tempo</option>
-                      <option value="10 - Não identificado entrave">10 - Não identificado entrave</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-on-surface-variant">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                  </div>
-                </div>
+                <MultiSelect 
+                  label="Entraves Identificados"
+                  placeholder="Selecione (Opcional)"
+                  className="col-span-1 md:col-span-2"
+                  options={[
+                    "1 - Horários incompatíveis com a rotina de trabalho",
+                    "2 - Vergonha ou constrangimento durante o exame",
+                    "3 - Ideia equivocada sobre a necessidade de fazer exame",
+                    "4 - Faz o rastreamento pela rede privada",
+                    "5 - Dificuldade de locomoção ( ex: acamada)",
+                    "6 - Distância da Unidade",
+                    "7 - Se recusa a fazer o exame com o profissional da equipe",
+                    "8 - Esquece a data do agendamento",
+                    "9 - Indisponibilidade de tempo",
+                    "10 - Não identificado entrave"
+                  ]}
+                  value={modalEntraves}
+                  onChange={setModalEntraves}
+                />
 
                 {/* Entraves Informado Por */}
-                <div className="col-span-1 md:col-span-2 space-y-2 group/field">
-                  <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
-                    <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
-                      <Info className="w-3.5 h-3.5" />
-                    </div>
-                    Entrave(s) Informado Por
-                  </label>
-                  <div className="relative">
-                    <select name="entraves_informado_por" className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-3.5 transition-all outline-none appearance-none cursor-pointer shadow-sm hover:border-primary/40">
-                      <option value="" disabled selected>Selecione (Opcional)</option>
-                      <option value="1 - Informado por paciente">1 - Informado por paciente</option>
-                      <option value="2 - Identificado por profissional">2 - Identificado por profissional</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-on-surface-variant">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                  </div>
-                </div>
+                <SingleSelect 
+                  label="Entrave(s) Informado Por"
+                  placeholder="Selecione (Opcional)"
+                  className="col-span-1 md:col-span-2"
+                  options={[
+                    "1 - Informado por paciente",
+                    "2 - Identificado por profissional"
+                  ]}
+                  value={modalEntravesInformadoPor}
+                  onChange={setModalEntravesInformadoPor}
+                  icon={<Info className="w-3.5 h-3.5" />}
+                />
 
                 {/* Observações */}
                 <div className="col-span-1 md:col-span-2 space-y-2 group/field">
@@ -1337,6 +1325,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   </label>
                   <textarea 
                     name="observacoes"
+                    value={modalObservacoes}
+                    onChange={(e) => setModalObservacoes(e.target.value)}
                     className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-4 resize-none transition-all outline-none placeholder:text-outline-variant/60 shadow-sm hover:border-primary/40 min-h-[120px]" 
                     placeholder="Descreva aqui detalhes relevantes do atendimento, informações adicionais repassadas pelo paciente ou qualquer outro ponto importante..." 
                     rows={4}

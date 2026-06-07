@@ -175,7 +175,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
       
       {/* Lado Direito - Perfil e Logout */}
-      <div className="flex items-center gap-2 md:gap-4 h-full ml-auto lg:ml-0">
+      <div className="hidden lg:flex items-center gap-2 md:gap-4 h-full ml-auto lg:ml-0">
         <div className="flex items-center gap-2 md:gap-3 pl-2 md:pl-4 border-l border-white/10 h-full">
           <div className="text-right hidden sm:flex flex-col justify-center min-w-0">
             <p className="text-xs md:text-sm font-bold text-white leading-tight truncate max-w-[100px] md:max-w-[150px]">

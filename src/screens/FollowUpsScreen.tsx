@@ -5,6 +5,7 @@ import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { MultiSelect } from '../components/MultiSelect';
+import { SingleSelect } from '../components/SingleSelect';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 
 interface Acompanhamento {
@@ -228,7 +229,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       setSelectedAcompanhamento({
         ...acompToEdit,
         data_busca_formatada: dataBuscaFormatada,
-        entraves_informado_por: acompToEdit.entraves_informado_por // Novo campo
+        entraves_identificados: acompToEdit.entraves_identificados 
+          ? acompToEdit.entraves_identificados.split('; ') 
+          : [],
+        entraves_informado_por: acompToEdit.entraves_informado_por
       });
       setIsEditModalOpen(true);
     }
@@ -244,9 +248,8 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     if (!selectedAcompanhamento) return;
     
     setIsSaving(true);
-    const formData = new FormData(e.currentTarget);
     
-    const rawDate = formData.get('data_busca') as string;
+    const rawDate = selectedAcompanhamento.data_busca_formatada;
     let dataBuscaIso = '';
     if (rawDate && rawDate.includes('/')) {
       const [d, m, y] = rawDate.split('/');
@@ -254,13 +257,15 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     }
 
     const data = {
-      tipo_busca: formData.get('tipo_busca') || '',
+      tipo_busca: selectedAcompanhamento.tipo_busca || '',
       data_busca: dataBuscaIso || rawDate,
-      tipo_contato: formData.get('tipo_contato') || '',
-      situacao_pos_busca: formData.get('situacao_pos_busca') || '',
-      entraves_identificados: formData.get('entraves_identificados') || '',
-      entraves_informado_por: formData.get('entraves_informado_por') || '', // Novo campo
-      observacoes: formData.get('observacoes') || '',
+      tipo_contato: selectedAcompanhamento.tipo_contato || '',
+      situacao_pos_busca: selectedAcompanhamento.situacao_pos_busca || '',
+      entraves_identificados: Array.isArray(selectedAcompanhamento.entraves_identificados) 
+        ? selectedAcompanhamento.entraves_identificados.join('; ') 
+        : selectedAcompanhamento.entraves_identificados || '',
+      entraves_informado_por: selectedAcompanhamento.entraves_informado_por || '',
+      observacoes: selectedAcompanhamento.observacoes || '',
     };
 
     try {
@@ -800,95 +805,117 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
               <form id="edit-acompanhamento-form" onSubmit={handleSaveEdit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                   <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
-                      <Calendar className="w-3.5 h-3.5" /> Data da Busca
-                    </label>
                     <DatePickerPTBR 
+                      label="Data da Busca"
                       value={selectedAcompanhamento.data_busca_formatada} 
+                      isISO={false}
                       onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, data_busca_formatada: val})} 
                     />
-                    <input type="hidden" name="data_busca" value={selectedAcompanhamento.data_busca_formatada} />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
-                      <Search className="w-3.5 h-3.5" /> Tipo de Busca
-                    </label>
-                    <select name="tipo_busca" defaultValue={selectedAcompanhamento.tipo_busca} required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium p-3.5 outline-none focus:border-primary">
-                      <option value="" disabled>Selecione</option>
-                      <option value="1 - Busca ativa- Visita domiciliar registrada em prontuário">1 - Busca ativa- Visita domiciliar registrada em prontuário</option>
-                      <option value="2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário">2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário</option>
-                      <option value="3 - Busca ativa - Mensagem registrada em prontuário">3 - Busca ativa - Mensagem registrada em prontuário</option>
-                    </select>
-                  </div>
+                  {/* Tipo de Busca */}
+                  <SingleSelect 
+                    label="Tipo de Busca"
+                    placeholder="Selecione"
+                    options={[
+                      "1 - Busca ativa- Visita domiciliar registrada em prontuário",
+                      "2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário",
+                      "3 - Busca ativa - Mensagem registrada em prontuário"
+                    ]}
+                    value={selectedAcompanhamento.tipo_busca || ''}
+                    onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, tipo_busca: val})}
+                    required
+                    icon={<Search className="w-3.5 h-3.5" />}
+                  />
 
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
-                      <Phone className="w-3.5 h-3.5" /> Tipo de Contato
-                    </label>
-                    <select name="tipo_contato" defaultValue={selectedAcompanhamento.tipo_contato} required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium p-3.5 outline-none focus:border-primary">
-                      <option value="" disabled>Selecione</option>
-                      <option value="Contato direto (conversa)">Contato direto (conversa)</option>
-                      <option value="Contato indireto (mensagem)">Contato indireto (mensagem)</option>
-                      <option value="Não houve contato ( não localizada, ligação não atendida...)">Não houve contato ( não localizada, ligação não atendida...)</option>
-                    </select>
-                  </div>
+                  {/* Tipo de Contato */}
+                  <SingleSelect 
+                    label="Tipo de Contato"
+                    placeholder="Selecione"
+                    options={[
+                      "Contato direto (conversa)",
+                      "Contato indireto (mensagem)",
+                      "Não houve contato ( não localizada, ligação não atendida...)"
+                    ]}
+                    value={selectedAcompanhamento.tipo_contato || ''}
+                    onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, tipo_contato: val})}
+                    required
+                    icon={<Phone className="w-3.5 h-3.5" />}
+                  />
 
-                  <div className="col-span-2 space-y-2">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
-                      <Info className="w-3.5 h-3.5" /> Situação Pós Busca
-                    </label>
-                    <select name="situacao_pos_busca" defaultValue={selectedAcompanhamento.situacao_pos_busca} required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium p-3.5 outline-none focus:border-primary">
-                      <option value="" disabled>Selecione</option>
-                      <option value="1- Agendamento após contato direto">1- Agendamento após contato direto</option>
-                      <option value="2 - Convite para demanda livre">2 - Convite para demanda livre</option>
-                      <option value="3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP">3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP</option>
-                      <option value="4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP">4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP</option>
-                      <option value="5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP">5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP</option>
-                      <option value="6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP">6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP</option>
-                      <option value="7 - Mudança de território (situação atualizada no PEP)">7 - Mudança de território (situação atualizada no PEP)</option>
-                      <option value="8 - Óbito (situação atualizada no PEP)">8 - Óbito (situação atualizada no PEP)</option>
-                      <option value="9 - Não localizada">9 - Não localizada</option>
-                      <option value="10 - Recusa">10 - Recusa</option>
-                    </select>
-                  </div>
+                  {/* Situação Pós Busca */}
+                  <SingleSelect 
+                    label="Situação Pós Busca"
+                    placeholder="Selecione"
+                    className="col-span-2"
+                    options={[
+                      "1- Agendamento após contato direto",
+                      "2 - Convite para demanda livre",
+                      "3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP",
+                      "4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP",
+                      "5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP",
+                      "6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP",
+                      "7 - Mudança de território (situação atualizada no PEP)",
+                      "8 - Óbito (situação atualizada no PEP)",
+                      "9 - Não localizada",
+                      "10 - Recusa"
+                    ]}
+                    value={selectedAcompanhamento.situacao_pos_busca || ''}
+                    onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, situacao_pos_busca: val})}
+                    required
+                    icon={<Info className="w-3.5 h-3.5" />}
+                  />
 
-                  <div className="col-span-2 space-y-2">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
-                      <AlertTriangle className="w-3.5 h-3.5" /> Entraves Identificados
-                    </label>
-                    <select name="entraves_identificados" defaultValue={selectedAcompanhamento.entraves_identificados} className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium p-3.5 outline-none focus:border-primary">
-                      <option value="">Nenhum</option>
-                      <option value="1 - Horários incompatíveis com a rotina de trabalho">1 - Horários incompatíveis com a rotina de trabalho</option>
-                      <option value="2 - Vergonha ou constrangimento durante o exame">2 - Vergonha ou constrangimento durante o exame</option>
-                      <option value="3 - Ideia equivocada sobre a necessidade de fazer exame">3 - Ideia equivocada sobre a necessidade de fazer exame</option>
-                      <option value="4 - Faz o rastreamento pela rede privada">4 - Faz o rastreamento pela rede privada</option>
-                      <option value="5 - Dificuldade de locomoção ( ex: acamada)">5 - Dificuldade de locomoção ( ex: acamada)</option>
-                      <option value="6 - Distância da Unidade">6 - Distância da Unidade</option>
-                      <option value="7 - Se recusa a fazer o exame com o profissional da equipe">7 - Se recusa a fazer o exame com o profissional da equipe</option>
-                      <option value="8 - Esquece a data do agendamento">8 - Esquece a data do agendamento</option>
-                      <option value="9 - Indisponibilidade de tempo">9 - Indisponibilidade de tempo</option>
-                      <option value="10 - Não identificado entrave">10 - Não identificado entrave</option>
-                    </select>
-                  </div>
+                  {/* Entraves Identificados */}
+                  <MultiSelect 
+                    label="Entraves Identificados"
+                    placeholder="Nenhum"
+                    className="col-span-2"
+                    options={[
+                      "1 - Horários incompatíveis com a rotina de trabalho",
+                      "2 - Vergonha ou constrangimento durante o exame",
+                      "3 - Ideia equivocada sobre a necessidade de fazer exame",
+                      "4 - Faz o rastreamento pela rede privada",
+                      "5 - Dificuldade de locomoção ( ex: acamada)",
+                      "6 - Distância da Unidade",
+                      "7 - Se recusa a fazer o exame com o profissional da equipe",
+                      "8 - Esquece a data do agendamento",
+                      "9 - Indisponibilidade de tempo",
+                      "10 - Não identificado entrave"
+                    ]}
+                    value={selectedAcompanhamento.entraves_identificados || []}
+                    onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_identificados: val})}
+                  />
 
                   {/* Entraves Informado Por */}
-                  <div className="col-span-2 space-y-2">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
-                      <Info className="w-3.5 h-3.5" /> Entrave(s) Informado Por
-                    </label>
-                    <select name="entraves_informado_por" defaultValue={selectedAcompanhamento.entraves_informado_por} className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium p-3.5 outline-none focus:border-primary">
-                      <option value="">Selecione (Opcional)</option>
-                      <option value="1 - Informado por paciente">1 - Informado por paciente</option>
-                      <option value="2 - Identificado por profissional">2 - Identificado por profissional</option>
-                    </select>
-                  </div>
+                  <SingleSelect 
+                    label="Entrave(s) Informado Por"
+                    placeholder="Selecione (Opcional)"
+                    className="col-span-2"
+                    options={[
+                      "1 - Informado por paciente",
+                      "2 - Identificado por profissional"
+                    ]}
+                    value={selectedAcompanhamento.entraves_informado_por || ''}
+                    onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_informado_por: val})}
+                    icon={<Info className="w-3.5 h-3.5" />}
+                  />
 
-                  <div className="col-span-2 space-y-2">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
-                      <MessageSquare className="w-3.5 h-3.5" /> Observações
+                  <div className="col-span-2 space-y-2 group/field">
+                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
+                      <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </div>
+                      Observações
                     </label>
-                    <textarea name="observacoes" defaultValue={selectedAcompanhamento.observacoes} className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium p-4 resize-none outline-none focus:border-primary min-h-[120px]" rows={4}></textarea>
+                    <textarea 
+                      name="observacoes" 
+                      value={selectedAcompanhamento.observacoes || ''} 
+                      onChange={(e) => setSelectedAcompanhamento({...selectedAcompanhamento, observacoes: e.target.value})}
+                      className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium p-4 resize-none outline-none focus:border-primary min-h-[120px] shadow-sm hover:border-primary/40 transition-all" 
+                      rows={4}
+                      placeholder="Informações adicionais relevantes..."
+                    ></textarea>
                   </div>
                 </div>
               </form>

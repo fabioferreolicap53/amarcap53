@@ -72,7 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
         {/* Perfil do Usuário Mobile */}
         {user && (
           <div className="px-2">
-            <div className="bg-white/50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#051934] to-[#1c2e4a] flex items-center justify-center text-white font-black text-sm shadow-md ring-1 ring-white/20">
                   {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
@@ -82,21 +82,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                     {user.name || user.email}
                   </p>
                   <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">
-                    Profissional
+                    {user.role === 'cap' ? 'Coordenação CAP' : 'Profissional Saúde'}
                   </p>
                 </div>
               </div>
+              
+              <button 
+                onClick={logout}
+                className="w-full mt-4 flex items-center justify-center gap-2 py-3 bg-rose-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:bg-rose-600 transition-all active:scale-95"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                Sair do Sistema
+              </button>
             </div>
           </div>
         )}
-
-        <button 
-          onClick={logout}
-          className="w-full flex items-center gap-3 text-error px-4 py-3.5 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all text-left border border-transparent hover:border-red-100 dark:hover:border-red-500/20 group"
-        >
-          <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform" />
-          <span className="text-sm tracking-widest font-black uppercase">Sair do Sistema</span>
-        </button>
       </div>
     </aside>
   );

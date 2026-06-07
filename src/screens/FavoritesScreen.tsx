@@ -774,7 +774,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                             >
                               <ClipboardList className="w-3.5 h-3.5 text-blue-300" /> Acomp.
                               {paciente.total_acompanhamentos !== undefined && paciente.total_acompanhamentos > 0 && (
-                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-5 px-1 flex items-center justify-center bg-blue-500 text-white text-[9px] font-black rounded-full border-2 border-[#001b3d] shadow-md z-10">
+                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-5 px-1 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-full border-2 border-[#001b3d] shadow-md z-10">
                                   {paciente.total_acompanhamentos}
                                 </span>
                               )}
