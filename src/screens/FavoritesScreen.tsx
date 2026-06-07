@@ -6,6 +6,7 @@ import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, Messa
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
+import { SingleSelect } from '../components/SingleSelect';
 import { MultiSelect } from '../components/MultiSelect';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 
@@ -39,6 +40,21 @@ const InfoTooltip: React.FC<{ content: string }> = ({ content }) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tooltipRef.current && !tooltipRef.current.contains(event.target as Node) &&
+          buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (closeTimeoutRef.current) window.clearTimeout(closeTimeoutRef.current);
+    };
+  }, []);
 
   const updatePosition = () => {
     if (buttonRef.current) {
@@ -51,12 +67,29 @@ const InfoTooltip: React.FC<{ content: string }> = ({ content }) => {
   };
 
   const handleOpen = () => {
+    if (closeTimeoutRef.current) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
     updatePosition();
     setIsOpen(true);
   };
 
-  const handleClose = () => {
-    setIsOpen(false);
+  const handleClose = (immediate = false) => {
+    if (closeTimeoutRef.current) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+
+    if (immediate) {
+      setIsOpen(false);
+      return;
+    }
+
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setIsOpen(false);
+      closeTimeoutRef.current = null;
+    }, 120);
   };
 
   return (
@@ -64,24 +97,33 @@ const InfoTooltip: React.FC<{ content: string }> = ({ content }) => {
       <button
         ref={buttonRef}
         type="button"
+        onClick={(e) => { e.stopPropagation(); if (isOpen) handleClose(true); else handleOpen(); }}
         onMouseEnter={handleOpen}
         onMouseLeave={handleClose}
+        onFocus={handleOpen}
+        onBlur={() => handleClose(true)}
         className="w-3.5 h-3.5 rounded-full bg-blue-400/20 hover:bg-blue-400/40 text-blue-300 hover:text-blue-200 flex items-center justify-center transition-all duration-200 flex-shrink-0 ring-1 ring-blue-400/20 hover:ring-blue-400/40"
+        aria-label="Mais informações"
       >
         <span className="text-[7px] font-black leading-none" style={{ fontFamily: 'serif' }}>i</span>
       </button>
-      {isOpen && (
+      {isOpen && createPortal(
         <div
-          className="fixed z-[9999] pointer-events-none"
+          ref={tooltipRef}
+          className="fixed z-[9999] pointer-events-auto"
           style={{ top: position.top, left: position.left }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseEnter={handleOpen}
+          onMouseLeave={handleClose}
         >
-          <div className="relative -translate-x-1/2 -translate-y-full pb-2">
+          <div className="relative -translate-x-1/2 -translate-y-[calc(100%+4px)]">
             <div className="bg-white text-slate-800 text-[10px] leading-relaxed font-medium rounded-xl px-4 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.18)] border border-slate-200/80 max-w-[240px] text-center">
               {content}
             </div>
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.08)]"></div>
+            <div className="absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.08)]"></div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
@@ -353,7 +395,6 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     if (!selectedPaciente || !user) return;
     
     setIsSaving(true);
-    const formData = new FormData(e.currentTarget);
     
     let dataBuscaIso = '';
     if (selectedDate && selectedDate.includes('/')) {
@@ -365,12 +406,12 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       paciente: selectedPaciente.id,
       profissional: user.id,
       data_busca: dataBuscaIso || selectedDate,
-      tipo_busca: formData.get('tipo_busca') || '',
-      tipo_contato: formData.get('tipo_contato') || '',
-      situacao_pos_busca: formData.get('situacao_pos_busca') || '',
-      entraves_identificados: formData.get('entraves_identificados') || '',
-      entraves_informado_por: formData.get('entraves_informado_por') || '', // Novo campo
-      observacoes: formData.get('observacoes') || '',
+      tipo_busca: modalTipoBusca,
+      tipo_contato: modalTipoContato,
+      situacao_pos_busca: modalSituacao,
+      entraves_identificados: modalEntraves.join('; '),
+      entraves_informado_por: modalEntravesInformadoPor,
+      observacoes: modalObservacoes,
     };
 
     try {
@@ -850,101 +891,152 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
               </button>
             </div>
             
-            <div className="overflow-y-auto custom-scrollbar-modal flex-1 p-10">
+            <div className="overflow-y-auto custom-scrollbar-modal flex-1 p-5 sm:p-8 md:p-10">
               <form id="registro-acompanhamento-form" onSubmit={handleSaveFollowUp}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
-                      <Calendar className="w-3.5 h-3.5" /> Data da Busca
-                    </label>
-                    <DatePickerPTBR value={selectedDate} onChange={(val) => setSelectedDate(val)} />
-                    <input type="hidden" name="data_busca" value={selectedDate} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5 sm:gap-y-6">
+                  <div className="space-y-2 group/field">
+                    <DatePickerPTBR 
+                      label="Data da Busca"
+                      value={selectedDate} 
+                      isISO={false}
+                      onChange={(val) => setSelectedDate(val)} 
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
-                      <Search className="w-3.5 h-3.5" /> Tipo de Busca
-                    </label>
-                    <select name="tipo_busca" defaultValue="" required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium p-3.5 outline-none focus:border-primary">
-                      <option value="" disabled>Selecione</option>
-                      <option value="1 - Busca ativa- Visita domiciliar registrada em prontuário">1 - Busca ativa- Visita domiciliar registrada em prontuário</option>
-                      <option value="2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário">2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário</option>
-                      <option value="3 - Busca ativa - Mensagem registrada em prontuário">3 - Busca ativa - Mensagem registrada em prontuário</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
-                      <Phone className="w-3.5 h-3.5" /> Tipo de Contato
-                    </label>
-                    <select name="tipo_contato" defaultValue="" required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium p-3.5 outline-none focus:border-primary">
-                      <option value="" disabled>Selecione</option>
-                      <option value="Contato direto (conversa)">Contato direto (conversa)</option>
-                      <option value="Contato indireto (mensagem)">Contato indireto (mensagem)</option>
-                      <option value="Não houve contato ( não localizada, ligação não atendida...)">Não houve contato ( não localizada, ligação não atendida...)</option>
-                    </select>
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
-                      <Info className="w-3.5 h-3.5" /> Situação Pós Busca
-                    </label>
-                    <select name="situacao_pos_busca" defaultValue="" required className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium p-3.5 outline-none focus:border-primary">
-                      <option value="" disabled>Selecione</option>
-                      <option value="1- Agendamento após contato direto">1- Agendamento após contato direto</option>
-                      <option value="2 - Convite para demanda livre">2 - Convite para demanda livre</option>
-                      <option value="3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP">3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP</option>
-                      <option value="4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP">4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP</option>
-                      <option value="5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP">5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP</option>
-                      <option value="6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP">6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP</option>
-                      <option value="7 - Mudança de território (situação atualizada no PEP)">7 - Mudança de território (situação atualizada no PEP)</option>
-                      <option value="8 - Óbito (situação atualizada no PEP)">8 - Óbito (situação atualizada no PEP)</option>
-                      <option value="9 - Não localizada">9 - Não localizada</option>
-                      <option value="10 - Recusa">10 - Recusa</option>
-                    </select>
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
-                      <AlertTriangle className="w-3.5 h-3.5" /> Entraves Identificados
-                    </label>
-                    <select name="entraves_identificados" className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium p-3.5 outline-none focus:border-primary">
-                      <option value="" disabled selected>Selecione (Opcional)</option>
-                      <option value="1 - Horários incompatíveis com a rotina de trabalho">1 - Horários incompatíveis com a rotina de trabalho</option>
-                      <option value="2 - Vergonha ou constrangimento durante o exame">2 - Vergonha ou constrangimento durante o exame</option>
-                      <option value="3 - Ideia equivocada sobre a necessidade de fazer exame">3 - Ideia equivocada sobre a necessidade de fazer exame</option>
-                      <option value="4 - Faz o rastreamento pela rede privada">4 - Faz o rastreamento pela rede privada</option>
-                      <option value="5 - Dificuldade de locomoção ( ex: acamada)">5 - Dificuldade de locomoção ( ex: acamada)</option>
-                      <option value="6 - Distância da Unidade">6 - Distância da Unidade</option>
-                      <option value="7 - Se recusa a fazer o exame com o profissional da equipe">7 - Se recusa a fazer o exame com o profissional da equipe</option>
-                      <option value="8 - Esquece a data do agendamento">8 - Esquece a data do agendamento</option>
-                      <option value="9 - Indisponibilidade de tempo">9 - Indisponibilidade de tempo</option>
-                      <option value="10 - Não identificado entrave">10 - Não identificado entrave</option>
-                    </select>
-                  </div>
+
+                  {/* Tipo de Busca */}
+                  <SingleSelect 
+                    label="Tipo de Busca"
+                    placeholder="Selecione"
+                    options={[
+                      "1 - Busca ativa- Visita domiciliar registrada em prontuário",
+                      "2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário",
+                      "3 - Busca ativa - Mensagem registrada em prontuário"
+                    ]}
+                    value={modalTipoBusca}
+                    onChange={setModalTipoBusca}
+                    required
+                    icon={<Search className="w-3.5 h-3.5" />}
+                    showSearch={false}
+                  />
+
+                  {/* Tipo de Contato */}
+                  <SingleSelect 
+                    label="Tipo de Contato"
+                    placeholder="Selecione uma modalidade"
+                    options={[
+                      "Contato direto (conversa)",
+                      "Contato indireto (mensagem)",
+                      "Não houve contato ( não localizada, ligação não atendida...)"
+                    ]}
+                    value={modalTipoContato}
+                    onChange={setModalTipoContato}
+                    required
+                    icon={<Phone className="w-3.5 h-3.5" />}
+                    showSearch={false}
+                  />
+
+                  {/* Situação Pós Busca */}
+                  <SingleSelect 
+                    label="Situação Pós Busca Ativa"
+                    placeholder="Selecione o desfecho da busca"
+                    className="col-span-1 md:col-span-2"
+                    options={[
+                      "1- Agendamento após contato direto",
+                      "2 - Convite para demanda livre",
+                      "3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP",
+                      "4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP",
+                      "5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP",
+                      "6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP",
+                      "7 - Mudança de território (situação atualizada no PEP)",
+                      "8 - Óbito (situação atualizada no PEP)",
+                      "9 - Não localizada",
+                      "10 - Recusa"
+                    ]}
+                    value={modalSituacao}
+                    onChange={setModalSituacao}
+                    required
+                    icon={<Info className="w-3.5 h-3.5" />}
+                    showSearch={false}
+                  />
+
+                  {/* Entraves Identificados */}
+                  <MultiSelect 
+                    label="Entraves Identificados"
+                    placeholder="Selecione (Opcional)"
+                    className="col-span-1 md:col-span-2"
+                    options={[
+                      "1 - Horários incompatíveis com a rotina de trabalho",
+                      "2 - Vergonha ou constrangimento durante o exame",
+                      "3 - Ideia equivocada sobre a necessidade de fazer exame",
+                      "4 - Faz o rastreamento pela rede privada",
+                      "5 - Dificuldade de locomoção ( ex: acamada)",
+                      "6 - Distância da Unidade",
+                      "7 - Se recusa a fazer o exame com o profissional da equipe",
+                      "8 - Esquece a data do agendamento",
+                      "9 - Indisponibilidade de tempo",
+                      "10 - Não identificado entrave"
+                    ]}
+                    value={modalEntraves}
+                    onChange={setModalEntraves}
+                    showSearch={false}
+                  />
 
                   {/* Entraves Informado Por */}
-                  <div className="col-span-2 space-y-2">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
-                      <Info className="w-3.5 h-3.5" /> Entrave(s) Informado Por
-                    </label>
-                    <select name="entraves_informado_por" className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium p-3.5 outline-none focus:border-primary">
-                      <option value="" disabled selected>Selecione (Opcional)</option>
-                      <option value="1 - Informado por paciente">1 - Informado por paciente</option>
-                      <option value="2 - Identificado por profissional">2 - Identificado por profissional</option>
-                    </select>
-                  </div>
+                  <SingleSelect 
+                    label="Entrave(s) Informado Por"
+                    placeholder="Selecione (Opcional)"
+                    className="col-span-1 md:col-span-2"
+                    options={[
+                      "1 - Informado por paciente",
+                      "2 - Identificado por profissional"
+                    ]}
+                    value={modalEntravesInformadoPor}
+                    onChange={setModalEntravesInformadoPor}
+                    icon={<Info className="w-3.5 h-3.5" />}
+                    showSearch={false}
+                  />
 
-                  <div className="col-span-2 space-y-2">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
-                      <MessageSquare className="w-3.5 h-3.5" /> Observações
+                  {/* Observações */}
+                  <div className="col-span-1 md:col-span-2 space-y-2 group/field">
+                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
+                      <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </div>
+                      Observações Detalhadas
                     </label>
-                    <textarea name="observacoes" className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium p-4 resize-none outline-none focus:border-primary min-h-[120px]" rows={4}></textarea>
+                    <textarea 
+                      name="observacoes"
+                      value={modalObservacoes}
+                      onChange={(e) => setModalObservacoes(e.target.value)}
+                      className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-4 resize-none transition-all outline-none placeholder:text-outline-variant/60 shadow-sm hover:border-primary/40 min-h-[120px]" 
+                      placeholder="Descreva aqui detalhes relevantes do atendimento..." 
+                      rows={4}
+                    ></textarea>
                   </div>
                 </div>
               </form>
             </div>
               
-            <div className="flex justify-end gap-4 p-6 border-t border-outline-variant/10 bg-surface-container-lowest shrink-0">
-              <button type="button" onClick={handleCloseModal} disabled={isSaving} className="px-8 py-3 rounded-xl text-sm font-bold text-primary hover:bg-primary/5 transition-all disabled:opacity-50">Descartar</button>
-              <button form="registro-acompanhamento-form" type="submit" disabled={isSaving} className="px-10 py-3 rounded-xl text-sm font-black text-white bg-gradient-to-r from-[#1c2e4a] to-[#253c61] shadow-lg transition-all flex items-center gap-2 disabled:opacity-50">
-                {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <CheckCircle2 className="w-4 h-4" />}
+            <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 p-5 sm:p-6 md:px-10 md:py-6 border-t border-outline-variant/10 bg-surface-container-lowest shrink-0 z-10">
+              <button 
+                type="button" 
+                onClick={handleCloseModal}
+                disabled={isSaving}
+                className="px-6 sm:px-8 py-3 rounded-xl text-sm font-bold text-primary hover:bg-primary/5 transition-all border border-transparent hover:border-primary/10 w-full sm:w-auto order-2 sm:order-1 disabled:opacity-50"
+              >
+                Descartar
+              </button>
+              <button 
+                form="registro-acompanhamento-form"
+                type="submit" 
+                disabled={isSaving}
+                className="px-6 sm:px-10 py-3 rounded-xl text-sm font-black text-white bg-gradient-to-r from-[#1c2e4a] to-[#253c61] shadow-[0_10px_20px_rgba(28,46,74,0.3)] hover:shadow-[0_15px_30px_rgba(28,46,74,0.4)] hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 group w-full sm:w-auto order-1 sm:order-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                )}
                 {isSaving ? 'Salvando...' : 'Salvar Registro'}
               </button>
             </div>

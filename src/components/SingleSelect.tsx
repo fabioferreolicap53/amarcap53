@@ -127,8 +127,10 @@ export const SingleSelect: React.FC<SingleSelectProps> = ({
         </label>
       )}
       
-      <div 
+      <button 
+        type="button"
         onClick={handleOpen}
+        disabled={disabled}
         className={`
           h-[56px] w-full px-4 bg-white border border-outline-variant/30 rounded-xl transition-all cursor-pointer flex items-center justify-between
           ${isOpen ? 'ring-2 ring-primary/20 border-primary shadow-md' : 'hover:border-primary/40 shadow-sm'}
@@ -142,6 +144,7 @@ export const SingleSelect: React.FC<SingleSelectProps> = ({
         <div className="flex items-center gap-2">
           {value && !required && !disabled && (
             <button 
+              type="button"
               onClick={clearValue}
               className="p-1 hover:bg-rose-500/10 rounded-lg text-rose-500/40 hover:text-rose-500 transition-colors"
             >

@@ -71,6 +71,7 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       (e.target as HTMLInputElement).blur(); // Fecha teclado no Enter
     }
   };
@@ -198,6 +199,7 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {displayValue && (
             <button 
+              type="button"
               onClick={(e) => { e.stopPropagation(); onChange(''); }}
               className="p-1.5 hover:bg-rose-500/10 rounded-lg text-rose-500/40 hover:text-rose-500 transition-colors"
             >
@@ -205,6 +207,7 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
             </button>
           )}
           <button
+            type="button"
             onClick={(e) => { 
               e.stopPropagation(); 
               const isMobile = window.innerWidth < 1024;
@@ -234,12 +237,14 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
           <div className="bg-white border border-primary/10 rounded-[2rem] shadow-[0px_25px_70px_rgba(0,0,0,0.2)] p-4 sm:p-6 backdrop-blur-xl bg-white/95 ring-1 ring-black/5">
             <div className="flex gap-2 mb-4 sm:mb-6">
               <button 
+                type="button"
                 onClick={() => setQuickDate(0)}
                 className="flex-1 py-2 sm:py-2.5 bg-primary/5 hover:bg-primary text-primary hover:text-white text-[9px] sm:text-[10px] font-black uppercase rounded-xl transition-all border border-primary/10 hover:border-transparent"
               >
                 Hoje
               </button>
               <button 
+                type="button"
                 onClick={() => setQuickDate(null)}
                 className="flex-1 py-2 sm:py-2.5 bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white text-[9px] sm:text-[10px] font-black uppercase rounded-xl transition-all border border-rose-100 hover:border-transparent"
               >
@@ -249,20 +254,21 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
             
             <div className="flex items-center justify-between mb-4 sm:mb-6 px-1">
               <button 
-                onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} 
-                className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-xl transition-all active:scale-90"
+                type="button"
+                onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+                className="p-2 hover:bg-primary/5 rounded-xl text-primary transition-all"
               >
-                <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                <ChevronLeft className="w-5 h-5" />
               </button>
-              <div className="text-center">
-                <span className="text-[11px] sm:text-xs font-black uppercase text-slate-800 tracking-widest block">{months[currentMonth.getMonth()]}</span>
-                <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{currentMonth.getFullYear()}</span>
-              </div>
+              <h4 className="text-xs sm:text-sm font-black text-primary uppercase tracking-widest">
+                {months[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+              </h4>
               <button 
-                onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} 
-                className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-xl transition-all active:scale-90"
+                type="button"
+                onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+                className="p-2 hover:bg-primary/5 rounded-xl text-primary transition-all"
               >
-                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                <ChevronRight className="w-5 h-5" />
               </button>
             </div>
 

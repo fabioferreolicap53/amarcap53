@@ -154,6 +154,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {value.length > 0 && (
             <button 
+              type="button"
               onClick={clearAll}
               className="p-1 hover:bg-rose-500/10 rounded-lg text-rose-500/40 hover:text-rose-500 transition-colors"
             >
