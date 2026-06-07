@@ -682,13 +682,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               </div>
 
               <div className="flex-1 w-full overflow-y-auto no-scrollbar max-h-[500px]">
-                <div className="space-y-4 md:space-y-6">
+                <div className="space-y-4 md:space-y-8">
                 {(isAdmin || user?.role === 'cap') && (
                   <div className="space-y-6">
-                    <p className="text-xs font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-2">Top Unidades</p>
+                    <p className="text-[10px] font-black text-primary/40 uppercase tracking-[0.2em] border-b border-primary/5 pb-2">Ranking de Unidades</p>
                     {Object.entries(acompStats.unidadeBreakdown)
                       .sort((a, b) => (b[1] as number) - (a[1] as number))
-                      .slice(0, 5)
+                      .slice(0, 10)
                       .map(([label, val]) => (
                         <SimpleProgressBar 
                           key={label}
@@ -696,6 +696,42 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                           value={val} 
                           total={stats.totalPacientes} 
                           color="bg-primary" 
+                        />
+                      ))}
+                  </div>
+                )}
+
+                {(isAdmin || user?.role === 'cap' || user?.role === 'unidade') && (
+                  <div className="space-y-6">
+                    <p className="text-[10px] font-black text-blue-500/40 uppercase tracking-[0.2em] border-b border-blue-500/5 pb-2">Ranking de Equipes</p>
+                    {Object.entries(acompStats.equipeBreakdown)
+                      .sort((a, b) => (b[1] as number) - (a[1] as number))
+                      .slice(0, 10)
+                      .map(([label, val]) => (
+                        <SimpleProgressBar 
+                          key={label}
+                          label={label} 
+                          value={val} 
+                          total={stats.totalPacientes} 
+                          color="bg-blue-500" 
+                        />
+                      ))}
+                  </div>
+                )}
+
+                {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
+                  <div className="space-y-6">
+                    <p className="text-[10px] font-black text-emerald-500/40 uppercase tracking-[0.2em] border-b border-emerald-500/5 pb-2">Ranking de Microáreas</p>
+                    {Object.entries(acompStats.microareaBreakdown)
+                      .sort((a, b) => (b[1] as number) - (a[1] as number))
+                      .slice(0, 10)
+                      .map(([label, val]) => (
+                        <SimpleProgressBar 
+                          key={label}
+                          label={`Microárea ${label}`} 
+                          value={val} 
+                          total={stats.totalPacientes} 
+                          color="bg-emerald-500" 
                         />
                       ))}
                   </div>
