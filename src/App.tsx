@@ -11,6 +11,7 @@ import { FollowUpsScreen } from './screens/FollowUpsScreen';
 import { FavoritesScreen } from './screens/FavoritesScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
+import { InstallBanner } from './components/InstallBanner';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthScreen } from './screens/AuthScreen';
@@ -71,6 +72,7 @@ function AppContent() {
         {activeTab === 'acompanhamento' && <FollowUpsScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
         {activeTab === 'configuracoes' && <SettingsScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
       </main>
+      <InstallBanner />
     </div>
   );
 }
