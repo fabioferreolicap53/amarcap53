@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
 import { ScrollIndicator } from '../components/ScrollIndicator';
+import { Footer } from '../components/Footer';
 import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
@@ -1185,6 +1186,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
               </div>
             </div>
           )}
+          <Footer />
         </div>
       </div>
 

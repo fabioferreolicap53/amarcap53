@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from '../components/Header';
 import { ScrollIndicator } from '../components/ScrollIndicator';
+import { Footer } from '../components/Footer';
 import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2, RotateCcw, Users, MapPin } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
@@ -779,6 +780,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
               </table>
             </div>
           </div>
+          <Footer />
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 {
-  "name": "AMAR Saúde - Ecossistema de Saúde",
-  "short_name": "AMAR Saúde",
-  "description": "Sistema de acompanhamento e rastreamento de saúde",
+  "name": "AMAR - SISTEMA DE RASTREIO",
+  "short_name": "AMAR RASTREIO",
+  "description": "AMAR - SISTEMA DE RASTREIO - Acompanhamento e rastreamento de saúde",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#051934",

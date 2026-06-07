@@ -16,6 +16,7 @@ import {
 import { Header } from '../components/Header';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { MultiSelect } from '../components/MultiSelect';
+import { Footer } from '../components/Footer';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
@@ -873,6 +874,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               </div>
             </div>
           </div>
+          <Footer />
         </div>
       </div>
     </div>
