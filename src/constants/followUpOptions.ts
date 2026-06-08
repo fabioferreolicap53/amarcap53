@@ -168,12 +168,16 @@ export const ENTRAVES_INFORMADO_POR_OPTIONS: SelectOption[] = [
   }
 ];
 
-const normalizeOptionText = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+const normalizeOptionText = (value: string) => {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+};
 
 const escapeFilterValue = (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
-export const getCanonicalSelectValue = (value: string | undefined, options: SelectOption[]) => {
-  if (!value) return '';
+export const getCanonicalSelectValue = (value: string | string[] | undefined, options: SelectOption[]) => {
+  if (!value || (Array.isArray(value) && value.length === 0)) return '';
+  if (Array.isArray(value)) return value.map(v => getCanonicalSelectValue(v, options)).filter(Boolean).join('; ');
 
   const normalizedValue = normalizeOptionText(value);
   const matchedOption = options.find(option =>
@@ -185,8 +189,9 @@ export const getCanonicalSelectValue = (value: string | undefined, options: Sele
   return matchedOption?.value || value;
 };
 
-export const getSelectLabel = (value: string | undefined, options: SelectOption[]) => {
-  if (!value) return '';
+export const getSelectLabel = (value: string | string[] | undefined, options: SelectOption[]) => {
+  if (!value || (Array.isArray(value) && value.length === 0)) return '';
+  if (Array.isArray(value)) return value.map(v => getSelectLabel(v, options)).filter(Boolean).join('; ');
 
   const normalizedValue = normalizeOptionText(value);
   const matchedOption = options.find(option =>
@@ -240,7 +245,7 @@ export const buildSelectFilter = (
   return clauses.length > 0 ? `(${Array.from(new Set(clauses)).join(' || ')})` : '';
 };
 
-export const getCanonicalValue = (fieldName: string, value: string | undefined): string => {
+export const getCanonicalValue = (fieldName: string, value: string | string[] | undefined): string => {
   if (!value) return '';
   switch (fieldName) {
     case 'tipo_busca': return getCanonicalSelectValue(value, TIPO_BUSCA_OPTIONS);
@@ -248,6 +253,6 @@ export const getCanonicalValue = (fieldName: string, value: string | undefined):
     case 'situacao_pos_busca': return getCanonicalSelectValue(value, SITUACAO_POS_BUSCA_OPTIONS);
     case 'entraves_informado_por': return getCanonicalSelectValue(value, ENTRAVES_INFORMADO_POR_OPTIONS);
     case 'entraves_identificados': return getCanonicalSelectValue(value, ENTRAVES_IDENTIFICADOS_OPTIONS);
-    default: return value;
+    default: return Array.isArray(value) ? value.join('; ') : value;
   }
 };

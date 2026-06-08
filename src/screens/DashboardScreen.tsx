@@ -456,10 +456,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           }
           
           // Filtrar entraves reais (ignorar "0- Nenhum" ou similares)
-          if (r.entraves_identificados && !r.entraves_identificados.startsWith('0')) {
-            const val = r.entraves_identificados;
-            aStats.entraves[val] = (aStats.entraves[val] || 0) + 1;
-          }
+          const entravesList = Array.isArray(r.entraves_identificados)
+            ? r.entraves_identificados
+            : r.entraves_identificados ? [r.entraves_identificados] : [];
+          entravesList.forEach(val => {
+            const cleanVal = val.replace(/^\d+\s*-\s*/, '');
+            if (cleanVal) {
+              aStats.entraves[cleanVal] = (aStats.entraves[cleanVal] || 0) + 1;
+            }
+          });
 
           const date = toValidDate(r.data_busca) || toValidDate(r.created);
           if (!date) return;

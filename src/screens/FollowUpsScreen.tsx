@@ -37,7 +37,7 @@ interface Acompanhamento {
   tipo_busca?: string;
   tipo_contato?: string;
   situacao_pos_busca?: string;
-  entraves_identificados?: string;
+  entraves_identificados?: string | string[];
   entraves_informado_por?: string; // Novo campo
   observacoes?: string;
   profissional: string; // ID do profissional
@@ -48,12 +48,12 @@ interface FollowUpsScreenProps {
   setActiveTab: (tab: string) => void;
 }
 
-const matchesMultiValueField = (rawValue: string | undefined, selectedValues: string[]) => {
+const matchesMultiValueField = (rawValue: string | string[] | undefined, selectedValues: string[]) => {
   if (selectedValues.length === 0) return true;
-  if (!rawValue) return false;
+  if (!rawValue || (Array.isArray(rawValue) && rawValue.length === 0)) return false;
 
-  const values = rawValue.split(';').map(value => value.trim()).filter(Boolean);
-  return selectedValues.some(value => values.includes(value));
+  const values = Array.isArray(rawValue) ? rawValue : rawValue.split('; ');
+  return values.some(v => selectedValues.includes(v));
 };
 
 export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, setActiveTab }) => {
@@ -767,10 +767,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                                   <Phone className="w-3.5 h-3.5" />
                                   {acomp.tipo_contato || '--'}
                                 </span>
-                                {acomp.entraves_identificados && (
+                                {acomp.entraves_identificados && acomp.entraves_identificados.length > 0 && (
                                   <span className="inline-flex items-center gap-1 text-[9px] font-bold text-rose-500 uppercase tracking-tighter bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100">
                                     <AlertTriangle className="w-3 h-3" />
-                                    {acomp.entraves_identificados}
+                                    {Array.isArray(acomp.entraves_identificados) ? acomp.entraves_identificados.join('; ') : acomp.entraves_identificados}
                                   </span>
                                 )}
                               </div>
