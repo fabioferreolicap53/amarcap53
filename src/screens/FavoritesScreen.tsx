@@ -255,13 +255,16 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
   const [modalEntravesInformadoPor, setModalEntravesInformadoPor] = useState('');
   const [modalObservacoes, setModalObservacoes] = useState('');
 
-  const [favorites, setFavorites] = useState<string[]>(() => {
-    const saved = localStorage.getItem('amarcap53_favorites');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [favorites, setFavorites] = useState<string[]>(user?.favoritos || []);
+
+  // Sincroniza estado local com o usuário do AuthContext (que vem do PocketBase)
+  useEffect(() => {
+    if (user?.favoritos) {
+      setFavorites(user.favoritos);
+    }
+  }, [user?.favoritos]);
 
   useEffect(() => {
-    localStorage.setItem('amarcap53_favorites', JSON.stringify(favorites));
     fetchFavorites();
   }, [favorites]);
 
@@ -293,8 +296,25 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     };
   }, []);
 
-  const toggleFavorite = (id: string) => {
-    setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
+  const toggleFavorite = async (id: string) => {
+    if (!user) return;
+    
+    const newFavorites = favorites.includes(id) 
+      ? favorites.filter(f => f !== id) 
+      : [...favorites, id];
+    
+    // Atualização otimista
+    setFavorites(newFavorites);
+    
+    try {
+      await pb.collection('users').update(user.id, {
+        favoritos: newFavorites
+      });
+    } catch (error) {
+      console.error("Erro ao sincronizar favoritos:", error);
+      // Reverter em caso de erro
+      setFavorites(user.favoritos || []);
+    }
   };
 
   const determinarAlerta = (p: any) => {

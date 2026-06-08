@@ -8,6 +8,7 @@ interface UserRecord extends RecordModel {
   equipe: string;
   microarea: string;
   role: 'cap' | 'unidade' | 'equipe' | 'microarea' | 'admin' | 'user';
+  favoritos?: string[];
 }
 
 interface AuthContextType {
@@ -40,10 +41,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAdmin(userModel?.role === 'admin' || userModel?.role === 'cap');
     });
 
+    // Inscrição em tempo real para o registro do usuário logado
+    let userUnsubscribe: (() => void) | undefined;
+    
+    if (pb.authStore.model?.id) {
+      pb.collection('users').subscribe(pb.authStore.model.id, (e) => {
+        if (e.action === 'update') {
+          const updatedUser = e.record as UserRecord;
+          setUser(updatedUser);
+        }
+      }).then(unsub => {
+        userUnsubscribe = unsub;
+      });
+    }
+
     setIsLoading(false);
 
     return () => {
       unsubscribe();
+      if (userUnsubscribe) userUnsubscribe();
     };
   }, []);
 
