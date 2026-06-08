@@ -16,6 +16,7 @@ interface MultiSelectProps {
   className?: string;
   disabled?: boolean;
   showSearch?: boolean;
+  required?: boolean;
 }
 
 export const MultiSelect: React.FC<MultiSelectProps> = ({
@@ -26,7 +27,8 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
   placeholder = "Selecionar...",
   className = "",
   disabled = false,
-  showSearch = true
+  showSearch = true,
+  required = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -118,6 +120,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       {label && (
         <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest ml-1">
           {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
       

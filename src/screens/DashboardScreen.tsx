@@ -20,6 +20,7 @@ import { Footer } from '../components/Footer';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
+import { getCanonicalValue } from '../constants/followUpOptions';
 
 ChartJS.register(
   CategoryScale,
@@ -393,8 +394,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
         const aStats = {
           total: acompRecords.length,
-          sucesso: acompRecords.filter(r => r.situacao_pos_busca && r.situacao_pos_busca.includes('1- Agendamento')).length,
-          contatos: acompRecords.filter(r => r.tipo_contato && !r.tipo_contato.includes('Não houve contato')).length,
+          sucesso: acompRecords.filter(r => {
+            const canonical = getCanonicalValue('situacao_pos_busca', r.situacao_pos_busca || '');
+            return canonical && canonical.includes('1 -');
+          }).length,
+          contatos: acompRecords.filter(r => {
+            const canonical = getCanonicalValue('tipo_contato', r.tipo_contato || '');
+            return canonical && !canonical.includes('3 -');
+          }).length,
           tipoBusca: {} as Record<string, number>,
           situacao: {} as Record<string, number>,
           entraves: {} as Record<string, number>,
@@ -407,11 +414,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         acompRecords.forEach(r => {
           const metodo = getAcompanhamentoMetodo(r);
           if (metodo) aStats.tipoBusca[metodo] = (aStats.tipoBusca[metodo] || 0) + 1;
-          if (r.situacao_pos_busca) aStats.situacao[r.situacao_pos_busca] = (aStats.situacao[r.situacao_pos_busca] || 0) + 1;
+          
+          const canonicalSituacao = getCanonicalValue('situacao_pos_busca', r.situacao_pos_busca || '');
+          if (canonicalSituacao) {
+            aStats.situacao[canonicalSituacao] = (aStats.situacao[canonicalSituacao] || 0) + 1;
+          }
           
           // Filtrar entraves reais (ignorar "0- Nenhum" ou similares)
           if (r.entraves_identificados && !r.entraves_identificados.startsWith('0')) {
-            aStats.entraves[r.entraves_identificados] = (aStats.entraves[r.entraves_identificados] || 0) + 1;
+            const val = r.entraves_identificados;
+            aStats.entraves[val] = (aStats.entraves[val] || 0) + 1;
           }
 
           const date = toValidDate(r.data_busca) || toValidDate(r.created);

@@ -9,7 +9,17 @@ import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { MultiSelect } from '../components/MultiSelect';
 import { SingleSelect } from '../components/SingleSelect';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
-import { TIPO_BUSCA_OPTIONS, TIPO_CONTATO_OPTIONS, SITUACAO_POS_BUSCA_OPTIONS, ENTRAVES_IDENTIFICADOS_OPTIONS, ENTRAVES_INFORMADO_POR_OPTIONS } from '../constants/followUpOptions';
+import {
+  TIPO_BUSCA_OPTIONS,
+  TIPO_CONTATO_OPTIONS,
+  SITUACAO_POS_BUSCA_OPTIONS,
+  ENTRAVES_IDENTIFICADOS_OPTIONS,
+  ENTRAVES_INFORMADO_POR_OPTIONS,
+  buildSelectFilter,
+  getCanonicalSelectValue,
+  matchesSelectFilter,
+  getCanonicalValue
+} from '../constants/followUpOptions';
 
 interface Acompanhamento {
   id: string;
@@ -36,6 +46,14 @@ interface FollowUpsScreenProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
+
+const matchesMultiValueField = (rawValue: string | undefined, selectedValues: string[]) => {
+  if (selectedValues.length === 0) return true;
+  if (!rawValue) return false;
+
+  const values = rawValue.split(';').map(value => value.trim()).filter(Boolean);
+  return selectedValues.some(value => values.includes(value));
+};
 
 export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, setActiveTab }) => {
   const { user, isAdmin } = useAuth();
@@ -77,21 +95,32 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const normalizeCanalLabel = (value?: string) => value || '';
 
   const getCanalLabel = (acomp: Acompanhamento) => {
-    const contato = acomp.tipo_contato || '';
-    if (contato.toLowerCase().includes('mensagem')) return 'Mensagem';
-    if (contato.toLowerCase().includes('direto')) return 'Contato Direto';
-    if (contato.toLowerCase().includes('indireto')) return 'Contato Indireto';
-    if (contato.toLowerCase().includes('não houve contato')) return 'Sem Contato';
+    const canonical = getCanonicalValue('tipo_contato', acomp.tipo_contato || '');
+    
+    if (canonical.includes('3 -')) return 'Sem Contato';
+    if (canonical.includes('1 -')) return 'Contato Direto';
+    if (canonical.includes('2 -')) return 'Contato Indireto';
 
-    return normalizeCanalLabel(acomp.tipo_contato);
+    return acomp.tipo_contato || '';
   };
 
   // Estatísticas Calculadas com useMemo para persistência e performance
   const stats = useMemo(() => {
     const total = acompanhamentos.length;
-    const contatos = acompanhamentos.filter(a => a.tipo_contato && !a.tipo_contato.includes('Não houve contato')).length;
-    const falhas = acompanhamentos.filter(a => a.tipo_contato && a.tipo_contato.includes('Não houve contato')).length;
-    const agendamentos = acompanhamentos.filter(a => a.situacao_pos_busca && a.situacao_pos_busca.includes('1- Agendamento')).length;
+    const contatos = acompanhamentos.filter(a => {
+      const canonical = getCanonicalValue('tipo_contato', a.tipo_contato || '');
+      return canonical && !canonical.includes('3 -');
+    }).length;
+    
+    const falhas = acompanhamentos.filter(a => {
+      const canonical = getCanonicalValue('tipo_contato', a.tipo_contato || '');
+      return canonical && canonical.includes('3 -');
+    }).length;
+    
+    const agendamentos = acompanhamentos.filter(a => {
+      const canonical = getCanonicalValue('situacao_pos_busca', a.situacao_pos_busca || '');
+      return canonical && canonical.includes('1 -');
+    }).length;
     
     const counts: Record<string, number> = {};
     const totalCounts: Record<string, number> = {};
@@ -103,7 +132,8 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
     validAcomps.forEach(a => {
       totalCounts[a.canal_label] = (totalCounts[a.canal_label] || 0) + 1;
-      if (a.situacao_pos_busca?.includes('1-') || a.situacao_pos_busca?.includes('Agendamento')) {
+      const canonicalSituacao = getCanonicalValue('situacao_pos_busca', a.situacao_pos_busca || '');
+      if (canonicalSituacao.includes('1 -')) {
         counts[a.canal_label] = (counts[a.canal_label] || 0) + 1;
       }
     });
@@ -165,16 +195,16 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
         // Outros Filtros UI
         if (filterTipoBusca.length > 0) {
-          acompFilters.push(`(${filterTipoBusca.map(v => `tipo_busca = "${v}"`).join(' || ')})`);
+          acompFilters.push(buildSelectFilter('tipo_busca', filterTipoBusca, TIPO_BUSCA_OPTIONS));
         }
         if (filterTipoContato.length > 0) {
-          acompFilters.push(`(${filterTipoContato.map(v => `tipo_contato = "${v}"`).join(' || ')})`);
+          acompFilters.push(buildSelectFilter('tipo_contato', filterTipoContato, TIPO_CONTATO_OPTIONS));
         }
         if (filterSituacao.length > 0) {
-          acompFilters.push(`(${filterSituacao.map(v => `situacao_pos_busca = "${v}"`).join(' || ')})`);
+          acompFilters.push(buildSelectFilter('situacao_pos_busca', filterSituacao, SITUACAO_POS_BUSCA_OPTIONS));
         }
         if (filterEntraves.length > 0) {
-          acompFilters.push(`(${filterEntraves.map(v => `entraves_identificados = "${v}"`).join(' || ')})`);
+          acompFilters.push(`(${filterEntraves.map(v => `entraves_identificados ~ "${v}"`).join(' || ')})`);
         }
 
         if (filterDataInicio) {
@@ -232,10 +262,13 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       setSelectedAcompanhamento({
         ...acompToEdit,
         data_busca_formatada: dataBuscaFormatada,
+        tipo_busca: getCanonicalSelectValue(acompToEdit.tipo_busca, TIPO_BUSCA_OPTIONS),
+        tipo_contato: getCanonicalSelectValue(acompToEdit.tipo_contato, TIPO_CONTATO_OPTIONS),
+        situacao_pos_busca: getCanonicalSelectValue(acompToEdit.situacao_pos_busca, SITUACAO_POS_BUSCA_OPTIONS),
         entraves_identificados: acompToEdit.entraves_identificados 
           ? acompToEdit.entraves_identificados.split('; ') 
           : [],
-        entraves_informado_por: acompToEdit.entraves_informado_por
+        entraves_informado_por: getCanonicalSelectValue(acompToEdit.entraves_informado_por, ENTRAVES_INFORMADO_POR_OPTIONS)
       });
       setIsEditModalOpen(true);
     }
@@ -250,24 +283,30 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     e.preventDefault();
     if (!selectedAcompanhamento) return;
     
+    // Validação de entraves obrigatórios se informado por preenchido
+    if (selectedAcompanhamento.entraves_informado_por && (!selectedAcompanhamento.entraves_identificados || selectedAcompanhamento.entraves_identificados.length === 0)) {
+      alert('Por favor, selecione ao menos um entrave identificado.');
+      return;
+    }
+
     setIsSaving(true);
     
     const rawDate = selectedAcompanhamento.data_busca_formatada;
     let dataBuscaIso = '';
     if (rawDate && rawDate.includes('/')) {
       const [d, m, y] = rawDate.split('/');
-      dataBuscaIso = `${y}-${m}-${d} 12:00:00`;
+      dataBuscaIso = `${y}-${m}-${d}`; // Formato YYYY-MM-DD
     }
 
     const data = {
-      tipo_busca: selectedAcompanhamento.tipo_busca || '',
+      tipo_busca: getCanonicalSelectValue(selectedAcompanhamento.tipo_busca, TIPO_BUSCA_OPTIONS),
       data_busca: dataBuscaIso || rawDate,
-      tipo_contato: selectedAcompanhamento.tipo_contato || '',
-      situacao_pos_busca: selectedAcompanhamento.situacao_pos_busca || '',
+      tipo_contato: getCanonicalSelectValue(selectedAcompanhamento.tipo_contato, TIPO_CONTATO_OPTIONS),
+      situacao_pos_busca: getCanonicalSelectValue(selectedAcompanhamento.situacao_pos_busca, SITUACAO_POS_BUSCA_OPTIONS),
       entraves_identificados: Array.isArray(selectedAcompanhamento.entraves_identificados) 
-        ? selectedAcompanhamento.entraves_identificados.join('; ') 
+        ? selectedAcompanhamento.entraves_identificados.filter(v => v).join('; ') 
         : selectedAcompanhamento.entraves_identificados || '',
-      entraves_informado_por: selectedAcompanhamento.entraves_informado_por || '',
+      entraves_informado_por: getCanonicalSelectValue(selectedAcompanhamento.entraves_informado_por, ENTRAVES_INFORMADO_POR_OPTIONS),
       observacoes: selectedAcompanhamento.observacoes || '',
     };
 
@@ -284,9 +323,22 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       
       alert('Acompanhamento atualizado com sucesso!');
       handleCloseModal();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao atualizar acompanhamento:', error);
-      alert('Erro ao atualizar o registro.');
+      const pbError = error.data?.data;
+      let errorMsg = 'Erro ao atualizar o registro.';
+      
+      if (pbError) {
+        const fields = Object.keys(pbError).map(k => {
+          const fieldError = pbError[k];
+          return `${k}: ${fieldError.message || JSON.stringify(fieldError)}`;
+        }).join('\n');
+        errorMsg += `\n\nCampos com problema:\n${fields}`;
+      } else if (error.message) {
+        errorMsg += `\n\nDetalhes: ${error.message}`;
+      }
+      
+      alert(errorMsg);
     } finally {
       setIsSaving(false);
     }
@@ -642,10 +694,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                         const date = acomp.data_busca ? new Date(acomp.data_busca).toLocaleDateString('pt-BR').toLowerCase() : '';
                         
                         const matchesSearch = patientName.includes(search) || cns.includes(search) || date.includes(search);
-                        const matchesTipoBusca = filterTipoBusca.length === 0 || (acomp.tipo_busca && filterTipoBusca.includes(acomp.tipo_busca));
-                        const matchesTipoContato = filterTipoContato.length === 0 || (acomp.tipo_contato && filterTipoContato.includes(acomp.tipo_contato));
-                        const matchesSituacao = filterSituacao.length === 0 || (acomp.situacao_pos_busca && filterSituacao.includes(acomp.situacao_pos_busca));
-                        const matchesEntraves = filterEntraves.length === 0 || (acomp.entraves_identificados && filterEntraves.includes(acomp.entraves_identificados));
+                        const matchesTipoBusca = matchesSelectFilter(acomp.tipo_busca, filterTipoBusca, TIPO_BUSCA_OPTIONS);
+                        const matchesTipoContato = matchesSelectFilter(acomp.tipo_contato, filterTipoContato, TIPO_CONTATO_OPTIONS);
+                        const matchesSituacao = matchesSelectFilter(acomp.situacao_pos_busca, filterSituacao, SITUACAO_POS_BUSCA_OPTIONS);
+                        const matchesEntraves = matchesMultiValueField(acomp.entraves_identificados, filterEntraves);
                         
                         // Filtro de Data
                         let matchesData = true;
@@ -846,6 +898,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_identificados: val})}
                     showSearch={false}
                     disabled={!selectedAcompanhamento.entraves_informado_por}
+                    required={!!selectedAcompanhamento.entraves_informado_por}
                   />
 
                   {/* Observações */}

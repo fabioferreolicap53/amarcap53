@@ -6,10 +6,18 @@ import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, Messa
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
-import { SingleSelect } from '../components/SingleSelect';
 import { MultiSelect } from '../components/MultiSelect';
+import { SingleSelect } from '../components/SingleSelect';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
-import { TIPO_BUSCA_OPTIONS, TIPO_CONTATO_OPTIONS, SITUACAO_POS_BUSCA_OPTIONS, ENTRAVES_IDENTIFICADOS_OPTIONS, ENTRAVES_INFORMADO_POR_OPTIONS } from '../constants/followUpOptions';
+import {
+  TIPO_BUSCA_OPTIONS,
+  TIPO_CONTATO_OPTIONS,
+  SITUACAO_POS_BUSCA_OPTIONS,
+  ENTRAVES_IDENTIFICADOS_OPTIONS,
+  ENTRAVES_INFORMADO_POR_OPTIONS,
+  getCanonicalSelectValue,
+  matchesSelectFilter
+} from '../constants/followUpOptions';
 
 interface Paciente {
   id: string;
@@ -37,6 +45,14 @@ interface FavoritesScreenProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
+
+const matchesMultiValueField = (rawValue: string | undefined, selectedValues: string[]) => {
+  if (selectedValues.length === 0) return true;
+  if (!rawValue) return false;
+
+  const values = rawValue.split(';').map(value => value.trim()).filter(Boolean);
+  return selectedValues.some(value => values.includes(value));
+};
 
 const InfoTooltip: React.FC<{ content: string }> = ({ content }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -463,10 +479,10 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     const matchesMicroarea = filterMicroarea.length === 0 || filterMicroarea.includes(String(p.microarea));
 
     // Filtros de acompanhamento (baseados no último registro)
-    const matchesTipoBusca = filterTipoBusca.length === 0 || filterTipoBusca.includes(p.lastAcomp?.tipo_busca || '');
-    const matchesTipoContato = filterTipoContato.length === 0 || filterTipoContato.includes(p.lastAcomp?.tipo_contato || '');
-    const matchesSituacao = filterSituacao.length === 0 || filterSituacao.includes(p.lastAcomp?.situacao_pos_busca || '');
-    const matchesEntraves = filterEntraves.length === 0 || filterEntraves.includes(p.lastAcomp?.entraves_identificados || '');
+    const matchesTipoBusca = matchesSelectFilter(p.lastAcomp?.tipo_busca, filterTipoBusca, TIPO_BUSCA_OPTIONS);
+    const matchesTipoContato = matchesSelectFilter(p.lastAcomp?.tipo_contato, filterTipoContato, TIPO_CONTATO_OPTIONS);
+    const matchesSituacao = matchesSelectFilter(p.lastAcomp?.situacao_pos_busca, filterSituacao, SITUACAO_POS_BUSCA_OPTIONS);
+    const matchesEntraves = matchesMultiValueField(p.lastAcomp?.entraves_identificados, filterEntraves);
 
     // Filtro de Data (baseado no último registro)
     let matchesData = true;
@@ -524,25 +540,31 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     e.preventDefault();
     if (!selectedPaciente || !user) return;
     
+    // Validação de entraves obrigatórios se informado por preenchido
+    if (modalEntravesInformadoPor && (!modalEntraves || modalEntraves.length === 0)) {
+      alert('Por favor, selecione ao menos um entrave identificado.');
+      return;
+    }
+
     setIsSaving(true);
     
     let dataBuscaIso = '';
     if (selectedDate && selectedDate.includes('/')) {
       const [d, m, y] = selectedDate.split('/');
-      dataBuscaIso = `${y}-${m}-${d} 12:00:00`;
+      dataBuscaIso = `${y}-${m}-${d}`; // Formato YYYY-MM-DD
     }
 
     const data = {
       paciente: selectedPaciente.id,
       profissional: user.id,
       data_busca: dataBuscaIso || selectedDate,
-      tipo_busca: modalTipoBusca,
-      tipo_contato: modalTipoContato,
-      situacao_pos_busca: modalSituacao,
+      tipo_busca: getCanonicalSelectValue(modalTipoBusca, TIPO_BUSCA_OPTIONS),
+      tipo_contato: getCanonicalSelectValue(modalTipoContato, TIPO_CONTATO_OPTIONS),
+      situacao_pos_busca: getCanonicalSelectValue(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS),
       entraves_identificados: Array.isArray(modalEntraves) 
-        ? modalEntraves.join('; ') 
+        ? modalEntraves.filter(v => v).join('; ') 
         : modalEntraves || '',
-      entraves_informado_por: modalEntravesInformadoPor,
+      entraves_informado_por: getCanonicalSelectValue(modalEntravesInformadoPor, ENTRAVES_INFORMADO_POR_OPTIONS),
       observacoes: modalObservacoes,
     };
 
@@ -555,10 +577,17 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       console.error('Erro ao salvar acompanhamento:', error);
       const pbError = error.data?.data;
       let errorMsg = 'Erro ao salvar o acompanhamento.';
+      
       if (pbError) {
-        const fields = Object.keys(pbError).map(k => `${k}: ${pbError[k].message}`).join('\n');
+        const fields = Object.keys(pbError).map(k => {
+          const fieldError = pbError[k];
+          return `${k}: ${fieldError.message || JSON.stringify(fieldError)}`;
+        }).join('\n');
         errorMsg += `\n\nCampos com problema:\n${fields}`;
+      } else if (error.message) {
+        errorMsg += `\n\nDetalhes: ${error.message}`;
       }
+      
       alert(errorMsg);
     } finally {
       setIsSaving(false);
@@ -744,11 +773,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                     <MultiSelect 
                       label="Tipo de Busca (Acomp.)"
                       placeholder="Todos os Tipos"
-                      options={[
-                        "1 - Busca ativa- Visita domiciliar registrada em prontuário",
-                        "2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário",
-                        "3 - Busca ativa - Mensagem registrada em prontuário"
-                      ]}
+                      options={TIPO_BUSCA_OPTIONS}
                       value={filterTipoBusca}
                       onChange={setFilterTipoBusca}
                     />
@@ -759,11 +784,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                     <MultiSelect 
                       label="Tipo de Contato (Acomp.)"
                       placeholder="Todos os Contatos"
-                      options={[
-                        "Contato direto (conversa)",
-                        "Contato indireto (mensagem)",
-                        "Não houve contato ( não localizada, ligação não atendida...)"
-                      ]}
+                      options={TIPO_CONTATO_OPTIONS}
                       value={filterTipoContato}
                       onChange={setFilterTipoContato}
                     />
@@ -774,18 +795,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                     <MultiSelect 
                       label="Situação Pós Busca (Acomp.)"
                       placeholder="Todas as Situações"
-                      options={[
-                        "1- Agendamento após contato direto",
-                        "2 - Convite para demanda livre",
-                        "3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP",
-                        "4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP",
-                        "5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP",
-                        "6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP",
-                        "7 - Mudança de território (situação atualizada no PEP)",
-                        "8 - Óbito (situação atualizada no PEP)",
-                        "9 - Não localizada",
-                        "10 - Recusa"
-                      ]}
+                      options={SITUACAO_POS_BUSCA_OPTIONS}
                       value={filterSituacao}
                       onChange={setFilterSituacao}
                     />
@@ -796,18 +806,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                     <MultiSelect 
                       label="Entraves (Acomp.)"
                       placeholder="Todos os Entraves"
-                      options={[
-                        "1 - Horários incompatíveis com a rotina de trabalho",
-                        "2 - Vergonha ou constrangimento durante o exame",
-                        "3 - Ideia equivocada sobre a necessidade de fazer exame",
-                        "4 - Faz o rastreamento pela rede privada",
-                        "5 - Dificuldade de locomoção ( ex: acamada)",
-                        "6 - Distância da Unidade",
-                        "7 - Se recusa a fazer o exame com o profissional da equipe",
-                        "8 - Esquece a data do agendamento",
-                        "9 - Indisponibilidade de tempo",
-                        "10 - Não identificado entrave"
-                      ]}
+                      options={ENTRAVES_IDENTIFICADOS_OPTIONS}
                       value={filterEntraves}
                       onChange={setFilterEntraves}
                     />
@@ -1058,7 +1057,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                     showSearch={false}
                   />
 
-                  {/* Situação Pós Busca */}
+                  {/* Situação Pós Busca Ativa */}
                   <SingleSelect 
                     label="Situação Pós Busca Ativa"
                     placeholder="Selecione o desfecho da busca"
@@ -1081,6 +1080,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                     onChange={setModalEntraves}
                     showSearch={false}
                     disabled={!modalEntravesInformadoPor}
+                    required={!!modalEntravesInformadoPor}
                   />
 
                   {/* Observações */}
