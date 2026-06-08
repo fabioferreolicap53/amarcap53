@@ -253,6 +253,15 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     setFavorites(user?.favoritos || []);
   }, [user?.favoritos]);
 
+  useEffect(() => {
+    setPacientes(prev =>
+      prev.map(paciente => ({
+        ...paciente,
+        isFavorite: favorites.includes(paciente.id),
+      }))
+    );
+  }, [favorites]);
+
   const toggleFavorite = async (id: string) => {
     if (!user?.id) return;
 
@@ -662,7 +671,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     };
 
     fetchPacientes();
-  }, [user, currentPage, isAdmin, searchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea]);
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, searchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea]);
 
   const resetFilters = () => {
     setSearchTerm('');
