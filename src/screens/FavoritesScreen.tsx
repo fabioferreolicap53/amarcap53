@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
-import { ScrollIndicator } from '../components/ScrollIndicator';
 import { Footer } from '../components/Footer';
 import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -30,6 +29,8 @@ interface Paciente {
   total_acompanhamentos?: number;
   isFavorite?: boolean;
 }
+
+const CITO_LAB_SYNC_EVENT = 'amarcap53:cito-laboratorio-updated';
 
 interface FavoritesScreenProps {
   activeTab: string;
@@ -264,6 +265,34 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     fetchFavorites();
   }, [favorites]);
 
+  useEffect(() => {
+    const handleCitoUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ patientId: string; displayDate: string; source?: string }>;
+      if (!customEvent.detail?.patientId || customEvent.detail.source === 'favorites') return;
+      applyCitoLaboratorioUpdate(customEvent.detail.patientId, customEvent.detail.displayDate || '--');
+    };
+
+    const handleStorageSync = (event: StorageEvent) => {
+      if (event.key !== 'amarcap53_cito_laboratorio_sync' || !event.newValue) return;
+
+      try {
+        const payload = JSON.parse(event.newValue) as { patientId: string; displayDate: string; source?: string };
+        if (!payload.patientId || payload.source === 'favorites') return;
+        applyCitoLaboratorioUpdate(payload.patientId, payload.displayDate || '--');
+      } catch (error) {
+        console.error('Erro ao sincronizar DNA-HPV (PEP):', error);
+      }
+    };
+
+    window.addEventListener(CITO_LAB_SYNC_EVENT, handleCitoUpdate as EventListener);
+    window.addEventListener('storage', handleStorageSync);
+
+    return () => {
+      window.removeEventListener(CITO_LAB_SYNC_EVENT, handleCitoUpdate as EventListener);
+      window.removeEventListener('storage', handleStorageSync);
+    };
+  }, []);
+
   const toggleFavorite = (id: string) => {
     setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
   };
@@ -274,6 +303,49 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     if (p.cito_pep && p.cito_pep !== '--' && p.cito_pep !== '') return 'PEP_CITO';
     if (p.cito_lab && p.cito_lab !== '--' && p.cito_lab !== '') return 'COLETA_CITO';
     return 'NAO_IDENTIFICADO';
+  };
+
+  const applyCitoLaboratorioUpdate = (patientId: string, displayDate: string) => {
+    setPacientes(prev => prev.map(p => {
+      if (p.id === patientId) {
+        const updated = { ...p, cito_laboratorio: displayDate === '' ? '--' : displayDate };
+        updated.alertas = determinarAlerta(updated);
+        return updated;
+      }
+      return p;
+    }));
+
+    setPatientDetails(prev => {
+      if (!prev || prev.id !== patientId) return prev;
+      const updated = { ...prev, cito_laboratorio: displayDate === '' ? '--' : displayDate };
+      updated.alertas = determinarAlerta(updated);
+      return updated;
+    });
+  };
+
+  const broadcastCitoLaboratorioUpdate = (patientId: string, displayDate: string) => {
+    const normalizedDate = displayDate === '' ? '--' : displayDate;
+    const payload = { patientId, displayDate: normalizedDate, source: 'favorites' };
+
+    window.dispatchEvent(new CustomEvent(CITO_LAB_SYNC_EVENT, { detail: payload }));
+    localStorage.setItem('amarcap53_cito_laboratorio_sync', JSON.stringify({
+      ...payload,
+      timestamp: Date.now(),
+    }));
+  };
+
+  const handleUpdateCitoLaboratorio = async (patientId: string, displayDate: string) => {
+    applyCitoLaboratorioUpdate(patientId, displayDate);
+    broadcastCitoLaboratorioUpdate(patientId, displayDate);
+
+    if (displayDate === '' || displayDate === '--' || displayDate.length === 10) {
+      try {
+        const valueToSave = displayDate === '--' ? '' : displayDate;
+        await pb.collection('amarcap53_pacientes').update(patientId, { cito_laboratorio: valueToSave });
+      } catch (err) {
+        console.error('Erro ao atualizar data no PocketBase:', err);
+      }
+    }
   };
 
   const fetchFavorites = async () => {
@@ -740,7 +812,6 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
             </div>
           ) : (
             <div className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-[0px_20px_50px_rgba(0,0,0,0.06)] border border-outline-variant/15 relative">
-            <ScrollIndicator />
             <div className="w-full overflow-x-auto custom-scrollbar-horizontal">
                 <table className="w-full text-center border-collapse">
                   <thead>
@@ -849,25 +920,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                         <td className="px-4 py-6 text-center">
                           <DatePickerPTBR 
                             value={paciente.cito_laboratorio || ''} 
-                            onChange={async (displayDate) => {
-                              setPacientes(prev => prev.map(p => {
-                                if (p.id === paciente.id) {
-                                  const updated = { ...p, cito_laboratorio: displayDate === '' ? '--' : displayDate };
-                                  updated.alertas = determinarAlerta(updated);
-                                  return updated;
-                                }
-                                return p;
-                              }));
-                              
-                              if (displayDate === '' || displayDate === '--' || displayDate.length === 10) {
-                                try {
-                                  const valueToSave = displayDate === '--' ? '' : displayDate;
-                                  await pb.collection('amarcap53_pacientes').update(paciente.id, { cito_laboratorio: valueToSave });
-                                } catch (err) {
-                                  console.error('Erro ao atualizar data no PocketBase:', err);
-                                }
-                              }
-                            }} 
+                            isISO={false}
+                            onChange={(displayDate) => handleUpdateCitoLaboratorio(paciente.id, displayDate)} 
                           />
                         </td>
                         <td className="px-4 py-6 text-center">
@@ -1066,8 +1120,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
 
       {isDetailsModalOpen && activePatientForDetails && (
         <div className="fixed inset-0 bg-primary/20 backdrop-blur-md z-[110] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
-          <div className="bg-surface-container-lowest w-full max-w-2xl rounded-2xl shadow-[0px_24px_48px_rgba(0,0,0,0.15)] overflow-hidden border border-white/20 animate-in zoom-in-95 duration-300">
-            <div className="bg-gradient-to-r from-[#001b3d] to-[#002b5c] px-6 py-5 flex justify-between items-center">
+          <div className="bg-surface-container-lowest w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-[0px_24px_48px_rgba(0,0,0,0.15)] flex flex-col border border-white/20 animate-in zoom-in-95 duration-300">
+            <div className="bg-gradient-to-r from-[#001b3d] to-[#002b5c] px-6 py-5 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
                   <Users className="w-6 h-6 text-white" />
@@ -1082,8 +1136,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
               </button>
             </div>
 
-            <div className="p-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 sm:p-8 overflow-y-auto no-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                 <div className="space-y-4">
                   <div>
                     <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Nome Completo</p>
@@ -1095,7 +1149,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Data de Nascimento / Idade</p>
-                    <p className="text-sm font-bold text-primary">{formatarData(activePatientForDetails.data_nascimento)} ({calcularIdade(activePatientForDetails.data_nascimento)} anos)</p>
+                    <p className="text-sm font-bold text-primary">{formatarData(activePatientForDetails.data_nascimento)} ({activePatientForDetails.idade} anos)</p>
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Grupo</p>
@@ -1121,6 +1175,15 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                   <div className="pt-4 border-t border-outline-variant/10">
                     <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-2">Status de Rastreamento</p>
                     <div className="flex flex-col gap-3">
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest">DNA-HPV (PEP)</p>
+                        <DatePickerPTBR
+                          value={activePatientForDetails.cito_laboratorio || ''}
+                          isISO={false}
+                          onChange={(displayDate) => handleUpdateCitoLaboratorio(activePatientForDetails.id, displayDate)}
+                        />
+                      </div>
+
                       {/* Badge de Status Principal */}
                       {activePatientForDetails.alertas && ALERT_CONFIGS[activePatientForDetails.alertas] ? (
                         <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 shadow-lg ${ALERT_CONFIGS[activePatientForDetails.alertas].bg}`}>
@@ -1164,8 +1227,10 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                 </div>
               )}
             </div>
-            <div className="p-6 border-t border-outline-variant/10 bg-surface-container-lowest flex justify-end">
-              <button onClick={handleCloseDetails} className="px-8 py-2.5 rounded-xl text-sm font-black text-white bg-[#001b3d] shadow-lg transition-all hover:bg-[#002b5c] active:scale-95">Fechar</button>
+            <div className="p-6 border-t border-outline-variant/10 bg-surface-container-lowest flex justify-end shrink-0">
+              <button onClick={handleCloseDetails} className="px-8 py-2.5 rounded-xl text-sm font-black text-white bg-[#001b3d] shadow-lg hover:shadow-xl transition-all active:scale-95 w-full sm:w-auto">
+                Fechar
+              </button>
             </div>
           </div>
         </div>

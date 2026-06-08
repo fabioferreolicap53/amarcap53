@@ -606,7 +606,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           </div>
 
           <div className="bg-white rounded-[2rem] overflow-hidden shadow-2xl border border-outline-variant/10 relative">
-            <ScrollIndicator />
+            <ScrollIndicator onlyWhenParentVisible />
             <div className="overflow-x-auto custom-scrollbar-horizontal">
               <table className="w-full text-center border-collapse min-w-[900px] lg:min-w-full">
                 <thead>

@@ -1,30 +1,46 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronRight, MousePointer2 } from 'lucide-react';
 
-export const ScrollIndicator: React.FC = () => {
+interface ScrollIndicatorProps {
+  onlyWhenParentVisible?: boolean;
+}
+
+export const ScrollIndicator: React.FC<ScrollIndicatorProps> = ({ onlyWhenParentVisible = false }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
+  const [isParentVisible, setIsParentVisible] = useState(!onlyWhenParentVisible);
   const indicatorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const parent = indicatorRef.current?.parentElement;
     const scrollableChild = parent?.querySelector('.overflow-x-auto') as HTMLElement;
 
-    if (!scrollableChild) return;
+    if (!parent || !scrollableChild) return;
 
     const checkScroll = () => {
-      if (scrollableChild) {
-        const canScroll = scrollableChild.scrollWidth > scrollableChild.clientWidth + 10; // Margem de erro
-        setIsVisible(canScroll && !hasScrolled);
-      }
+      const canScroll = scrollableChild.scrollWidth > scrollableChild.clientWidth + 10;
+      const canShowByViewport = onlyWhenParentVisible ? isParentVisible : true;
+      setIsVisible(canScroll && !hasScrolled && canShowByViewport);
     };
 
-    // Observer para detectar mudanças de tamanho (carregamento de dados ou redimensionamento)
     const resizeObserver = new ResizeObserver(() => {
       checkScroll();
     });
 
     resizeObserver.observe(scrollableChild);
+
+    let intersectionObserver: IntersectionObserver | null = null;
+
+    if (onlyWhenParentVisible) {
+      intersectionObserver = new IntersectionObserver(
+        ([entry]) => {
+          setIsParentVisible(entry.isIntersecting);
+        },
+        { threshold: 0.25 }
+      );
+
+      intersectionObserver.observe(parent);
+    }
 
     const handleScroll = () => {
       if (scrollableChild.scrollLeft > 20) {
@@ -42,10 +58,11 @@ export const ScrollIndicator: React.FC = () => {
 
     return () => {
       resizeObserver.disconnect();
+      intersectionObserver?.disconnect();
       scrollableChild.removeEventListener('scroll', handleScroll);
       clearTimeout(timer);
     };
-  }, [hasScrolled]);
+  }, [hasScrolled, isParentVisible, onlyWhenParentVisible]);
 
   // Se não estiver visível, renderiza um div invisível para manter o ref e o parent check funcionando
   if (!isVisible) return <div ref={indicatorRef} className="hidden" aria-hidden="true" />;
