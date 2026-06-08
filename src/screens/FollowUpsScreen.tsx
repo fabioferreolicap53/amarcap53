@@ -311,6 +311,9 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     };
 
     try {
+      // #region debug-point E:followups-update-payload
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"E",location:"FollowUpsScreen.tsx:handleSaveAcompanhamentoEdit",msg:"followups update payload",data:{recordId:selectedAcompanhamento.id,payload:data},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       const record = await pb.collection('amarcap53_acompanhamentos').update(selectedAcompanhamento.id, data);
       
       // Atualiza o estado local para refletir as mudanças na tabela
@@ -324,6 +327,9 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       alert('Acompanhamento atualizado com sucesso!');
       handleCloseModal();
     } catch (error: any) {
+      // #region debug-point F:followups-update-error
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"F",location:"FollowUpsScreen.tsx:handleSaveAcompanhamentoEdit-catch",msg:"followups update error",data:{recordId:selectedAcompanhamento.id,payload:data,errorData:error?.data||null,errorMessage:error?.message||null,response:error?.response||null},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       console.error('Erro ao atualizar acompanhamento:', error);
       const pbError = error.data?.data;
       let errorMsg = 'Erro ao atualizar o registro.';

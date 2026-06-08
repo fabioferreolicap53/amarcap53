@@ -569,11 +569,26 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     };
 
     try {
+      // #region debug-point C:favorites-followup-create-payload
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"C",location:"FavoritesScreen.tsx:handleSaveFollowUp",msg:"favorites create payload",data:{payload:data},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       await pb.collection('amarcap53_acompanhamentos').create(data);
       alert('Acompanhamento registrado com sucesso!');
       handleCloseModal();
       fetchFavorites(true); // Refresh list to update counts
     } catch (error: any) {
+      try {
+        const sampleRecords = await pb.collection('amarcap53_acompanhamentos').getList(1, 5, {
+          sort: '-created',
+          fields: 'id,tipo_busca,tipo_contato,situacao_pos_busca,entraves_informado_por',
+        });
+        // #region debug-point H:favorites-followup-create-samples
+        fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"H",location:"FavoritesScreen.tsx:handleSaveFollowUp-samples",msg:"favorites existing samples",data:{items:sampleRecords.items},ts:Date.now()})}).catch(()=>{});
+        // #endregion
+      } catch (_) {}
+      // #region debug-point D:favorites-followup-create-error
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"D",location:"FavoritesScreen.tsx:handleSaveFollowUp-catch",msg:"favorites create error",data:{payload:data,errorData:error?.data||null,errorMessage:error?.message||null,response:error?.response||null},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       console.error('Erro ao salvar acompanhamento:', error);
       const pbError = error.data?.data;
       let errorMsg = 'Erro ao salvar o acompanhamento.';

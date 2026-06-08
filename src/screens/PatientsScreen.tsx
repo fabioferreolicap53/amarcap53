@@ -396,6 +396,9 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     };
 
     try {
+      // #region debug-point A:patients-followup-create-payload
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"A",location:"PatientsScreen.tsx:handleSaveFollowUp",msg:"patients create payload",data:{payload:data},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       await pb.collection('amarcap53_acompanhamentos').create(data);
       
       // Atualiza o contador de acompanhamentos localmente para feedback instantâneo
@@ -412,6 +415,18 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       alert('Acompanhamento registrado com sucesso!');
       handleCloseModal();
     } catch (error: any) {
+      try {
+        const sampleRecords = await pb.collection('amarcap53_acompanhamentos').getList(1, 5, {
+          sort: '-created',
+          fields: 'id,tipo_busca,tipo_contato,situacao_pos_busca,entraves_informado_por',
+        });
+        // #region debug-point G:patients-followup-create-samples
+        fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"G",location:"PatientsScreen.tsx:handleSaveFollowUp-samples",msg:"patients existing samples",data:{items:sampleRecords.items},ts:Date.now()})}).catch(()=>{});
+        // #endregion
+      } catch (_) {}
+      // #region debug-point B:patients-followup-create-error
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"B",location:"PatientsScreen.tsx:handleSaveFollowUp-catch",msg:"patients create error",data:{payload:data,errorData:error?.data||null,errorMessage:error?.message||null,response:error?.response||null},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       console.error('Erro ao salvar acompanhamento:', error);
       const pbError = error.data?.data;
       let errorMsg = 'Erro ao salvar o acompanhamento.';
