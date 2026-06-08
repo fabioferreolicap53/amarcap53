@@ -34,34 +34,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Escuta mudanças de autenticação
     const unsubscribe = pb.authStore.onChange((token, model) => {
       const userModel = model as UserRecord;
       setUser(userModel);
       setIsAdmin(userModel?.role === 'admin' || userModel?.role === 'cap');
     });
 
-    // Inscrição em tempo real para o registro do usuário logado
-    let userUnsubscribe: (() => void) | undefined;
-    
-    if (pb.authStore.model?.id) {
-      pb.collection('users').subscribe(pb.authStore.model.id, (e) => {
-        if (e.action === 'update') {
-          const updatedUser = e.record as UserRecord;
-          setUser(updatedUser);
-        }
-      }).then(unsub => {
-        userUnsubscribe = unsub;
-      });
-    }
-
     setIsLoading(false);
 
     return () => {
       unsubscribe();
-      if (userUnsubscribe) userUnsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const collectionName =
+      (user as UserRecord & { collectionName?: string }).collectionName ||
+      (pb.authStore.model as UserRecord & { collectionName?: string })?.collectionName ||
+      'users';
+
+    let disposed = false;
+    let userUnsubscribe: (() => void) | undefined;
+
+    pb.collection(collectionName)
+      .subscribe(user.id, (e) => {
+        if (e.action === 'update') {
+          const updatedUser = e.record as UserRecord;
+          setUser(updatedUser);
+          setIsAdmin(updatedUser?.role === 'admin' || updatedUser?.role === 'cap');
+          pb.authStore.save(pb.authStore.token, updatedUser);
+        }
+      })
+      .then((unsub) => {
+        if (disposed) {
+          unsub();
+          return;
+        }
+        userUnsubscribe = unsub;
+      })
+      .catch((error) => {
+        console.error('Erro ao inscrever sincronizacao do usuario:', error);
+      });
+
+    return () => {
+      disposed = true;
+      if (userUnsubscribe) userUnsubscribe();
+    };
+  }, [user?.id]);
 
   const logout = () => {
     pb.authStore.clear();

@@ -259,9 +259,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
 
   // Sincroniza estado local com o usuário do AuthContext (que vem do PocketBase)
   useEffect(() => {
-    if (user?.favoritos) {
-      setFavorites(user.favoritos);
-    }
+    setFavorites(user?.favoritos || []);
   }, [user?.favoritos]);
 
   useEffect(() => {
@@ -298,6 +296,11 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
 
   const toggleFavorite = async (id: string) => {
     if (!user) return;
+
+    const collectionName =
+      (user as typeof user & { collectionName?: string })?.collectionName ||
+      (pb.authStore.model as typeof user & { collectionName?: string })?.collectionName ||
+      'users';
     
     const newFavorites = favorites.includes(id) 
       ? favorites.filter(f => f !== id) 
@@ -305,15 +308,24 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     
     // Atualização otimista
     setFavorites(newFavorites);
+    pb.authStore.save(pb.authStore.token, {
+      ...(pb.authStore.model || {}),
+      favoritos: newFavorites,
+    });
     
     try {
-      await pb.collection('users').update(user.id, {
+      const updatedUser = await pb.collection(collectionName).update(user.id, {
         favoritos: newFavorites
       });
+      pb.authStore.save(pb.authStore.token, updatedUser);
     } catch (error) {
       console.error("Erro ao sincronizar favoritos:", error);
       // Reverter em caso de erro
-      setFavorites(user.favoritos || []);
+      setFavorites(user?.favoritos || []);
+      pb.authStore.save(pb.authStore.token, {
+        ...(pb.authStore.model || {}),
+        favoritos: user?.favoritos || [],
+      });
     }
   };
 
