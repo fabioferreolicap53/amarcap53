@@ -867,7 +867,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                   {/* Entraves Informado Por */}
                   <SingleSelect 
                     label="Entrave(s) Informado Por"
-                    placeholder="Selecione (Opcional)"
+                    placeholder="Selecione"
                     options={ENTRAVES_INFORMADO_POR_OPTIONS}
                     value={selectedAcompanhamento.entraves_informado_por || ''}
                     onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_informado_por: val})}
@@ -891,7 +891,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                   {/* Entraves Identificados */}
                   <MultiSelect 
                     label="Entraves Identificados"
-                    placeholder={selectedAcompanhamento.entraves_informado_por ? "Selecione (Opcional)" : "Selecione quem informou primeiro"}
+                    placeholder={selectedAcompanhamento.entraves_informado_por ? "Selecione" : "Selecione quem informou primeiro"}
                     className="col-span-1 md:col-span-2"
                     options={ENTRAVES_IDENTIFICADOS_OPTIONS}
                     value={selectedAcompanhamento.entraves_identificados || []}

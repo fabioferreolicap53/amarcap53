@@ -1354,7 +1354,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   {/* Entraves Informado Por */}
                   <SingleSelect 
                     label="Entrave(s) Informado Por"
-                    placeholder="Selecione (Opcional)"
+                    placeholder="Selecione"
                     options={ENTRAVES_INFORMADO_POR_OPTIONS}
                     value={modalEntravesInformadoPor}
                     onChange={setModalEntravesInformadoPor}
@@ -1378,7 +1378,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   {/* Entraves Identificados */}
                   <MultiSelect 
                     label="Entraves Identificados"
-                    placeholder={modalEntravesInformadoPor ? "Selecione (Opcional)" : "Selecione quem informou primeiro"}
+                    placeholder={modalEntravesInformadoPor ? "Selecione" : "Selecione quem informou primeiro"}
                     className="col-span-1 md:col-span-2"
                     options={ENTRAVES_IDENTIFICADOS_OPTIONS}
                     value={modalEntraves}
