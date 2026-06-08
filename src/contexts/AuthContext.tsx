@@ -111,13 +111,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const freshUser = await pb.collection(collectionName).getOne(user.id);
         if (cancelled) return;
 
-        // #region debug-point M:poll-user-sync
-        fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"M",location:"AuthContext.tsx:poll-sync",msg:"[DEBUG] poll user sync",data:{reason,userId:user.id,collectionName,favoritos:(freshUser as UserRecord).favoritos||[]},ts:Date.now()})}).catch(()=>{});
-        // #endregion
+        // Só atualiza se houver mudança real para evitar loops e overwrites de optimistic updates
+        const currentFavoritos = JSON.stringify(user.favoritos || []);
+        const freshFavoritos = JSON.stringify((freshUser as UserRecord).favoritos || []);
+        
+        if (currentFavoritos !== freshFavoritos || (freshUser as UserRecord).role !== user.role) {
+          // #region debug-point M:poll-user-sync
+          fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"M",location:"AuthContext.tsx:poll-sync",msg:"[DEBUG] poll user sync - data changed",data:{reason,userId:user.id,collectionName,favoritos:(freshUser as UserRecord).favoritos||[]},ts:Date.now()})}).catch(()=>{});
+          // #endregion
 
-        setUser(freshUser as UserRecord);
-        setIsAdmin((freshUser as UserRecord)?.role === 'admin' || (freshUser as UserRecord)?.role === 'cap');
-        pb.authStore.save(pb.authStore.token, freshUser);
+          setUser(freshUser as UserRecord);
+          setIsAdmin((freshUser as UserRecord)?.role === 'admin' || (freshUser as UserRecord)?.role === 'cap');
+          pb.authStore.save(pb.authStore.token, freshUser);
+        }
       } catch (error) {
         // #region debug-point N:poll-user-sync-error
         fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"N",location:"AuthContext.tsx:poll-sync-error",msg:"[DEBUG] poll user sync erro",data:{reason,userId:user.id,collectionName,error:String(error)},ts:Date.now()})}).catch(()=>{});

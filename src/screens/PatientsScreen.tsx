@@ -254,46 +254,53 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   }, [user?.favoritos]);
 
   const toggleFavorite = async (id: string) => {
-    if (!user) return;
+    if (!user?.id) return;
 
-    const collectionName =
-      (user as typeof user & { collectionName?: string })?.collectionName ||
-      (pb.authStore.model as typeof user & { collectionName?: string })?.collectionName ||
-      'users';
+    const collectionName = pb.authStore.model?.collectionName || 'users';
     
-    const newFavorites = favorites.includes(id) 
+    const isFav = favorites.includes(id);
+    const newFavorites = isFav 
       ? favorites.filter(f => f !== id) 
       : [...favorites, id];
     
-    // Atualização otimista
-    setFavorites(newFavorites);
-    pb.authStore.save(pb.authStore.token, {
-      ...(pb.authStore.model || {}),
-      favoritos: newFavorites,
-    });
     // #region debug-point F:patients-toggle-start
     fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"F",location:"PatientsScreen.tsx:toggleFavorite",msg:"[DEBUG] patients toggle favorite start",data:{userId:user.id,patientId:id,collectionName,newFavorites},ts:Date.now()})}).catch(()=>{});
     // #endregion
+
+    // Atualização otimista local e no AuthStore
+    setFavorites(newFavorites);
+    pb.authStore.save(pb.authStore.token, {
+      ...pb.authStore.model,
+      favoritos: newFavorites,
+    });
     
     try {
       const updatedUser = await pb.collection(collectionName).update(user.id, {
         favoritos: newFavorites
       });
+      
+      // Sincroniza com o retorno real do servidor
       pb.authStore.save(pb.authStore.token, updatedUser);
+
       // #region debug-point G:patients-toggle-success
-      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"G",location:"PatientsScreen.tsx:toggleFavorite-success",msg:"[DEBUG] patients toggle favorite success",data:{userId:user.id,patientId:id,collectionName,favoritos:(updatedUser as typeof user & { favoritos?: string[] })?.favoritos||[]},ts:Date.now()})}).catch(()=>{});
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"G",location:"PatientsScreen.tsx:toggleFavorite-success",msg:"[DEBUG] patients toggle favorite success",data:{userId:user.id,patientId:id,collectionName,favoritos:(updatedUser as any)?.favoritos||[]},ts:Date.now()})}).catch(()=>{});
       // #endregion
     } catch (error) {
       // #region debug-point H:patients-toggle-error
       fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"H",location:"PatientsScreen.tsx:toggleFavorite-error",msg:"[DEBUG] patients toggle favorite erro",data:{userId:user.id,patientId:id,collectionName,error:String(error)},ts:Date.now()})}).catch(()=>{});
       // #endregion
+      
       console.error("Erro ao sincronizar favoritos:", error);
-      // Reverter em caso de erro
-      setFavorites(user?.favoritos || []);
+      
+      // Reverter para o estado que está no objeto user do contexto
+      const rollbackFavs = user.favoritos || [];
+      setFavorites(rollbackFavs);
       pb.authStore.save(pb.authStore.token, {
-        ...(pb.authStore.model || {}),
-        favoritos: user?.favoritos || [],
+        ...pb.authStore.model,
+        favoritos: rollbackFavs,
       });
+      
+      alert("Erro ao salvar favorito. Verifique sua conexão ou se o campo 'favoritos' existe na coleção de usuários.");
     }
   };
 
