@@ -247,9 +247,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
   // Sincroniza estado local com o usuário do AuthContext (que vem do PocketBase)
   useEffect(() => {
-    // #region debug-point E:patients-favorites-sync
-    fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"E",location:"PatientsScreen.tsx:favorites-effect",msg:"[DEBUG] patients favorites sync effect",data:{userId:user?.id||null,favoritos:user?.favoritos||[]},ts:Date.now()})}).catch(()=>{});
-    // #endregion
     setFavorites(user?.favoritos || []);
   }, [user?.favoritos]);
 
@@ -272,10 +269,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       ? favorites.filter(f => f !== id) 
       : [...favorites, id];
     
-    // #region debug-point F:patients-toggle-start
-    fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"F",location:"PatientsScreen.tsx:toggleFavorite",msg:"[DEBUG] patients toggle favorite start",data:{userId:user.id,patientId:id,collectionName,newFavorites},ts:Date.now()})}).catch(()=>{});
-    // #endregion
-
     // Atualização otimista local e no AuthStore
     setFavorites(newFavorites);
     pb.authStore.save(pb.authStore.token, {
@@ -290,15 +283,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       
       // Sincroniza com o retorno real do servidor
       pb.authStore.save(pb.authStore.token, updatedUser);
-
-      // #region debug-point G:patients-toggle-success
-      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"G",location:"PatientsScreen.tsx:toggleFavorite-success",msg:"[DEBUG] patients toggle favorite success",data:{userId:user.id,patientId:id,collectionName,favoritos:(updatedUser as any)?.favoritos||[]},ts:Date.now()})}).catch(()=>{});
-      // #endregion
     } catch (error) {
-      // #region debug-point H:patients-toggle-error
-      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"H",location:"PatientsScreen.tsx:toggleFavorite-error",msg:"[DEBUG] patients toggle favorite erro",data:{userId:user.id,patientId:id,collectionName,error:String(error)},ts:Date.now()})}).catch(()=>{});
-      // #endregion
-      
       console.error("Erro ao sincronizar favoritos:", error);
       
       // Reverter para o estado que está no objeto user do contexto
@@ -388,7 +373,9 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       tipo_busca: modalTipoBusca,
       tipo_contato: modalTipoContato,
       situacao_pos_busca: modalSituacao,
-      entraves_identificados: modalEntraves.join('; '),
+      entraves_identificados: Array.isArray(modalEntraves) 
+        ? modalEntraves.join('; ') 
+        : modalEntraves || '',
       entraves_informado_por: modalEntravesInformadoPor,
       observacoes: modalObservacoes,
     };
