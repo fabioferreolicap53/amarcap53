@@ -9,6 +9,7 @@ import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { MultiSelect } from '../components/MultiSelect';
 import { SingleSelect } from '../components/SingleSelect';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
+import { TIPO_BUSCA_OPTIONS, TIPO_CONTATO_OPTIONS, SITUACAO_POS_BUSCA_OPTIONS, ENTRAVES_IDENTIFICADOS_OPTIONS, ENTRAVES_INFORMADO_POR_OPTIONS } from '../constants/followUpOptions';
 
 interface Acompanhamento {
   id: string;
@@ -451,11 +452,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     <MultiSelect 
                       label="Tipo de Busca"
                       placeholder="Todos os Tipos"
-                      options={[
-                        "1 - Busca ativa- Visita domiciliar registrada em prontuário",
-                        "2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário",
-                        "3 - Busca ativa - Mensagem registrada em prontuário"
-                      ]}
+                      options={TIPO_BUSCA_OPTIONS}
                       value={filterTipoBusca}
                       onChange={setFilterTipoBusca}
                     />
@@ -465,11 +462,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     <MultiSelect 
                       label="Tipo de Contato"
                       placeholder="Todos os Contatos"
-                      options={[
-                        "Contato direto (conversa)",
-                        "Contato indireto (mensagem)",
-                        "Não houve contato ( não localizada, ligação não atendida...)"
-                      ]}
+                      options={TIPO_CONTATO_OPTIONS}
                       value={filterTipoContato}
                       onChange={setFilterTipoContato}
                     />
@@ -479,18 +472,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     <MultiSelect 
                       label="Situação Pós Busca"
                       placeholder="Todas as Situações"
-                      options={[
-                        "1- Agendamento após contato direto",
-                        "2 - Convite para demanda livre",
-                        "3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP",
-                        "4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP",
-                        "5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP",
-                        "6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP",
-                        "7 - Mudança de território (situação atualizada no PEP)",
-                        "8 - Óbito (situação atualizada no PEP)",
-                        "9 - Não localizada",
-                        "10 - Recusa"
-                      ]}
+                      options={SITUACAO_POS_BUSCA_OPTIONS}
                       value={filterSituacao}
                       onChange={setFilterSituacao}
                     />
@@ -500,18 +482,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     <MultiSelect 
                       label="Entraves Identificados"
                       placeholder="Todos os Entraves"
-                      options={[
-                        "1 - Horários incompatíveis com a rotina de trabalho",
-                        "2 - Vergonha ou constrangimento durante o exame",
-                        "3 - Ideia equivocada sobre a necessidade de fazer exame",
-                        "4 - Faz o rastreamento pela rede privada",
-                        "5 - Dificuldade de locomoção ( ex: acamada)",
-                        "6 - Distância da Unidade",
-                        "7 - Se recusa a fazer o exame com o profissional da equipe",
-                        "8 - Esquece a data do agendamento",
-                        "9 - Indisponibilidade de tempo",
-                        "10 - Não identificado entrave"
-                      ]}
+                      options={ENTRAVES_IDENTIFICADOS_OPTIONS}
                       value={filterEntraves}
                       onChange={setFilterEntraves}
                     />
@@ -821,11 +792,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                   <SingleSelect 
                     label="Tipo de Busca"
                     placeholder="Selecione"
-                    options={[
-                      "1 - Busca ativa- Visita domiciliar registrada em prontuário",
-                      "2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário",
-                      "3 - Busca ativa - Mensagem registrada em prontuário"
-                    ]}
+                    options={TIPO_BUSCA_OPTIONS}
                     value={selectedAcompanhamento.tipo_busca || ''}
                     onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, tipo_busca: val})}
                     required
@@ -837,11 +804,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                   <SingleSelect 
                     label="Tipo de Contato"
                     placeholder="Selecione uma modalidade"
-                    options={[
-                      "Contato direto (conversa)",
-                      "Contato indireto (mensagem)",
-                      "Não houve contato ( não localizada, ligação não atendida...)"
-                    ]}
+                    options={TIPO_CONTATO_OPTIONS}
                     value={selectedAcompanhamento.tipo_contato || ''}
                     onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, tipo_contato: val})}
                     required
@@ -853,10 +816,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                   <SingleSelect 
                     label="Entrave(s) Informado Por"
                     placeholder="Selecione (Opcional)"
-                    options={[
-                      "1 - Informado por paciente",
-                      "2 - Identificado por profissional"
-                    ]}
+                    options={ENTRAVES_INFORMADO_POR_OPTIONS}
                     value={selectedAcompanhamento.entraves_informado_por || ''}
                     onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_informado_por: val})}
                     icon={<Info className="w-3.5 h-3.5" />}
@@ -868,18 +828,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     label="Situação Pós Busca Ativa"
                     placeholder="Selecione o desfecho da busca"
                     className="col-span-1 md:col-span-2"
-                    options={[
-                      "1- Agendamento após contato direto",
-                      "2 - Convite para demanda livre",
-                      "3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP",
-                      "4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP",
-                      "5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP",
-                      "6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP",
-                      "7 - Mudança de território (situação atualizada no PEP)",
-                      "8 - Óbito (situação atualizada no PEP)",
-                      "9 - Não localizada",
-                      "10 - Recusa"
-                    ]}
+                    options={SITUACAO_POS_BUSCA_OPTIONS}
                     value={selectedAcompanhamento.situacao_pos_busca || ''}
                     onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, situacao_pos_busca: val})}
                     required
@@ -890,23 +839,13 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                   {/* Entraves Identificados */}
                   <MultiSelect 
                     label="Entraves Identificados"
-                    placeholder="Selecione (Opcional)"
+                    placeholder={selectedAcompanhamento.entraves_informado_por ? "Selecione (Opcional)" : "Selecione quem informou primeiro"}
                     className="col-span-1 md:col-span-2"
-                    options={[
-                      "1 - Horários incompatíveis com a rotina de trabalho",
-                      "2 - Vergonha ou constrangimento durante o exame",
-                      "3 - Ideia equivocada sobre a necessidade de fazer exame",
-                      "4 - Faz o rastreamento pela rede privada",
-                      "5 - Dificuldade de locomoção ( ex: acamada)",
-                      "6 - Distância da Unidade",
-                      "7 - Se recusa a fazer o exame com o profissional da equipe",
-                      "8 - Esquece a data do agendamento",
-                      "9 - Indisponibilidade de tempo",
-                      "10 - Não identificado entrave"
-                    ]}
+                    options={ENTRAVES_IDENTIFICADOS_OPTIONS}
                     value={selectedAcompanhamento.entraves_identificados || []}
                     onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_identificados: val})}
                     showSearch={false}
+                    disabled={!selectedAcompanhamento.entraves_informado_por}
                   />
 
                   {/* Observações */}

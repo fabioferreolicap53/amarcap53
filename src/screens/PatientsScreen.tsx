@@ -9,6 +9,7 @@ import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { MultiSelect } from '../components/MultiSelect';
 import { SingleSelect } from '../components/SingleSelect';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
+import { TIPO_BUSCA_OPTIONS, TIPO_CONTATO_OPTIONS, SITUACAO_POS_BUSCA_OPTIONS, ENTRAVES_IDENTIFICADOS_OPTIONS, ENTRAVES_INFORMADO_POR_OPTIONS } from '../constants/followUpOptions';
 
 interface Paciente {
   id: string;
@@ -1333,11 +1334,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                 <SingleSelect 
                   label="Tipo de Busca"
                   placeholder="Selecione"
-                  options={[
-                    "1 - Busca ativa- Visita domiciliar registrada em prontuário",
-                    "2 - Busca ativa - Contato Telefônico (ligação) registrada em prontuário",
-                    "3 - Busca ativa - Mensagem registrada em prontuário"
-                  ]}
+                  options={TIPO_BUSCA_OPTIONS}
                   value={modalTipoBusca}
                   onChange={setModalTipoBusca}
                   required
@@ -1349,11 +1346,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   <SingleSelect 
                     label="Tipo de Contato"
                     placeholder="Selecione uma modalidade"
-                    options={[
-                      "Contato direto (conversa)",
-                      "Contato indireto (mensagem)",
-                      "Não houve contato ( não localizada, ligação não atendida...)"
-                    ]}
+                    options={TIPO_CONTATO_OPTIONS}
                     value={modalTipoContato}
                     onChange={setModalTipoContato}
                     required
@@ -1365,10 +1358,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   <SingleSelect 
                     label="Entrave(s) Informado Por"
                     placeholder="Selecione (Opcional)"
-                    options={[
-                      "1 - Informado por paciente",
-                      "2 - Identificado por profissional"
-                    ]}
+                    options={ENTRAVES_INFORMADO_POR_OPTIONS}
                     value={modalEntravesInformadoPor}
                     onChange={setModalEntravesInformadoPor}
                     icon={<Info className="w-3.5 h-3.5" />}
@@ -1380,18 +1370,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     label="Situação Pós Busca Ativa"
                     placeholder="Selecione o desfecho da busca"
                     className="col-span-1 md:col-span-2"
-                    options={[
-                      "1- Agendamento após contato direto",
-                      "2 - Convite para demanda livre",
-                      "3 - Citopatológico realizado nos últimos 3 anos, em outra unidade do SUS com fornecimento do laudo e resultado registrado no PEP",
-                      "4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP",
-                      "5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP",
-                      "6 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade da rede privada com resultado registrado no PEP",
-                      "7 - Mudança de território (situação atualizada no PEP)",
-                      "8 - Óbito (situação atualizada no PEP)",
-                      "9 - Não localizada",
-                      "10 - Recusa"
-                    ]}
+                    options={SITUACAO_POS_BUSCA_OPTIONS}
                     value={modalSituacao}
                     onChange={setModalSituacao}
                     required
@@ -1402,23 +1381,13 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   {/* Entraves Identificados */}
                   <MultiSelect 
                     label="Entraves Identificados"
-                    placeholder="Selecione (Opcional)"
+                    placeholder={modalEntravesInformadoPor ? "Selecione (Opcional)" : "Selecione quem informou primeiro"}
                     className="col-span-1 md:col-span-2"
-                    options={[
-                      "1 - Horários incompatíveis com a rotina de trabalho",
-                      "2 - Vergonha ou constrangimento durante o exame",
-                      "3 - Ideia equivocada sobre a necessidade de fazer exame",
-                      "4 - Faz o rastreamento pela rede privada",
-                      "5 - Dificuldade de locomoção ( ex: acamada)",
-                      "6 - Distância da Unidade",
-                      "7 - Se recusa a fazer o exame com o profissional da equipe",
-                      "8 - Esquece a data do agendamento",
-                      "9 - Indisponibilidade de tempo",
-                      "10 - Não identificado entrave"
-                    ]}
+                    options={ENTRAVES_IDENTIFICADOS_OPTIONS}
                     value={modalEntraves}
                     onChange={setModalEntraves}
                     showSearch={false}
+                    disabled={!modalEntravesInformadoPor}
                   />
 
                 {/* Observações */}
