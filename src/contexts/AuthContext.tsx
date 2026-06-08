@@ -96,6 +96,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const collectionName =
+      (user as UserRecord & { collectionName?: string }).collectionName ||
+      (pb.authStore.model as UserRecord & { collectionName?: string })?.collectionName ||
+      'users';
+
+    let cancelled = false;
+
+    const syncCurrentUser = async (reason: string) => {
+      try {
+        const freshUser = await pb.collection(collectionName).getOne(user.id);
+        if (cancelled) return;
+
+        // #region debug-point M:poll-user-sync
+        fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"M",location:"AuthContext.tsx:poll-sync",msg:"[DEBUG] poll user sync",data:{reason,userId:user.id,collectionName,favoritos:(freshUser as UserRecord).favoritos||[]},ts:Date.now()})}).catch(()=>{});
+        // #endregion
+
+        setUser(freshUser as UserRecord);
+        setIsAdmin((freshUser as UserRecord)?.role === 'admin' || (freshUser as UserRecord)?.role === 'cap');
+        pb.authStore.save(pb.authStore.token, freshUser);
+      } catch (error) {
+        // #region debug-point N:poll-user-sync-error
+        fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"N",location:"AuthContext.tsx:poll-sync-error",msg:"[DEBUG] poll user sync erro",data:{reason,userId:user.id,collectionName,error:String(error)},ts:Date.now()})}).catch(()=>{});
+        // #endregion
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      syncCurrentUser('interval');
+    }, 5000);
+
+    const handleFocus = () => {
+      syncCurrentUser('focus');
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncCurrentUser('visibility');
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    syncCurrentUser('mount');
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user?.id]);
+
   const logout = () => {
     pb.authStore.clear();
   };
