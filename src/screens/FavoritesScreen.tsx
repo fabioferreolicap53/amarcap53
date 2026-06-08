@@ -259,6 +259,9 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
 
   // Sincroniza estado local com o usuário do AuthContext (que vem do PocketBase)
   useEffect(() => {
+    // #region debug-point I:favorites-screen-sync
+    fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"I",location:"FavoritesScreen.tsx:favorites-effect",msg:"[DEBUG] favorites screen sync effect",data:{userId:user?.id||null,favoritos:user?.favoritos||[]},ts:Date.now()})}).catch(()=>{});
+    // #endregion
     setFavorites(user?.favoritos || []);
   }, [user?.favoritos]);
 
@@ -312,13 +315,22 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       ...(pb.authStore.model || {}),
       favoritos: newFavorites,
     });
+    // #region debug-point J:favorites-toggle-start
+    fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"J",location:"FavoritesScreen.tsx:toggleFavorite",msg:"[DEBUG] favorites toggle start",data:{userId:user.id,patientId:id,collectionName,newFavorites},ts:Date.now()})}).catch(()=>{});
+    // #endregion
     
     try {
       const updatedUser = await pb.collection(collectionName).update(user.id, {
         favoritos: newFavorites
       });
       pb.authStore.save(pb.authStore.token, updatedUser);
+      // #region debug-point K:favorites-toggle-success
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"K",location:"FavoritesScreen.tsx:toggleFavorite-success",msg:"[DEBUG] favorites toggle success",data:{userId:user.id,patientId:id,collectionName,favoritos:(updatedUser as typeof user & { favoritos?: string[] })?.favoritos||[]},ts:Date.now()})}).catch(()=>{});
+      // #endregion
     } catch (error) {
+      // #region debug-point L:favorites-toggle-error
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"favorites-sync-devices",runId:"pre-fix",hypothesisId:"L",location:"FavoritesScreen.tsx:toggleFavorite-error",msg:"[DEBUG] favorites toggle erro",data:{userId:user.id,patientId:id,collectionName,error:String(error)},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       console.error("Erro ao sincronizar favoritos:", error);
       // Reverter em caso de erro
       setFavorites(user?.favoritos || []);
