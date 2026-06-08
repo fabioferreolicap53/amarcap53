@@ -451,14 +451,36 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
       {
         label: 'Citopatológico',
         data: stats.examTrend.map(t => t.cito),
-        backgroundColor: 'rgba(16, 185, 129, 0.8)',
-        borderRadius: 8,
+        backgroundColor: (context: any) => {
+          const ctx = context.chart.ctx;
+          const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+          gradient.addColorStop(0, 'rgba(16, 185, 129, 0.9)');
+          gradient.addColorStop(1, 'rgba(16, 185, 129, 0.2)');
+          return gradient;
+        },
+        borderColor: 'rgb(16, 185, 129)',
+        borderWidth: 1,
+        borderRadius: { topLeft: 12, topRight: 12, bottomLeft: 0, bottomRight: 0 },
+        borderSkipped: false,
+        barThickness: 32,
+        hoverBackgroundColor: 'rgba(16, 185, 129, 1)',
       },
       {
         label: 'Molecular DNA',
         data: stats.examTrend.map(t => t.hpv),
-        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-        borderRadius: 8,
+        backgroundColor: (context: any) => {
+          const ctx = context.chart.ctx;
+          const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+          gradient.addColorStop(0, 'rgba(59, 130, 246, 0.9)');
+          gradient.addColorStop(1, 'rgba(59, 130, 246, 0.2)');
+          return gradient;
+        },
+        borderColor: 'rgb(59, 130, 246)',
+        borderWidth: 1,
+        borderRadius: { topLeft: 12, topRight: 12, bottomLeft: 0, bottomRight: 0 },
+        borderSkipped: false,
+        barThickness: 32,
+        hoverBackgroundColor: 'rgba(59, 130, 246, 1)',
       }
     ]
   };
@@ -687,14 +709,30 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                       responsive: true,
                       maintainAspectRatio: false,
                       plugins: {
-                        legend: { display: false },
+                        legend: { 
+                          display: true,
+                          position: 'top',
+                          align: 'end',
+                          labels: {
+                            boxWidth: 8,
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            font: { size: 10, weight: 'bold' },
+                            padding: 20,
+                            color: '#64748b'
+                          }
+                        },
                         tooltip: {
                           backgroundColor: '#051934',
                           titleFont: { size: 12, weight: 'bold' },
                           bodyFont: { size: 11 },
                           padding: 12,
                           cornerRadius: 12,
-                          displayColors: false
+                          displayColors: true,
+                          usePointStyle: true,
+                          callbacks: {
+                            label: (context: any) => ` ${context.dataset.label}: ${context.parsed.y}%`
+                          }
                         }
                       },
                       scales: {
@@ -704,21 +742,28 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                           ticks: {
                             callback: (value) => `${value}%`,
                             font: { weight: 'bold', size: 10 },
-                            color: '#94a3b8'
+                            color: '#94a3b8',
+                            stepSize: 20
                           },
-                          grid: { color: '#f8fafc' },
+                          grid: { 
+                            color: 'rgba(241, 245, 249, 1)',
+                            drawTicks: false
+                          },
                           border: { display: false }
                         },
                         x: {
                           grid: { display: false },
                           border: { display: false },
                           ticks: {
-                            font: { weight: 'bold', size: 9 },
+                            font: { weight: 'bold', size: 10 },
                             color: '#64748b',
-                            maxRotation: 45,
-                            minRotation: 45
+                            padding: 10
                           }
                         }
+                      },
+                      interaction: {
+                        mode: 'index',
+                        intersect: false,
                       }
                     }} 
                   />
