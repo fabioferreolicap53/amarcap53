@@ -43,8 +43,8 @@ export const TIPO_CONTATO_OPTIONS: SelectOption[] = [
     aliases: ["2 - CONTATO INDIRETO (MENSAGEM)"]
   },
   {
-    label: "NÃO HOUVE CONTATO ( NÃO LOCALIZADA, LIGAÇÃO NÃO ATENDIDA...)",
-    value: "NÃO HOUVE CONTATO ( NÃO LOCALIZADA, LIGAÇÃO NÃO ATENDIDA...)",
+    label: "NÃO HOUVE CONTATO (NÃO LOCALIZADA, LIGAÇÃO NÃO ATENDIDA...)",
+    value: "NÃO HOUVE CONTATO (NÃO LOCALIZADA, LIGAÇÃO NÃO ATENDIDA...)",
     aliases: ["3 - NÃO HOUVE CONTATO ( NÃO LOCALIZADA, LIGAÇÃO NÃO ATENDIDA...)"]
   }
 ];
@@ -71,8 +71,8 @@ export const SITUACAO_POS_BUSCA_OPTIONS: SelectOption[] = [
     aliases: ["4 - CITOPATOLÓGICO REALIZADO NOS ÚLTIMOS 3 ANOS, EM OUTRA UNIDADE DA REDE PRIVADA COM FORNECIMENTO DO LAUDO E RESULTADO REGISTRADO NO PEP", "4 - Citopatológico realizado nos últimos 3 anos, em outra unidade da rede privada com fornecimento do laudo e resultado registrado no PEP"]
   },
   {
-    label: "TESTE MOLECULAR/ DNA-HPV ONCOGÊNICO REALIZADO NOS ÚLTIMOS 5 ANOS, EM OUTRA UNIDADE DO SUS COM RESULTADO REGISTRADO NO PEP",
-    value: "TESTE MOLECULAR/ DNA-HPV ONCOGÊNICO REALIZADO NOS ÚLTIMOS 5 ANOS, EM OUTRA UNIDADE DO SUS COM RESULTADO REGISTRADO NO PEP",
+    label: "TESTE MOLECULAR/DNA-HPV ONCOGÊNICO REALIZADO NOS ÚLTIMOS 5 ANOS, EM OUTRA UNIDADE DO SUS COM RESULTADO REGISTRADO NO PEP",
+    value: "TESTE MOLECULAR/DNA-HPV ONCOGÊNICO REALIZADO NOS ÚLTIMOS 5 ANOS, EM OUTRA UNIDADE DO SUS COM RESULTADO REGISTRADO NO PEP",
     aliases: ["5 - TESTE MOLECULAR/ DNA-HPV ONCOGÊNICO REALIZADO NOS ÚLTIMOS 5 ANOS, EM OUTRA UNIDADE DO SUS COM RESULTADO REGISTRADO NO PEP", "5 - Teste molecular/ DNA-HPV oncogênico realizado nos últimos 5 anos, em outra unidade do SUS com resultado registrado no PEP"]
   },
   {
@@ -124,8 +124,8 @@ export const ENTRAVES_IDENTIFICADOS_OPTIONS: SelectOption[] = [
     aliases: ["4 - FAZ O RASTREAMENTO PELA REDE PRIVADA", "4 - Faz o rastreamento pela rede privada"]
   },
   {
-    label: "DIFICULDADE DE LOCOMOÇÃO (EX: ACAMADA)",
-    value: "DIFICULDADE DE LOCOMOÇÃO (EX: ACAMADA)",
+    label: "DIFICULDADE DE LOCOMOÇÃO (EX:ACAMADA)",
+    value: "DIFICULDADE DE LOCOMOÇÃO (EX:ACAMADA)",
     aliases: ["5 - DIFICULDADE DE LOCOMOÇÃO ( EX: ACAMADA)", "5 - Dificuldade de locomoção ( ex: acamada)"]
   },
   {
