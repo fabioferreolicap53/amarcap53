@@ -1289,7 +1289,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       {/* Modal Premium */}
       {isModalOpen && selectedPaciente && (
         <div className="fixed inset-0 bg-primary/20 backdrop-blur-md z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
-          <div className="bg-surface-container-lowest w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl shadow-[0px_24px_48px_rgba(0,0,0,0.15)] overflow-hidden border border-white/20 animate-in zoom-in-95 duration-300">
+          <div data-dropdown-root="true" className="relative bg-surface-container-lowest w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl shadow-[0px_24px_48px_rgba(0,0,0,0.15)] overflow-visible border border-white/20 animate-in zoom-in-95 duration-300">
             {/* Header do Modal */}
             <div className="bg-gradient-to-r from-[#1c2e4a] to-[#253c61] px-5 sm:px-8 md:px-10 py-5 sm:py-6 flex justify-between items-center relative shrink-0">
               <div className="flex items-center gap-3 sm:gap-4">

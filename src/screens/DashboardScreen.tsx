@@ -141,35 +141,70 @@ const ColumnChart: React.FC<{ data: { label: string; value: number; color: strin
 
 const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ data }) => {
   const max = Math.max(...data.map(d => d.value), 1);
+  
   return (
-    <div className="relative h-56 pt-8 w-full">
-      <div className="absolute inset-x-0 bottom-8 h-px bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
-      <div className="absolute inset-0 flex items-end justify-between px-3">
-        {data.map((d, i) => (
-          <div key={i} className="flex-1 flex flex-col items-center justify-end h-full relative group pb-8">
-            <div 
-              className="w-4.5 h-4.5 bg-primary rounded-full border-[3px] border-white shadow-xl z-10 transition-transform group-hover:scale-125"
-              style={{ marginBottom: `${(d.value / max) * 100}%` }}
-            />
-            {i < data.length - 1 && (
+    <div className="relative h-64 pt-12 w-full px-2">
+      {/* Linhas de Grade */}
+      <div className="absolute inset-x-0 bottom-8 h-px bg-slate-100" />
+      <div className="absolute inset-x-0 top-12 h-px bg-slate-50/50" />
+      
+      <div className="absolute inset-0 flex items-end justify-between px-4">
+        {data.map((d, i) => {
+          const heightPercent = (d.value / max) * 100;
+          const nextHeightPercent = i < data.length - 1 ? (data[i+1].value / max) * 100 : 0;
+          
+          return (
+            <div key={i} className="flex-1 flex flex-col items-center justify-end h-full relative group pb-8">
+              {/* Valor fixo no topo se for relevante */}
+              <div className={`absolute left-1/2 -translate-x-1/2 transition-all duration-500 mb-2 ${d.value > 0 ? 'opacity-100' : 'opacity-30'}`}
+                style={{ bottom: `calc(${heightPercent}% + 45px)` }}
+              >
+                <span className="text-[11px] font-black text-primary bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
+                  {d.value}
+                </span>
+              </div>
+
+              {/* Área de Gradiente (Simulada com Divs) */}
               <div 
-                className="absolute h-1 bg-primary/45 origin-left rounded-full"
-                style={{ 
-                  left: '50%', 
-                  bottom: `${(d.value / max) * 100}%`,
-                  width: '100%',
-                  transform: `rotate(${Math.atan2((data[i+1].value - d.value) * 48 / max, 100) * 180 / Math.PI}deg)`
-                }}
+                className="absolute bottom-8 w-px bg-gradient-to-t from-primary/20 to-transparent transition-all duration-1000"
+                style={{ height: `${heightPercent}%`, left: '50%' }}
               />
-            )}
-            <span className="mt-5 text-[10px] md:text-[11px] font-black text-primary/70 uppercase tracking-tight">
-              {d.label}
-            </span>
-            <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[11px] px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-black z-20 shadow-xl">
-              {d.value}
+
+              {/* Ponto (Dot) */}
+              <div 
+                className={`w-4 h-4 rounded-full border-[3px] border-white shadow-xl z-10 transition-all duration-500 group-hover:scale-150 ${
+                  d.value > 0 ? 'bg-primary shadow-primary/30' : 'bg-slate-300'
+                }`}
+                style={{ marginBottom: `${heightPercent}%` }}
+              />
+
+              {/* Linha de Conexão */}
+              {i < data.length - 1 && (
+                <div 
+                  className="absolute h-[2px] bg-gradient-to-r from-primary/40 to-primary/40 origin-left z-0"
+                  style={{ 
+                    left: '50%', 
+                    bottom: `calc(${heightPercent}% + 8px)`, // Ajuste para centralizar no dot
+                    width: '100%',
+                    transform: `rotate(${Math.atan2((data[i+1].value - d.value) * 160 / max, 100) * 180 / Math.PI}deg)`
+                  }}
+                />
+              )}
+
+              {/* Label Eixo X */}
+              <span className={`mt-5 text-[10px] md:text-[11px] font-black uppercase tracking-tight transition-colors ${
+                d.value > 0 ? 'text-primary' : 'text-slate-300'
+              }`}>
+                {d.label}
+              </span>
+
+              {/* Tooltip Hover */}
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-3 py-1.5 rounded-xl opacity-0 group-hover:opacity-100 transition-all transform group-hover:-translate-y-1 font-black z-30 shadow-2xl pointer-events-none whitespace-nowrap">
+                {d.label}: {d.value} buscas
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

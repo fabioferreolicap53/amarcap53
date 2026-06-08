@@ -34,8 +34,9 @@ export const SingleSelect: React.FC<SingleSelectProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number; openAbove: boolean; maxHeight: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
 
   const normalizedOptions: Option[] = options.map(opt => 
     typeof opt === 'string' ? { label: opt, value: opt } : opt
@@ -50,50 +51,75 @@ export const SingleSelect: React.FC<SingleSelectProps> = ({
   const updatePosition = () => {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
+      const portalHost = containerRef.current.closest('[data-dropdown-root="true"]') as HTMLElement | null;
+      const hostRect = portalHost?.getBoundingClientRect();
       const dropdownHeight = 300; // Altura máxima estimada
+      const viewportPadding = 12;
       const spaceBelow = window.innerHeight - rect.bottom;
       const spaceAbove = rect.top;
       
-      let top = rect.bottom + window.scrollY + 8;
+      const shouldOpenAbove = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+      const availableHeight = shouldOpenAbove ? spaceAbove - viewportPadding : spaceBelow - viewportPadding;
+      const maxHeight = Math.max(Math.min(availableHeight, dropdownHeight), 160);
       
-      // Se não houver espaço embaixo e houver mais espaço em cima, inverte
-      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
-        top = rect.top + window.scrollY - dropdownHeight - 8;
-      }
-
       setDropdownPosition({
-        top: top,
-        left: rect.left + window.scrollX,
-        width: rect.width
+        top: hostRect ? rect.bottom - hostRect.top + 8 : 0,
+        left: hostRect ? rect.left - hostRect.left : 0,
+        width: rect.width,
+        openAbove: shouldOpenAbove,
+        maxHeight
       });
     }
   };
 
+  const scheduleUpdatePosition = () => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+    }
+
+    rafRef.current = requestAnimationFrame(() => {
+      updatePosition();
+      rafRef.current = null;
+    });
+  };
+
   const handleOpen = () => {
     if (!disabled) {
-      updatePosition();
+      scheduleUpdatePosition();
       setIsOpen(true);
     }
   };
 
   useEffect(() => {
     if (isOpen) {
-      updatePosition();
-      const handleUpdate = () => updatePosition();
+      scheduleUpdatePosition();
+      const handleUpdate = () => scheduleUpdatePosition();
       window.addEventListener('scroll', handleUpdate, true);
       window.addEventListener('resize', handleUpdate);
       return () => {
         window.removeEventListener('scroll', handleUpdate, true);
         window.removeEventListener('resize', handleUpdate);
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
+        }
       };
     }
   }, [isOpen]);
 
   useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         const target = e.target as HTMLElement;
-        if (!target.closest('.singleselect-portal-content')) {
+        if (!target.closest('.singleselect-dropdown-content')) {
           setIsOpen(false);
         }
       }
@@ -155,16 +181,24 @@ export const SingleSelect: React.FC<SingleSelectProps> = ({
         </div>
       </button>
 
-      {isOpen && dropdownPosition && createPortal(
-        <div 
-          className="singleselect-portal-content fixed z-[10001] animate-in fade-in slide-in-from-top-1 duration-200 origin-top"
-          style={{ 
-            top: dropdownPosition.top, 
-            left: dropdownPosition.left, 
-            width: dropdownPosition.width 
-          }}
-        >
-          <div className="bg-white border border-primary/10 rounded-2xl shadow-[0px_15px_40px_rgba(0,0,0,0.15)] p-3 backdrop-blur-xl bg-white/98 ring-1 ring-black/5">
+      {isOpen && dropdownPosition && (() => {
+        const portalHost = containerRef.current?.closest('[data-dropdown-root="true"]') as HTMLElement | null;
+        const dropdownContent = (
+          <div 
+            className={`singleselect-dropdown-content z-[10001] animate-in fade-in duration-200 ${
+              portalHost
+                ? 'absolute'
+                : `absolute inset-x-0 ${dropdownPosition.openAbove ? 'bottom-full mb-2 slide-in-from-bottom-1 origin-bottom' : 'top-full mt-2 slide-in-from-top-1 origin-top'}`
+            }`}
+            style={portalHost ? {
+              top: dropdownPosition.openAbove
+                ? dropdownPosition.top - dropdownPosition.maxHeight - containerRef.current!.offsetHeight - 8
+                : dropdownPosition.top,
+              left: dropdownPosition.left,
+              width: dropdownPosition.width
+            } : undefined}
+          >
+            <div className="bg-white border border-primary/10 rounded-2xl shadow-[0px_15px_40px_rgba(0,0,0,0.15)] p-3 backdrop-blur-xl bg-white/98 ring-1 ring-black/5">
             {showSearch && (
               <div className="relative mb-4">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -179,7 +213,7 @@ export const SingleSelect: React.FC<SingleSelectProps> = ({
               </div>
             )}
 
-            <div className="max-h-[250px] overflow-y-auto no-scrollbar space-y-1">
+            <div className="overflow-y-auto no-scrollbar space-y-1" style={{ maxHeight: dropdownPosition.maxHeight }}>
               {filteredOptions.length === 0 ? (
                 <p className="text-[10px] font-bold text-slate-400 text-center py-4 uppercase">Nenhum resultado</p>
               ) : (
@@ -202,9 +236,11 @@ export const SingleSelect: React.FC<SingleSelectProps> = ({
               )}
             </div>
           </div>
-        </div>,
-        document.body
-      )}
+          </div>
+        );
+
+        return portalHost ? createPortal(dropdownContent, portalHost) : dropdownContent;
+      })()}
     </div>
   );
 };
