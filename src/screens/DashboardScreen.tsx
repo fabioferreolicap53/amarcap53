@@ -39,50 +39,100 @@ interface DashboardScreenProps {
 }
 
 // Helper Components
-const SimpleProgressBar: React.FC<{ label: string; value: number; total: number; color: string }> = ({ label, value, total, color }) => (
-  <div className="space-y-3">
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-[11px] md:text-xs font-black uppercase tracking-widest text-primary/70 truncate max-w-[220px]">{label}</span>
+const SimpleProgressBar: React.FC<{ label: string; value: number; total: number; color: string; rank?: number }> = ({ label, value, total, color, rank }) => (
+  <div className="group/item relative">
+    <div className="flex items-center justify-between gap-4 mb-2">
+      <div className="flex items-center gap-3 min-w-0">
+        {rank !== undefined && (
+          <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${
+            rank === 0 ? 'bg-amber-100 text-amber-600 ring-1 ring-amber-200' : 
+            rank === 1 ? 'bg-slate-100 text-slate-500 ring-1 ring-slate-200' :
+            rank === 2 ? 'bg-orange-50 text-orange-600 ring-1 ring-orange-100' :
+            'bg-primary/5 text-primary/40'
+          }`}>
+            {rank + 1}
+          </div>
+        )}
+        <span className="text-[11px] md:text-xs font-black uppercase tracking-widest text-primary/70 truncate group-hover/item:text-primary transition-colors">{label}</span>
+      </div>
       <div className="flex items-center gap-2 shrink-0">
         <span className="text-sm md:text-base font-black text-primary">{value}</span>
-        <span className="text-[10px] md:text-[11px] font-black text-primary/50 uppercase bg-primary/5 px-2.5 py-1 rounded-full border border-primary/10">
-          {total > 0 ? Math.round((value / total) * 100) : 0}%
-        </span>
+        <div className="flex flex-col items-end">
+          <span className="text-[9px] font-black text-primary/40 uppercase tracking-tighter leading-none">Pacientes</span>
+          <span className="text-[10px] font-black text-primary/60 mt-0.5">
+            {total > 0 ? Math.round((value / total) * 100) : 0}%
+          </span>
+        </div>
       </div>
     </div>
-    <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden border border-outline-variant/10 shadow-inner">
+    <div className="h-3 w-full bg-slate-100/50 rounded-full overflow-hidden border border-outline-variant/10 shadow-inner relative">
       <div 
-        className={`h-full ${color} transition-all duration-1000 ease-out shadow-lg rounded-full`} 
-        style={{ width: `${total > 0 ? (value / total) * 100 : 0}%` }}
-      />
+        className={`h-full ${color} transition-all duration-1000 ease-out shadow-lg rounded-full relative overflow-hidden`} 
+        style={{ width: `${total > 0 && value > 0 ? (value / total) * 100 : 2}%` }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent" />
+      </div>
     </div>
   </div>
 );
 
 const ColumnChart: React.FC<{ data: { label: string; value: number; color: string }[] }> = ({ data }) => {
   const max = Math.max(...data.map(d => d.value), 1);
+  const total = data.reduce((acc, curr) => acc + curr.value, 0);
+
   return (
-    <div className="relative h-56 pt-8 w-full">
-      <div className="absolute inset-x-0 bottom-8 h-px bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
-      <div className="flex items-end justify-between h-full gap-4">
-      {data.map((d, i) => (
-        <div key={i} className="flex-1 flex flex-col items-center gap-3 group">
-          <div className="relative w-full flex flex-col items-center justify-end h-full pb-8">
-            <div 
-              className={`w-full max-w-[52px] ${d.color} rounded-t-[1rem] transition-all duration-1000 ease-out shadow-xl relative group-hover:brightness-110 group-hover:scale-[1.03]`}
-              style={{ height: `${(d.value / max) * 100}%` }}
-            >
-              <div className="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-white/20 to-transparent rounded-t-[1rem]" />
-              <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[11px] px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-black z-20 shadow-xl">
-                {d.value}
+    <div className="relative h-64 pt-12 w-full">
+      {/* Linhas de Grade de Fundo */}
+      <div className="absolute inset-x-0 bottom-8 h-px bg-slate-200/50" />
+      <div className="absolute inset-x-0 top-12 h-px bg-slate-100/30" />
+      
+      <div className="flex items-end justify-between h-full gap-2 md:gap-4 px-2">
+      {data.map((d, i) => {
+        const percentage = total > 0 ? Math.round((d.value / total) * 100) : 0;
+        const heightPercent = (d.value / max) * 100;
+        
+        return (
+          <div key={i} className="flex-1 flex flex-col items-center gap-4 group h-full">
+            <div className="relative w-full flex flex-col items-center justify-end h-full pb-8">
+              {/* Valor fixo no topo */}
+              <div className="absolute -top-8 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                <span className={`text-[11px] md:text-sm font-black transition-colors duration-300 ${d.value > 0 ? 'text-primary' : 'text-slate-300'}`}>
+                  {d.value}
+                </span>
+                {d.value > 0 && (
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
+                    {percentage}%
+                  </span>
+                )}
+              </div>
+
+              {/* Barra de trilha (Track) */}
+              <div className="absolute inset-x-0 bottom-8 top-0 bg-slate-50/50 rounded-2xl border border-slate-100/50" />
+              
+              {/* Barra de dados */}
+              <div 
+                className={`w-full max-w-[48px] ${d.color} rounded-t-xl transition-all duration-1000 ease-out shadow-lg relative group-hover:brightness-110 group-hover:scale-[1.05] group-hover:shadow-2xl`}
+                style={{ height: `${d.value > 0 ? Math.max(heightPercent, 8) : 4}%` }}
+              >
+                {/* Efeito de brilho no topo da barra */}
+                <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/30 to-transparent rounded-t-xl" />
+                
+                {/* Tooltip no hover (opcional, mantido para detalhes) */}
+                <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-3 py-1.5 rounded-xl opacity-0 group-hover:opacity-100 transition-all transform group-hover:-translate-y-1 font-black z-20 shadow-2xl pointer-events-none whitespace-nowrap">
+                  {d.label}: {d.value} ({percentage}%)
+                </div>
               </div>
             </div>
+            
+            {/* Label do Eixo X */}
+            <div className="flex flex-col items-center">
+              <span className={`text-[9px] md:text-[11px] font-black uppercase tracking-widest transition-colors duration-300 ${d.value > 0 ? 'text-primary/70' : 'text-slate-300'}`}>
+                {d.label}
+              </span>
+            </div>
           </div>
-          <span className="text-[10px] md:text-[11px] font-black text-primary/80 uppercase tracking-tight truncate w-full text-center leading-tight">
-            {d.label}
-          </span>
-        </div>
-      ))}
+        );
+      })}
       </div>
     </div>
   );
@@ -697,13 +747,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     {Object.entries(acompStats.unidadeBreakdown)
                       .sort((a, b) => (b[1] as number) - (a[1] as number))
                       .slice(0, 5)
-                      .map(([label, val]) => (
+                      .map(([label, val], idx) => (
                         <SimpleProgressBar 
                           key={label}
                           label={label} 
                           value={val} 
                           total={stats.totalPacientes} 
                           color="bg-primary" 
+                          rank={idx}
                         />
                       ))}
                   </div>
@@ -715,13 +766,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     {Object.entries(acompStats.equipeBreakdown)
                       .sort((a, b) => (b[1] as number) - (a[1] as number))
                       .slice(0, 5)
-                      .map(([label, val]) => (
+                      .map(([label, val], idx) => (
                         <SimpleProgressBar 
                           key={label}
                           label={label} 
                           value={val} 
                           total={stats.totalPacientes} 
                           color="bg-blue-500" 
+                          rank={idx}
                         />
                       ))}
                   </div>
@@ -732,13 +784,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     {Object.entries(acompStats.microareaBreakdown)
                       .sort((a, b) => (b[1] as number) - (a[1] as number))
                       .slice(0, 5)
-                      .map(([label, val]) => (
+                      .map(([label, val], idx) => (
                         <SimpleProgressBar 
                           key={label}
                           label={`MA ${label}`} 
                           value={val} 
                           total={stats.totalPacientes} 
                           color="bg-emerald-500" 
+                          rank={idx}
                         />
                       ))}
                   </div>
