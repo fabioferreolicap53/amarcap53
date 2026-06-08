@@ -16,7 +16,8 @@ import {
   ENTRAVES_IDENTIFICADOS_OPTIONS,
   ENTRAVES_INFORMADO_POR_OPTIONS,
   buildSelectFilter,
-  getCanonicalSelectValue
+  getCanonicalSelectValue,
+  getSelectLabel
 } from '../constants/followUpOptions';
 
 interface Paciente {
@@ -367,7 +368,16 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     e.preventDefault();
     if (!selectedPaciente || !user) return;
     
-    // Validação de entraves obrigatórios se informado por preenchido
+    if (!selectedDate) {
+      alert('Preencha a Data da Busca.');
+      return;
+    }
+    
+    if (!modalTipoBusca || !modalTipoContato || !modalSituacao) {
+      alert('Preencha todos os campos obrigatórios: Tipo de Busca, Tipo de Contato e Situação Pós Busca.');
+      return;
+    }
+    
     if (modalEntravesInformadoPor && (!modalEntraves || modalEntraves.length === 0)) {
       alert('Por favor, selecione ao menos um entrave identificado.');
       return;
@@ -378,30 +388,29 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     let dataBuscaIso = '';
     if (selectedDate && selectedDate.includes('/')) {
       const [d, m, y] = selectedDate.split('/');
-      dataBuscaIso = `${y}-${m}-${d}`; // Formato YYYY-MM-DD é mais seguro para PocketBase
+      dataBuscaIso = `${y}-${m}-${d}`;
     }
 
     const data = {
       paciente: selectedPaciente.id,
       profissional: user.id,
       data_busca: dataBuscaIso || selectedDate,
-      tipo_busca: getCanonicalSelectValue(modalTipoBusca, TIPO_BUSCA_OPTIONS),
-      tipo_contato: getCanonicalSelectValue(modalTipoContato, TIPO_CONTATO_OPTIONS),
-      situacao_pos_busca: getCanonicalSelectValue(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS),
+      tipo_busca: getSelectLabel(modalTipoBusca, TIPO_BUSCA_OPTIONS),
+      tipo_contato: getSelectLabel(modalTipoContato, TIPO_CONTATO_OPTIONS),
+      situacao_pos_busca: getSelectLabel(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS),
       entraves_identificados: Array.isArray(modalEntraves) 
-        ? modalEntraves.filter(v => v).join('; ') 
-        : modalEntraves || '',
-      entraves_informado_por: getCanonicalSelectValue(modalEntravesInformadoPor, ENTRAVES_INFORMADO_POR_OPTIONS),
+        ? modalEntraves.filter(v => v)
+        : modalEntraves ? [modalEntraves] : [],
+      entraves_informado_por: getSelectLabel(modalEntravesInformadoPor, ENTRAVES_INFORMADO_POR_OPTIONS),
       observacoes: modalObservacoes,
     };
 
+    console.log('[SAVE] Payload para amarcap53_acompanhamentos:', JSON.stringify(data, null, 2));
+
     try {
-      // #region debug-point A:patients-followup-create-payload
-      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"A",location:"PatientsScreen.tsx:handleSaveFollowUp",msg:"patients create payload",data:{payload:data},ts:Date.now()})}).catch(()=>{});
-      // #endregion
-      await pb.collection('amarcap53_acompanhamentos').create(data);
+      const result = await pb.collection('amarcap53_acompanhamentos').create(data);
+      console.log('[SAVE] Sucesso:', result);
       
-      // Atualiza o contador de acompanhamentos localmente para feedback instantâneo
       setPacientes(prev => prev.map(p => {
         if (p.id === selectedPaciente.id) {
           return {
@@ -415,19 +424,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       alert('Acompanhamento registrado com sucesso!');
       handleCloseModal();
     } catch (error: any) {
-      try {
-        const sampleRecords = await pb.collection('amarcap53_acompanhamentos').getList(1, 5, {
-          sort: '-created',
-          fields: 'id,tipo_busca,tipo_contato,situacao_pos_busca,entraves_informado_por',
-        });
-        // #region debug-point G:patients-followup-create-samples
-        fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"G",location:"PatientsScreen.tsx:handleSaveFollowUp-samples",msg:"patients existing samples",data:{items:sampleRecords.items},ts:Date.now()})}).catch(()=>{});
-        // #endregion
-      } catch (_) {}
-      // #region debug-point B:patients-followup-create-error
-      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"B",location:"PatientsScreen.tsx:handleSaveFollowUp-catch",msg:"patients create error",data:{payload:data,errorData:error?.data||null,errorMessage:error?.message||null,response:error?.response||null},ts:Date.now()})}).catch(()=>{});
-      // #endregion
-      console.error('Erro ao salvar acompanhamento:', error);
+      console.error('[SAVE] Erro completo:', error);
+      console.error('[SAVE] error.data.data (field errors):', JSON.stringify(error?.data?.data, null, 2));
+      console.error('[SAVE] error.message:', error?.message);
+      
       const pbError = error.data?.data;
       let errorMsg = 'Erro ao salvar o acompanhamento.';
       

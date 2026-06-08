@@ -17,6 +17,7 @@ import {
   ENTRAVES_INFORMADO_POR_OPTIONS,
   buildSelectFilter,
   getCanonicalSelectValue,
+  getSelectLabel,
   matchesSelectFilter,
   getCanonicalValue
 } from '../constants/followUpOptions';
@@ -265,8 +266,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         tipo_busca: getCanonicalSelectValue(acompToEdit.tipo_busca, TIPO_BUSCA_OPTIONS),
         tipo_contato: getCanonicalSelectValue(acompToEdit.tipo_contato, TIPO_CONTATO_OPTIONS),
         situacao_pos_busca: getCanonicalSelectValue(acompToEdit.situacao_pos_busca, SITUACAO_POS_BUSCA_OPTIONS),
-        entraves_identificados: acompToEdit.entraves_identificados 
-          ? acompToEdit.entraves_identificados.split('; ') 
+        entraves_identificados: acompToEdit.entraves_identificados
+          ? (Array.isArray(acompToEdit.entraves_identificados)
+            ? acompToEdit.entraves_identificados.map(v => getCanonicalSelectValue(v, ENTRAVES_IDENTIFICADOS_OPTIONS))
+            : acompToEdit.entraves_identificados.split('; ').map(v => getCanonicalSelectValue(v, ENTRAVES_IDENTIFICADOS_OPTIONS)))
           : [],
         entraves_informado_por: getCanonicalSelectValue(acompToEdit.entraves_informado_por, ENTRAVES_INFORMADO_POR_OPTIONS)
       });
@@ -283,7 +286,11 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     e.preventDefault();
     if (!selectedAcompanhamento) return;
     
-    // Validação de entraves obrigatórios se informado por preenchido
+    if (!selectedAcompanhamento.data_busca_formatada || !selectedAcompanhamento.tipo_busca || !selectedAcompanhamento.tipo_contato || !selectedAcompanhamento.situacao_pos_busca) {
+      alert('Preencha todos os campos obrigatórios: Data da Busca, Tipo de Busca, Tipo de Contato e Situação Pós Busca.');
+      return;
+    }
+    
     if (selectedAcompanhamento.entraves_informado_por && (!selectedAcompanhamento.entraves_identificados || selectedAcompanhamento.entraves_identificados.length === 0)) {
       alert('Por favor, selecione ao menos um entrave identificado.');
       return;
@@ -295,28 +302,27 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     let dataBuscaIso = '';
     if (rawDate && rawDate.includes('/')) {
       const [d, m, y] = rawDate.split('/');
-      dataBuscaIso = `${y}-${m}-${d}`; // Formato YYYY-MM-DD
+      dataBuscaIso = `${y}-${m}-${d}`;
     }
 
     const data = {
-      tipo_busca: getCanonicalSelectValue(selectedAcompanhamento.tipo_busca, TIPO_BUSCA_OPTIONS),
+      tipo_busca: getSelectLabel(selectedAcompanhamento.tipo_busca, TIPO_BUSCA_OPTIONS),
       data_busca: dataBuscaIso || rawDate,
-      tipo_contato: getCanonicalSelectValue(selectedAcompanhamento.tipo_contato, TIPO_CONTATO_OPTIONS),
-      situacao_pos_busca: getCanonicalSelectValue(selectedAcompanhamento.situacao_pos_busca, SITUACAO_POS_BUSCA_OPTIONS),
+      tipo_contato: getSelectLabel(selectedAcompanhamento.tipo_contato, TIPO_CONTATO_OPTIONS),
+      situacao_pos_busca: getSelectLabel(selectedAcompanhamento.situacao_pos_busca, SITUACAO_POS_BUSCA_OPTIONS),
       entraves_identificados: Array.isArray(selectedAcompanhamento.entraves_identificados) 
-        ? selectedAcompanhamento.entraves_identificados.filter(v => v).join('; ') 
-        : selectedAcompanhamento.entraves_identificados || '',
-      entraves_informado_por: getCanonicalSelectValue(selectedAcompanhamento.entraves_informado_por, ENTRAVES_INFORMADO_POR_OPTIONS),
+        ? selectedAcompanhamento.entraves_identificados.filter(v => v)
+        : selectedAcompanhamento.entraves_identificados ? [selectedAcompanhamento.entraves_identificados] : [],
+      entraves_informado_por: getSelectLabel(selectedAcompanhamento.entraves_informado_por, ENTRAVES_INFORMADO_POR_OPTIONS),
       observacoes: selectedAcompanhamento.observacoes || '',
     };
 
+    console.log('[SAVE EDIT] Payload:', JSON.stringify(data, null, 2));
+
     try {
-      // #region debug-point E:followups-update-payload
-      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"E",location:"FollowUpsScreen.tsx:handleSaveAcompanhamentoEdit",msg:"followups update payload",data:{recordId:selectedAcompanhamento.id,payload:data},ts:Date.now()})}).catch(()=>{});
-      // #endregion
-      const record = await pb.collection('amarcap53_acompanhamentos').update(selectedAcompanhamento.id, data);
+      const result = await pb.collection('amarcap53_acompanhamentos').update(selectedAcompanhamento.id, data);
+      console.log('[SAVE EDIT] Sucesso:', result);
       
-      // Atualiza o estado local para refletir as mudanças na tabela
       setAcompanhamentos(prev => prev.map(item => {
         if (item.id === selectedAcompanhamento.id) {
           return { ...item, ...data };
@@ -327,10 +333,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       alert('Acompanhamento atualizado com sucesso!');
       handleCloseModal();
     } catch (error: any) {
-      // #region debug-point F:followups-update-error
-      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"F",location:"FollowUpsScreen.tsx:handleSaveAcompanhamentoEdit-catch",msg:"followups update error",data:{recordId:selectedAcompanhamento.id,payload:data,errorData:error?.data||null,errorMessage:error?.message||null,response:error?.response||null},ts:Date.now()})}).catch(()=>{});
-      // #endregion
-      console.error('Erro ao atualizar acompanhamento:', error);
+      console.error('[SAVE EDIT] Erro completo:', error);
+      console.error('[SAVE EDIT] error.data:', error?.data);
+      console.error('[SAVE EDIT] error.message:', error?.message);
+      
       const pbError = error.data?.data;
       let errorMsg = 'Erro ao atualizar o registro.';
       
