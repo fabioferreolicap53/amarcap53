@@ -5,9 +5,9 @@ export const TIPO_BUSCA_OPTIONS = [
 ];
 
 export const TIPO_CONTATO_OPTIONS = [
-  "Contato direto (conversa)",
-  "Contato indireto (mensagem)",
-  "Não houve contato ( não localizada, ligação não atendida...)"
+  "CONTATO DIRETO (CONVERSA)",
+  "CONTATO INDIRETO (MENSAGEM)",
+  "NÃO HOUVE CONTATO ( NÃO LOCALIZADA, LIGAÇÃO NÃO ATENDIDA...)"
 ];
 
 export const SITUACAO_POS_BUSCA_OPTIONS = [

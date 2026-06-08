@@ -539,7 +539,9 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       tipo_busca: modalTipoBusca,
       tipo_contato: modalTipoContato,
       situacao_pos_busca: modalSituacao,
-      entraves_identificados: modalEntraves.join('; '),
+      entraves_identificados: Array.isArray(modalEntraves) 
+        ? modalEntraves.join('; ') 
+        : modalEntraves || '',
       entraves_informado_por: modalEntravesInformadoPor,
       observacoes: modalObservacoes,
     };
@@ -549,9 +551,15 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       alert('Acompanhamento registrado com sucesso!');
       handleCloseModal();
       fetchFavorites(true); // Refresh list to update counts
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar acompanhamento:', error);
-      alert('Erro ao salvar o acompanhamento.');
+      const pbError = error.data?.data;
+      let errorMsg = 'Erro ao salvar o acompanhamento.';
+      if (pbError) {
+        const fields = Object.keys(pbError).map(k => `${k}: ${pbError[k].message}`).join('\n');
+        errorMsg += `\n\nCampos com problema:\n${fields}`;
+      }
+      alert(errorMsg);
     } finally {
       setIsSaving(false);
     }

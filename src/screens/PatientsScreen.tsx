@@ -397,9 +397,17 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
       alert('Acompanhamento registrado com sucesso!');
       handleCloseModal();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar acompanhamento:', error);
-      alert('Erro ao salvar o acompanhamento. Verifique se a coleção foi criada no PocketBase.');
+      const pbError = error.data?.data;
+      let errorMsg = 'Erro ao salvar o acompanhamento.';
+      if (pbError) {
+        const fields = Object.keys(pbError).map(k => `${k}: ${pbError[k].message}`).join('\n');
+        errorMsg += `\n\nCampos com problema:\n${fields}`;
+      } else {
+        errorMsg += '\nVerifique se a coleção foi criada no PocketBase.';
+      }
+      alert(errorMsg);
     } finally {
       setIsSaving(false);
     }
