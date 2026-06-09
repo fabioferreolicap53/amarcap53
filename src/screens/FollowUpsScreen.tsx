@@ -96,7 +96,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const normalizeCanalLabel = (value?: string) => value || '';
 
   const getCanalLabel = (acomp: Acompanhamento) => {
-    const canonical = getCanonicalValue('tipo_contato', acomp.tipo_contato || '');
+    const canonical = String(getCanonicalValue('tipo_contato', acomp.tipo_contato || ''));
     const lower = canonical.toLowerCase();
     
     if (lower.includes('não houve contato')) return 'Sem Contato';
@@ -110,17 +110,17 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const stats = useMemo(() => {
     const total = acompanhamentos.length;
     const contatos = acompanhamentos.filter(a => {
-      const val = (a.tipo_contato || '').toLowerCase();
+      const val = String(a.tipo_contato || '').toLowerCase();
       return val && !val.includes('não houve contato');
     }).length;
     
     const falhas = acompanhamentos.filter(a => {
-      const val = (a.tipo_contato || '').toLowerCase();
+      const val = String(a.tipo_contato || '').toLowerCase();
       return val && val.includes('não houve contato');
     }).length;
     
     const agendamentos = acompanhamentos.filter(a => {
-      const val = (a.situacao_pos_busca || '').toLowerCase();
+      const val = String(a.situacao_pos_busca || '').toLowerCase();
       return val && val.includes('agendamento');
     }).length;
     
@@ -133,7 +133,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
     validAcomps.forEach(a => {
       totalCounts[a.canal_label] = (totalCounts[a.canal_label] || 0) + 1;
-      const situacaoLower = (a.situacao_pos_busca || '').toLowerCase();
+      const situacaoLower = String(a.situacao_pos_busca || '').toLowerCase();
       if (situacaoLower.includes('agendamento')) {
         counts[a.canal_label] = (counts[a.canal_label] || 0) + 1;
       }

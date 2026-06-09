@@ -430,11 +430,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         const aStats = {
           total: acompRecords.length,
           sucesso: acompRecords.filter(r => {
-            const val = (r.situacao_pos_busca || '').toLowerCase();
+            const val = String(r.situacao_pos_busca || '').toLowerCase();
             return val && val.includes('agendamento');
           }).length,
           contatos: acompRecords.filter(r => {
-            const val = (r.tipo_contato || '').toLowerCase();
+            const val = String(r.tipo_contato || '').toLowerCase();
             return val && !val.includes('não houve contato');
           }).length,
           tipoBusca: {} as Record<string, number>,
