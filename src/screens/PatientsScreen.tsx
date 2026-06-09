@@ -212,6 +212,11 @@ const formatarData = (dataStr: string | undefined) => {
   return dateOnly;
 };
 
+const SIM_NAO_OPTIONS = [
+  { label: 'SIM', value: 'SIM' },
+  { label: 'NÃO', value: 'NÃO' },
+];
+
 export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setActiveTab }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
@@ -251,6 +256,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [filterUnidade, setFilterUnidade] = useState<string[]>([]);
   const [filterEquipe, setFilterEquipe] = useState<string[]>([]);
   const [filterMicroarea, setFilterMicroarea] = useState<string[]>([]);
+  const [filterDnaHpvPep, setFilterDnaHpvPep] = useState<string[]>([]);
+  const [filterCitoLab, setFilterCitoLab] = useState<string[]>([]);
+  const [filterCitoPep, setFilterCitoPep] = useState<string[]>([]);
+  const [filterDnaHpvGal, setFilterDnaHpvGal] = useState<string[]>([]);
 
   const [availableGroups, setAvailableGroups] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>(user?.favoritos || []);
@@ -690,6 +699,24 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         if (filterStatus.length > 0) {
           pacientesFormatados = pacientesFormatados.filter(p => p.alertas && filterStatus.includes(p.alertas));
         }
+        
+        // Filtros de data dos exames (SIM/NÃO)
+        const dateFilter = (field: string | undefined, filterVals: string[]) => {
+          if (filterVals.length === 0) return true;
+          const hasVal = field && field !== '--' && field !== '';
+          const wantSim = filterVals.includes('SIM');
+          const wantNao = filterVals.includes('NÃO');
+          if (wantSim && wantNao) return true;
+          if (wantSim) return !!hasVal;
+          if (wantNao) return !hasVal;
+          return true;
+        };
+        pacientesFormatados = pacientesFormatados.filter(p =>
+          dateFilter(p.cito_laboratorio, filterDnaHpvPep) &&
+          dateFilter(p.cito_lab, filterCitoLab) &&
+          dateFilter(p.cito_pep, filterCitoPep) &&
+          dateFilter(p.dna_hpv, filterDnaHpvGal)
+        );
 
         setPacientes(pacientesFormatados);
         setTotalItems(resultList.totalItems);
@@ -701,7 +728,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     };
 
     fetchPacientes();
-  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, searchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea]);
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, searchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal]);
 
   const resetFilters = () => {
     setSearchTerm('');
@@ -716,6 +743,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     setFilterUnidade([]);
     setFilterEquipe([]);
     setFilterMicroarea([]);
+    setFilterDnaHpvPep([]);
+    setFilterCitoLab([]);
+    setFilterCitoPep([]);
+    setFilterDnaHpvGal([]);
     setCurrentPage(1);
   };
 
@@ -809,16 +840,16 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                 <button 
                   onClick={() => setIsFilterVisible(!isFilterVisible)}
                   className={`flex items-center gap-3 px-8 h-14 rounded-2xl text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
-                    isFilterVisible || filterStatus.length > 0 || filterGrupo.length > 0 || filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0
+                    isFilterVisible || filterStatus.length > 0 || filterGrupo.length > 0 || filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0
                       ? 'bg-primary text-white border-primary shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]' 
                       : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
                   }`}
                 >
                   <Filter className="w-5 h-5" />
                   <span>Filtros</span>
-                  {(filterStatus.length > 0 || filterGrupo.length > 0 || filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0) && (
+                  {(filterStatus.length > 0 || filterGrupo.length > 0 || filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0) && (
                     <div className="w-6 h-6 flex items-center justify-center bg-white text-primary text-[10px] rounded-full font-black animate-pulse">
-                      {[filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves].filter(f => f.length > 0).length}
+                      {[filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal].filter(f => f.length > 0).length}
                     </div>
                   )}
                 </button>
@@ -889,6 +920,46 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                       value={filterGrupo}
                       onChange={setFilterGrupo}
                     />
+                  </div>
+
+                  {/* Filtros de Exames (SIM/NÃO) */}
+                  <div className="grid grid-cols-2 gap-4 col-span-1 md:col-span-2">
+                    <div className="space-y-3">
+                      <MultiSelect 
+                        label="DNA-HPV (PEP)"
+                        placeholder="SIM / NÃO"
+                        options={SIM_NAO_OPTIONS}
+                        value={filterDnaHpvPep}
+                        onChange={setFilterDnaHpvPep}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <MultiSelect 
+                        label="Cito (Lab)"
+                        placeholder="SIM / NÃO"
+                        options={SIM_NAO_OPTIONS}
+                        value={filterCitoLab}
+                        onChange={setFilterCitoLab}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <MultiSelect 
+                        label="Cito (PEP)"
+                        placeholder="SIM / NÃO"
+                        options={SIM_NAO_OPTIONS}
+                        value={filterCitoPep}
+                        onChange={setFilterCitoPep}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <MultiSelect 
+                        label="DNA-HPV (GAL)"
+                        placeholder="SIM / NÃO"
+                        options={SIM_NAO_OPTIONS}
+                        value={filterDnaHpvGal}
+                        onChange={setFilterDnaHpvGal}
+                      />
+                    </div>
                   </div>
 
                   {/* Filtros Regionais Condicionais */}

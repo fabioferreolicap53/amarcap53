@@ -220,7 +220,11 @@ const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ dat
 
 const InfoPopover: React.FC<{ content: string }> = ({ content }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isHover, setIsHover] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const show = isOpen || isHover;
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -230,8 +234,38 @@ const InfoPopover: React.FC<{ content: string }> = ({ content }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleMouseEnter = () => {
+    if (leaveTimer.current) clearTimeout(leaveTimer.current);
+    setIsHover(true);
+  };
+  const handleMouseLeave = () => {
+    leaveTimer.current = setTimeout(() => {
+      setIsHover(false);
+    }, 200);
+  };
+
   return (
-    <div className="relative group" ref={ref}>
+    <div
+      className="relative inline-flex flex-col items-center"
+      ref={ref}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {/* Tooltip acima */}
+      <div
+        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 transition-opacity duration-200 pointer-events-auto"
+        style={{ opacity: show ? 1 : 0, visibility: show ? 'visible' : 'hidden' }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="bg-white text-slate-700 text-[11px] leading-relaxed font-medium rounded-xl px-4 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-200/80 max-w-[240px] text-center whitespace-normal">
+          {content}
+        </div>
+        <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.08)]"></div>
+      </div>
+
+      {/* Botão */}
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
@@ -240,19 +274,6 @@ const InfoPopover: React.FC<{ content: string }> = ({ content }) => {
       >
         <span className="text-[8px] font-black leading-none" style={{ fontFamily: 'serif', fontStyle: 'italic' }}>i</span>
       </button>
-      <div
-        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none"
-        style={{ opacity: isOpen ? 1 : undefined }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="transition-opacity duration-200 opacity-0 group-hover:opacity-100"
-          style={{ opacity: isOpen ? 1 : undefined }}>
-          <div className="bg-white text-slate-700 text-[11px] leading-relaxed font-medium rounded-xl px-4 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-200/80 max-w-[240px] text-center whitespace-normal">
-            {content}
-          </div>
-          <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.08)]"></div>
-        </div>
-      </div>
     </div>
   );
 };
