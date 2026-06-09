@@ -430,12 +430,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         const aStats = {
           total: acompRecords.length,
           sucesso: acompRecords.filter(r => {
-            const canonical = getCanonicalValue('situacao_pos_busca', r.situacao_pos_busca || '');
-            return canonical && canonical.includes('1 -');
+            const val = (r.situacao_pos_busca || '').toLowerCase();
+            return val && val.includes('agendamento');
           }).length,
           contatos: acompRecords.filter(r => {
-            const canonical = getCanonicalValue('tipo_contato', r.tipo_contato || '');
-            return canonical && !canonical.includes('3 -');
+            const val = (r.tipo_contato || '').toLowerCase();
+            return val && !val.includes('não houve contato');
           }).length,
           tipoBusca: {} as Record<string, number>,
           situacao: {} as Record<string, number>,

@@ -97,10 +97,11 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
   const getCanalLabel = (acomp: Acompanhamento) => {
     const canonical = getCanonicalValue('tipo_contato', acomp.tipo_contato || '');
+    const lower = canonical.toLowerCase();
     
-    if (canonical.includes('3 -')) return 'Sem Contato';
-    if (canonical.includes('1 -')) return 'Contato Direto';
-    if (canonical.includes('2 -')) return 'Contato Indireto';
+    if (lower.includes('não houve contato')) return 'Sem Contato';
+    if (lower.includes('contato direto')) return 'Contato Direto';
+    if (lower.includes('contato indireto')) return 'Contato Indireto';
 
     return acomp.tipo_contato || '';
   };
@@ -109,32 +110,31 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const stats = useMemo(() => {
     const total = acompanhamentos.length;
     const contatos = acompanhamentos.filter(a => {
-      const canonical = getCanonicalValue('tipo_contato', a.tipo_contato || '');
-      return canonical && !canonical.includes('3 -');
+      const val = (a.tipo_contato || '').toLowerCase();
+      return val && !val.includes('não houve contato');
     }).length;
     
     const falhas = acompanhamentos.filter(a => {
-      const canonical = getCanonicalValue('tipo_contato', a.tipo_contato || '');
-      return canonical && canonical.includes('3 -');
+      const val = (a.tipo_contato || '').toLowerCase();
+      return val && val.includes('não houve contato');
     }).length;
     
     const agendamentos = acompanhamentos.filter(a => {
-      const canonical = getCanonicalValue('situacao_pos_busca', a.situacao_pos_busca || '');
-      return canonical && canonical.includes('1 -');
+      const val = (a.situacao_pos_busca || '').toLowerCase();
+      return val && val.includes('agendamento');
     }).length;
     
     const counts: Record<string, number> = {};
     const totalCounts: Record<string, number> = {};
 
-    // Usa apenas tipo_contato para o canal
     const validAcomps = acompanhamentos
       .map(a => ({ ...a, canal_label: getCanalLabel(a) }))
       .filter(a => a.canal_label);
 
     validAcomps.forEach(a => {
       totalCounts[a.canal_label] = (totalCounts[a.canal_label] || 0) + 1;
-      const canonicalSituacao = getCanonicalValue('situacao_pos_busca', a.situacao_pos_busca || '');
-      if (canonicalSituacao.includes('1 -')) {
+      const situacaoLower = (a.situacao_pos_busca || '').toLowerCase();
+      if (situacaoLower.includes('agendamento')) {
         counts[a.canal_label] = (counts[a.canal_label] || 0) + 1;
       }
     });
