@@ -124,9 +124,9 @@ export const ENTRAVES_IDENTIFICADOS_OPTIONS: SelectOption[] = [
     aliases: ["4 - FAZ O RASTREAMENTO PELA REDE PRIVADA", "4 - Faz o rastreamento pela rede privada"]
   },
   {
-    label: "DIFICULDADE DE LOCOMOVER-SE (EX: ACAMADA)",
-    value: "DIFICULDADE DE LOCOMOVER-SE (EX: ACAMADA)",
-    aliases: ["5 - DIFICULDADE DE LOCOMOVER-SE (EX: ACAMADA)", "5 - DIFICULDADE DE LOCOMOÇÃO POR EXEMPLO ACAMADA", "5 - DIFICULDADE DE LOCOMOÇÃO (EX:ACAMADA)", "5 - DIFICULDADE DE LOCOMOÇÃO ( EX: ACAMADA)", "5 - Dificuldade de locomover-se (ex: acamada)", "5 - Dificuldade de locomoção por exemplo acamada", "5 - Dificuldade de locomoção ( ex: acamada)"]
+    label: "DIFICULDADE DE LOCOMOÇÃO (EX:ACAMADA)",
+    value: "DIFICULDADE DE LOCOMOÇÃO (EX:ACAMADA)",
+    aliases: ["5 - DIFICULDADE DE LOCOMOÇÃO (EX:ACAMADA)", "5 - DIFICULDADE DE LOCOMOVER-SE (EX: ACAMADA)", "5 - DIFICULDADE DE LOCOMOÇÃO POR EXEMPLO ACAMADA", "5 - DIFICULDADE DE LOCOMOÇÃO ( EX: ACAMADA)", "5 - Dificuldade de locomoção (ex:acamada)", "5 - Dificuldade de locomover-se (ex: acamada)", "5 - Dificuldade de locomoção por exemplo acamada", "5 - Dificuldade de locomoção ( ex: acamada)"]
   },
   {
     label: "DISTÂNCIA DA UNIDADE",
