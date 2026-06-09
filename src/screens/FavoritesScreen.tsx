@@ -176,7 +176,7 @@ const ALERT_CONFIGS: Record<string, { label: string; icon: any; color: string; b
     description: 'Identificado registro de resultado no PEP de cito'
   },
   'COLETA_CITO': {
-    label: 'IDENTIFICADO COLETA DE CITO/ PENDENTE DE REGISTRO NO PEP',
+    label: 'IDENTIFICADO COLETA DE CITO/PENDENTE DE REGISTRO DE RESULTADO NO PEP',
     icon: Microscope,
     color: 'text-white',
     bg: 'bg-yellow-500 border-yellow-600 shadow-md shadow-yellow-500/20',
