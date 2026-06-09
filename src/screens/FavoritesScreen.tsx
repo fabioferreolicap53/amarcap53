@@ -627,7 +627,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                 <div className="text-center md:text-left">
                   <p className="text-xs md:text-sm font-black text-white/40 uppercase tracking-[0.3em] mb-2">Monitoramento Prioritário</p>
                   <p className="text-4xl md:text-[3.5rem] font-black text-white leading-none tracking-tighter">
-                    {pacientes.length} <span className="text-lg font-bold text-white/60 ml-2 tracking-normal uppercase">Favoritos</span>
+                    {filteredPacientes.length} <span className="text-lg font-bold text-white/60 ml-2 tracking-normal uppercase">Favoritos</span>
                   </p>
                 </div>
               </div>
