@@ -143,28 +143,28 @@ const InfoTooltip: React.FC<{ content: string }> = ({ content }) => {
 
 const ALERT_CONFIGS: Record<string, { label: string; icon: any; color: string; bg: string; description: string }> = {
   'PEP_MOLECULAR': {
-    label: 'IDENTIFICADO REGISTRO DE RESULTADO NO PEP DE TESTE MOLECULAR',
+    label: 'CONFIRMADO O REGISTRO DE RESULTADOS DO TESTE MOLECULAR DNA-HPV NO PEP',
     icon: TestTube,
     color: 'text-white',
     bg: 'bg-blue-600 border-blue-700 shadow-md shadow-blue-600/20',
     description: 'Identificado registro de resultado no PEP de teste molecular'
   },
   'COLETA_MOLECULAR': {
-    label: 'IDENTIFICADO COLETA/RESULTADO DE TESTE MOLECULAR',
+    label: 'IDENTIFICADO TESTE MOLECULAR DNA-HPV - (GAL/MEDIREC)',
     icon: TestTube,
     color: 'text-white',
     bg: 'bg-orange-500 border-orange-600 shadow-md shadow-orange-500/20',
     description: 'Identificado coleta/resultado de teste molecular'
   },
   'PEP_CITO': {
-    label: 'IDENTIFICADO REGISTRO DE RESULTADO NO PEP DE CITO',
+    label: 'IDENTIFICADO REGISTRO DE RESULTADO DE CITO NO PEP',
     icon: Microscope,
     color: 'text-white',
     bg: 'bg-emerald-600 border-emerald-700 shadow-md shadow-emerald-600/20',
     description: 'Identificado registro de resultado no PEP de cito'
   },
   'COLETA_CITO': {
-    label: 'IDENTIFICADO COLETA/ RESULTADO DE CITO',
+    label: 'IDENTIFICADO COLETA DE CITO/ PENDENTE DE REGISTRO NO PEP',
     icon: Microscope,
     color: 'text-white',
     bg: 'bg-yellow-500 border-yellow-600 shadow-md shadow-yellow-500/20',
@@ -874,16 +874,17 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             )}
 
             {/* Painel de Filtros Avançados */}
-            {isFilterVisible && (
-              <div className="bg-white p-8 rounded-3xl shadow-2xl border border-primary/5 animate-in slide-in-from-top-6 fade-in duration-500">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6">
+                        {isFilterVisible && (
+              <div className="bg-white p-6 md:p-8 rounded-3xl shadow-2xl border border-primary/5 animate-in slide-in-from-top-6 fade-in duration-500">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-5">
+
                   {/* Período de Busca (Acomp.) */}
-                  <div className="md:col-span-2 space-y-3">
+                  <div className="md:col-span-2 space-y-2">
                     <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
                       <Calendar className="w-3.5 h-3.5" />
                       Período da Busca (Acomp.)
                     </label>
-                    <div className="flex gap-4">
+                    <div className="flex gap-3">
                       <DatePickerPTBR 
                         placeholder="Início"
                         value={filterDataInicio}
@@ -897,8 +898,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     </div>
                   </div>
 
-                  {/* Filtro de Status */}
-                  <div className="space-y-3">
+                  {/* Status + Grupo na linha 1 */}
+                  <div className="space-y-2">
                     <MultiSelect 
                       label="Status de Rastreamento"
                       placeholder="Todos os Status"
@@ -910,9 +911,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                       onChange={setFilterStatus}
                     />
                   </div>
-
-                  {/* Filtro de Grupo */}
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <MultiSelect 
                       label="Grupo de Idade"
                       placeholder="Todos os Grupos"
@@ -922,49 +921,47 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     />
                   </div>
 
-                  {/* Filtros de Exames (SIM/NÃO) */}
-                  <div className="grid grid-cols-2 gap-4 col-span-1 md:col-span-2">
-                    <div className="space-y-3">
-                      <MultiSelect 
-                        label="DNA-HPV (PEP)"
-                        placeholder="SIM / NÃO"
-                        options={SIM_NAO_OPTIONS}
-                        value={filterDnaHpvPep}
-                        onChange={setFilterDnaHpvPep}
-                      />
-                    </div>
-                    <div className="space-y-3">
-                      <MultiSelect 
-                        label="Cito (Lab)"
-                        placeholder="SIM / NÃO"
-                        options={SIM_NAO_OPTIONS}
-                        value={filterCitoLab}
-                        onChange={setFilterCitoLab}
-                      />
-                    </div>
-                    <div className="space-y-3">
-                      <MultiSelect 
-                        label="Cito (PEP)"
-                        placeholder="SIM / NÃO"
-                        options={SIM_NAO_OPTIONS}
-                        value={filterCitoPep}
-                        onChange={setFilterCitoPep}
-                      />
-                    </div>
-                    <div className="space-y-3">
-                      <MultiSelect 
-                        label="DNA-HPV (GAL)"
-                        placeholder="SIM / NÃO"
-                        options={SIM_NAO_OPTIONS}
-                        value={filterDnaHpvGal}
-                        onChange={setFilterDnaHpvGal}
-                      />
-                    </div>
+                  {/* Exames SIM/NÃO — linha 2 completa */}
+                  <div className="space-y-2">
+                    <MultiSelect 
+                      label="DNA-HPV (PEP)"
+                      placeholder="SIM / NÃO"
+                      options={SIM_NAO_OPTIONS}
+                      value={filterDnaHpvPep}
+                      onChange={setFilterDnaHpvPep}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <MultiSelect 
+                      label="Cito (Lab)"
+                      placeholder="SIM / NÃO"
+                      options={SIM_NAO_OPTIONS}
+                      value={filterCitoLab}
+                      onChange={setFilterCitoLab}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <MultiSelect 
+                      label="Cito (PEP)"
+                      placeholder="SIM / NÃO"
+                      options={SIM_NAO_OPTIONS}
+                      value={filterCitoPep}
+                      onChange={setFilterCitoPep}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <MultiSelect 
+                      label="DNA-HPV (GAL)"
+                      placeholder="SIM / NÃO"
+                      options={SIM_NAO_OPTIONS}
+                      value={filterDnaHpvGal}
+                      onChange={setFilterDnaHpvGal}
+                    />
                   </div>
 
-                  {/* Filtros Regionais Condicionais */}
+                  {/* Filtros Regionais — ocupam ate 3 colunas quando visiveis */}
                   {(isAdmin || user?.role === 'cap') && (
-                    <div className="space-y-3">
+                    <div>
                       <MultiSelect 
                         label="Unidade"
                         placeholder="Todas as Unidades"
@@ -980,7 +977,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   )}
 
                   {(isAdmin || user?.role === 'cap' || user?.role === 'unidade') && (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <MultiSelect 
                         label="Equipe"
                         placeholder="Todas as Equipes"
@@ -1002,7 +999,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   )}
 
                   {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe') && (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <MultiSelect 
                         label="Microárea"
                         placeholder="Todas as Microáreas"
@@ -1014,8 +1011,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     </div>
                   )}
 
-                  {/* Filtro de Tipo de Busca */}
-                  <div className="space-y-3">
+                  {/* Acompanhamento filters — linha completa */}
+                  <div className="space-y-2">
                     <MultiSelect 
                       label="Tipo de Busca (Acomp.)"
                       placeholder="Todos os Tipos"
@@ -1024,9 +1021,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                       onChange={setFilterTipoBusca}
                     />
                   </div>
-
-                  {/* Filtro de Tipo de Contato */}
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <MultiSelect 
                       label="Tipo de Contato (Acomp.)"
                       placeholder="Todos os Contatos"
@@ -1035,9 +1030,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                       onChange={setFilterTipoContato}
                     />
                   </div>
-
-                  {/* Filtro de Situação */}
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <MultiSelect 
                       label="Situação Pós Busca (Acomp.)"
                       placeholder="Todas as Situações"
@@ -1046,9 +1039,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                       onChange={setFilterSituacao}
                     />
                   </div>
-
-                  {/* Filtro de Entraves */}
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <MultiSelect 
                       label="Entraves (Acomp.)"
                       placeholder="Todos os Entraves"
@@ -1058,18 +1049,22 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     />
                   </div>
 
-                  {/* Botões de Ação */}
-                  <div className="flex items-end gap-4 md:col-span-2 lg:col-span-4 mt-2">
+                  {/* Botões */}
+                  <div className="flex items-end gap-4 md:col-span-2 lg:col-span-4 pt-3">
                     <button 
                       onClick={resetFilters}
-                      className="flex-1 flex items-center justify-center gap-2 py-4 bg-surface-container-high text-on-surface-variant text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-surface-container-highest transition-all duration-300"
+                      className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-surface-container-high text-on-surface-variant text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-surface-container-highest transition-all duration-300"
                     >
                       <RotateCcw className="w-4 h-4" />
                       Resetar
                     </button>
                     <button 
                       onClick={() => setIsFilterVisible(false)}
-                      className="flex-1 py-4 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all duration-300 shadow-lg shadow-primary/20"
+                      className="flex-1 py-3.5 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all duration-300 shadow-lg shadow-primary/20"
+
+
+
+
                     >
                       Aplicar Filtros
                     </button>

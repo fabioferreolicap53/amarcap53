@@ -56,6 +56,11 @@ const matchesMultiValueField = (rawValue: string | string[] | undefined, selecte
   return values.some(v => selectedValues.includes(v));
 };
 
+const SIM_NAO_OPTIONS = [
+  { label: 'SIM', value: 'SIM' },
+  { label: 'NÃO', value: 'NÃO' },
+];
+
 export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, setActiveTab }) => {
   const { user, isAdmin } = useAuth();
   const [acompanhamentos, setAcompanhamentos] = useState<Acompanhamento[]>([]);
@@ -79,6 +84,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const [filterUnidade, setFilterUnidade] = useState<string[]>([]);
   const [filterEquipe, setFilterEquipe] = useState<string[]>([]);
   const [filterMicroarea, setFilterMicroarea] = useState<string[]>([]);
+  const [filterDnaHpvPep, setFilterDnaHpvPep] = useState<string[]>([]);
+  const [filterCitoLab, setFilterCitoLab] = useState<string[]>([]);
+  const [filterCitoPep, setFilterCitoPep] = useState<string[]>([]);
+  const [filterDnaHpvGal, setFilterDnaHpvGal] = useState<string[]>([]);
 
   const resetFilters = () => {
     setSearchTerm('');
@@ -91,6 +100,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     setFilterUnidade([]);
     setFilterEquipe([]);
     setFilterMicroarea([]);
+    setFilterDnaHpvPep([]);
+    setFilterCitoLab([]);
+    setFilterCitoPep([]);
+    setFilterDnaHpvGal([]);
   };
 
   const normalizeCanalLabel = (value?: string) => value || '';
@@ -224,7 +237,26 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           filter: filterString,
           requestKey: null
         });
-        setAcompanhamentos(records);
+        // Filtro client-side: data dos exames do paciente (expand)
+        const dateFilter = (field: string | undefined, filterVals: string[]) => {
+          if (filterVals.length === 0) return true;
+          const hasVal = field && field !== '--' && field !== '';
+          const wantSim = filterVals.includes('SIM');
+          const wantNao = filterVals.includes('NÃO');
+          if (wantSim && wantNao) return true;
+          if (wantSim) return !!hasVal;
+          if (wantNao) return !hasVal;
+          return true;
+        };
+        const filtered = records.filter(r => {
+          const p = (r as any).expand?.paciente;
+          if (!p) return true;
+          return dateFilter(p.cito_laboratorio, filterDnaHpvPep)
+            && dateFilter(p.cito_lab, filterCitoLab)
+            && dateFilter(p.cito_pep, filterCitoPep)
+            && dateFilter(p.dna_hpv, filterDnaHpvGal);
+        });
+        setAcompanhamentos(filtered);
       } catch (error) {
         console.error('Erro ao buscar acompanhamentos:', error);
       } finally {
@@ -233,7 +265,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     };
 
     fetchAcompanhamentos();
-  }, [user, filterUnidade, filterEquipe, filterMicroarea, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim]);
+  }, [user, filterUnidade, filterEquipe, filterMicroarea, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este registro?')) {
@@ -406,16 +438,16 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                 <button 
                   onClick={() => setIsFilterVisible(!isFilterVisible)}
                   className={`flex items-center gap-4 px-10 h-16 rounded-[1.5rem] text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
-                    isFilterVisible || filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDataInicio || filterDataFim
+                    isFilterVisible || filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDataInicio || filterDataFim || filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0
                       ? 'bg-primary text-white border-primary shadow-[0_0_25px_rgba(var(--primary-rgb),0.4)]' 
                       : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
                   }`}
                 >
                   <Filter className="w-6 h-6" />
                   <span>Filtros</span>
-                  {(filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDataInicio || filterDataFim) && (
+                  {(filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDataInicio || filterDataFim || filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0) && (
                     <div className="w-7 h-7 flex items-center justify-center bg-white text-primary text-[11px] rounded-full font-black animate-pulse">
-                      {[filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves].filter(f => f.length > 0).length + (filterDataInicio || filterDataFim ? 1 : 0)}
+                      {[filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal].filter(f => f.length > 0).length + (filterDataInicio || filterDataFim ? 1 : 0)}
                     </div>
                   )}
                 </button>
@@ -441,15 +473,15 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
             {/* Painel de Filtros Avançados */}
             {isFilterVisible && (
-              <div className="col-span-1 md:col-span-2 lg:col-span-4 bg-white p-8 rounded-[2rem] shadow-2xl border border-primary/5 animate-in slide-in-from-top-6 fade-in duration-500">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6">
+              <div className="col-span-1 md:col-span-2 lg:col-span-4 bg-white p-6 md:p-8 rounded-3xl shadow-2xl border border-primary/5 animate-in slide-in-from-top-6 fade-in duration-500">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-5">
                   {/* Período de Busca */}
-                  <div className="md:col-span-2 space-y-3">
+                  <div className="md:col-span-2 space-y-2">
                     <label className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-[0.2em]">
                       <Calendar className="w-3.5 h-3.5" />
                       Período da Busca (Início e Fim)
                     </label>
-                    <div className="flex gap-4">
+                    <div className="flex gap-3">
                       <DatePickerPTBR 
                         placeholder="Data Inicial"
                         value={filterDataInicio}
@@ -463,47 +495,70 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     </div>
                   </div>
 
-                  {/* Filtros Regionais Condicionais */}
+                  {/* Exames SIM/NÃO */}
+                  <div className="space-y-2">
+                    <MultiSelect 
+                      label="DNA-HPV (PEP)"
+                      placeholder="SIM / NÃO"
+                      options={SIM_NAO_OPTIONS}
+                      value={filterDnaHpvPep}
+                      onChange={setFilterDnaHpvPep}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <MultiSelect 
+                      label="Cito (Lab)"
+                      placeholder="SIM / NÃO"
+                      options={SIM_NAO_OPTIONS}
+                      value={filterCitoLab}
+                      onChange={setFilterCitoLab}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <MultiSelect 
+                      label="Cito (PEP)"
+                      placeholder="SIM / NÃO"
+                      options={SIM_NAO_OPTIONS}
+                      value={filterCitoPep}
+                      onChange={setFilterCitoPep}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <MultiSelect 
+                      label="DNA-HPV (GAL)"
+                      placeholder="SIM / NÃO"
+                      options={SIM_NAO_OPTIONS}
+                      value={filterDnaHpvGal}
+                      onChange={setFilterDnaHpvGal}
+                    />
+                  </div>
+
+                  {/* Regionais */}
                   {(isAdmin || user?.role === 'cap') && (
-                    <div className="space-y-3">
+                    <div>
                       <MultiSelect 
                         label="Unidade"
                         placeholder="Todas as Unidades"
                         options={Object.keys(UNIDADES_EQUIPES)}
                         value={filterUnidade}
-                        onChange={(val) => {
-                          setFilterUnidade(val);
-                          setFilterEquipe([]);
-                          setFilterMicroarea([]);
-                        }}
+                        onChange={(val) => { setFilterUnidade(val); setFilterEquipe([]); setFilterMicroarea([]); }}
                       />
                     </div>
                   )}
-
                   {(isAdmin || user?.role === 'cap' || user?.role === 'unidade') && (
-                    <div className="space-y-3">
+                    <div>
                       <MultiSelect 
                         label="Equipe"
                         placeholder="Todas as Equipes"
-                        options={
-                          filterUnidade.length > 0 
-                            ? Array.from(new Set(filterUnidade.flatMap(u => UNIDADES_EQUIPES[u] || [])))
-                            : user?.role === 'unidade' 
-                              ? UNIDADES_EQUIPES[user.unidade_saude] || []
-                              : []
-                        }
+                        options={filterUnidade.length > 0 ? Array.from(new Set(filterUnidade.flatMap(u => UNIDADES_EQUIPES[u] || []))) : user?.role === 'unidade' ? UNIDADES_EQUIPES[user.unidade_saude] || [] : []}
                         value={filterEquipe}
-                        onChange={(val) => {
-                          setFilterEquipe(val);
-                          setFilterMicroarea([]);
-                        }}
+                        onChange={(val) => { setFilterEquipe(val); setFilterMicroarea([]); }}
                         disabled={filterUnidade.length === 0 && (isAdmin || user?.role === 'cap')}
                       />
                     </div>
                   )}
-
                   {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe') && (
-                    <div className="space-y-3">
+                    <div>
                       <MultiSelect 
                         label="Microárea"
                         placeholder="Todas as Microáreas"
@@ -515,58 +570,32 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     </div>
                   )}
 
-                  <div className="space-y-3">
-                    <MultiSelect 
-                      label="Tipo de Busca"
-                      placeholder="Todos os Tipos"
-                      options={TIPO_BUSCA_OPTIONS}
-                      value={filterTipoBusca}
-                      onChange={setFilterTipoBusca}
-                    />
+                  {/* Acompanhamento filters */}
+                  <div className="space-y-2">
+                    <MultiSelect label="Tipo de Busca" placeholder="Todos os Tipos"
+                      options={TIPO_BUSCA_OPTIONS} value={filterTipoBusca} onChange={setFilterTipoBusca} />
+                  </div>
+                  <div className="space-y-2">
+                    <MultiSelect label="Tipo de Contato" placeholder="Todos os Contatos"
+                      options={TIPO_CONTATO_OPTIONS} value={filterTipoContato} onChange={setFilterTipoContato} />
+                  </div>
+                  <div className="space-y-2">
+                    <MultiSelect label="Situação Pós Busca" placeholder="Todas as Situações"
+                      options={SITUACAO_POS_BUSCA_OPTIONS} value={filterSituacao} onChange={setFilterSituacao} />
+                  </div>
+                  <div className="space-y-2">
+                    <MultiSelect label="Entraves Identificados" placeholder="Todos os Entraves"
+                      options={ENTRAVES_IDENTIFICADOS_OPTIONS} value={filterEntraves} onChange={setFilterEntraves} />
                   </div>
 
-                  <div className="space-y-3">
-                    <MultiSelect 
-                      label="Tipo de Contato"
-                      placeholder="Todos os Contatos"
-                      options={TIPO_CONTATO_OPTIONS}
-                      value={filterTipoContato}
-                      onChange={setFilterTipoContato}
-                    />
-                  </div>
-
-                  <div className="md:col-span-2 space-y-3">
-                    <MultiSelect 
-                      label="Situação Pós Busca"
-                      placeholder="Todas as Situações"
-                      options={SITUACAO_POS_BUSCA_OPTIONS}
-                      value={filterSituacao}
-                      onChange={setFilterSituacao}
-                    />
-                  </div>
-
-                  <div className="md:col-span-2 space-y-3">
-                    <MultiSelect 
-                      label="Entraves Identificados"
-                      placeholder="Todos os Entraves"
-                      options={ENTRAVES_IDENTIFICADOS_OPTIONS}
-                      value={filterEntraves}
-                      onChange={setFilterEntraves}
-                    />
-                  </div>
-
-                  <div className="flex items-end gap-4 md:col-span-2 lg:col-span-4 mt-2">
-                    <button 
-                      onClick={resetFilters}
-                      className="flex-1 flex items-center justify-center gap-2 py-4 bg-surface-container-high text-on-surface-variant text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-surface-container-highest transition-all duration-300"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                      Resetar
+                  {/* Botões */}
+                  <div className="flex items-end gap-4 md:col-span-2 lg:col-span-4 pt-3">
+                    <button onClick={resetFilters}
+                      className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-surface-container-high text-on-surface-variant text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-surface-container-highest transition-all duration-300">
+                      <RotateCcw className="w-4 h-4" /> Resetar
                     </button>
-                    <button 
-                      onClick={() => setIsFilterVisible(false)}
-                      className="flex-1 py-4 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all duration-300 shadow-lg shadow-primary/20"
-                    >
+                    <button onClick={() => setIsFilterVisible(false)}
+                      className="flex-1 py-3.5 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all duration-300 shadow-lg shadow-primary/20">
                       Aplicar Filtros
                     </button>
                   </div>
