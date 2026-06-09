@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, Activity, HeartPulse, Calendar, BadgeCheck, TrendingUp, Phone, MessageSquare, ClipboardList, PieChart, BarChart3, MapPin, LayoutDashboard, Filter, CheckCircle, AlertCircle, Target, Building2, Building, X } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
 import {
@@ -194,10 +194,10 @@ const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ dat
         {/* Dots + labels + tooltips */}
         {points.map((p, i) => (
           <g key={i} className="group/dot" style={{ cursor: 'pointer' }}>
-            {/* Tooltip - sempre dentro do SVG */}
-            <rect x={p.x - 32} y={p.y - 38} width="64" height="26" rx="8"
+            {/* Tooltip abaixo do dot */}
+            <rect x={p.x - 32} y={p.y + 14} width="64" height="26" rx="8"
               className="fill-slate-900 opacity-0 group-hover/dot:opacity-100 transition-opacity pointer-events-none" />
-            <text x={p.x} y={p.y - 21} textAnchor="middle"
+            <text x={p.x} y={p.y + 31} textAnchor="middle"
               className="fill-white text-[9px] font-black opacity-0 group-hover/dot:opacity-100 transition-opacity pointer-events-none">
               {p.value} buscas
             </text>
@@ -218,14 +218,56 @@ const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ dat
   );
 };
 
-const StatCard: React.FC<{ title: string; value: number | string; icon: React.ReactNode; color: string }> = ({ title, value, icon, color }) => (
-  <div className="bg-white p-6 md:p-7 rounded-[2.5rem] shadow-lg border border-primary/5 hover:border-primary/10 transition-all duration-500 group relative overflow-hidden">
+const InfoPopover: React.FC<{ content: string }> = ({ content }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isHover, setIsHover] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const show = isOpen || isHover;
+
+  return (
+    <div className="relative inline-flex" ref={ref}>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+        onMouseEnter={() => setIsHover(true)}
+        onMouseLeave={() => setIsHover(false)}
+        className="w-4 h-4 rounded-full bg-slate-200/60 hover:bg-primary/15 text-slate-400 hover:text-primary flex items-center justify-center transition-all duration-200 flex-shrink-0"
+        aria-label="Info"
+      >
+        <span className="text-[8px] font-black leading-none" style={{ fontFamily: 'serif', fontStyle: 'italic' }}>i</span>
+      </button>
+      {show && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white text-slate-700 text-[11px] leading-relaxed font-medium rounded-xl px-4 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-200/80 max-w-[240px] text-center pointer-events-none whitespace-normal">
+            {content}
+          </div>
+          <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.08)]"></div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const StatCard: React.FC<{ title: string; value: number | string; icon: React.ReactNode; color: string; description?: string }> = ({ title, value, icon, color, description }) => (
+  <div className="bg-white p-6 md:p-7 rounded-[2.5rem] shadow-lg border border-primary/5 hover:border-primary/10 transition-all duration-500 group relative overflow-visible">
     <div className={`absolute top-0 right-0 w-24 h-24 ${color.replace('bg-', 'bg-')}/5 rounded-full blur-2xl`} />
     <div className="flex justify-between items-start mb-5 relative z-10">
       <div className={`w-14 h-14 rounded-[1.25rem] ${color.replace('bg-', 'bg-')}/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-inner`}>
         {React.cloneElement(icon as React.ReactElement, { className: 'w-7 h-7 ' + color.replace('bg-', 'text-'), strokeWidth: 2.5 })}
       </div>
-      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/30">Geral</span>
+      <div className="flex items-center gap-2">
+        {description && <InfoPopover content={description} />}
+        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/30">Geral</span>
+      </div>
     </div>
     <div className={`text-4xl md:text-5xl font-black ${color.replace('bg-', 'text-')} tracking-tighter mb-2 relative z-10`}>{value}</div>
     <p className="text-[11px] font-black text-on-surface-variant/50 uppercase tracking-widest relative z-10">{title}</p>
@@ -721,24 +763,28 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               value={stats.totalPacientes} 
               icon={<Users className="w-6 h-6" />}
               color="bg-blue-500"
+              description="Número total de pacientes cadastrados na base ativa sob sua responsabilidade."
             />
             <StatCard 
               title="Busca Ativa" 
               value={stats.coletasAtrasadas} 
               icon={<Clock className="w-6 h-6" />}
               color="bg-amber-500"
+              description="Pacientes sem registro de coleta ou resultado de exame de rastreamento. Necessitam busca ativa."
             />
             <StatCard 
               title="Exames em Dia" 
               value={`${stats.coberturaPercent}%`} 
               icon={<CheckCircle2 className="w-6 h-6" />}
               color="bg-emerald-500"
+              description="Percentual de pacientes com pelo menos um exame de rastreamento registrado (cito ou molecular)."
             />
             <StatCard 
               title="Casos Alterados" 
               value={stats.resultadosAlterados} 
               icon={<AlertTriangle className="w-6 h-6" />}
               color="bg-rose-500"
+              description="Pacientes com resultado de teste molecular (DNA-HPV) ou citopatológico registrado. Requerem avaliação."
             />
           </div>
 
