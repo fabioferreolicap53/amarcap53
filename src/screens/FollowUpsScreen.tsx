@@ -311,7 +311,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     const data = {
       tipo_busca: getSelectLabel(selectedAcompanhamento.tipo_busca, TIPO_BUSCA_OPTIONS),
       data_busca: dataBuscaIso || rawDate,
-      tipo_contato: rawTipoContato,
+      tipo_contato: rawTipoContato.normalize('NFC'),
       situacao_pos_busca: getSelectLabel(selectedAcompanhamento.situacao_pos_busca, SITUACAO_POS_BUSCA_OPTIONS),
       entraves_identificados: Array.isArray(selectedAcompanhamento.entraves_identificados) 
         ? selectedAcompanhamento.entraves_identificados.filter(v => v)
