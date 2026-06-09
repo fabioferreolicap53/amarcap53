@@ -138,15 +138,23 @@ const ColumnChart: React.FC<{ data: { label: string; value: number; color: strin
 };
 
 const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ data }) => {
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 text-slate-300 text-[10px] font-black uppercase tracking-widest">
+        Sem dados
+      </div>
+    );
+  }
+
   const max = Math.max(...data.map(d => d.value), 1);
-  const svgWidth = data.length * 80;
+  const svgWidth = Math.max(data.length * 80, 300);
   const svgHeight = 220;
   const padding = { top: 20, right: 10, bottom: 30, left: 10 };
   const chartW = svgWidth - padding.left - padding.right;
   const chartH = svgHeight - padding.top - padding.bottom;
   
   const points = data.map((d, i) => ({
-    x: padding.left + (i / (data.length - 1)) * chartW,
+    x: padding.left + (i / Math.max(data.length - 1, 1)) * chartW,
     y: padding.top + chartH - (d.value / max) * chartH,
     value: d.value
   }));
@@ -155,7 +163,9 @@ const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ dat
     i === 0 ? `M${p.x},${p.y}` : `L${p.x},${p.y}`
   ).join(' ');
 
-  const areaPath = linePath + ` L${points[points.length - 1].x},${padding.top + chartH} L${points[0].x},${padding.top + chartH} Z`;
+  const last = points[points.length - 1];
+  const first = points[0];
+  const areaPath = linePath + ` L${last.x},${padding.top + chartH} L${first.x},${padding.top + chartH} Z`;
 
   return (
     <div className="relative w-full overflow-x-auto no-scrollbar">
