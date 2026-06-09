@@ -82,58 +82,56 @@ const ColumnChart: React.FC<{ data: { label: string; value: number; color: strin
   const total = data.reduce((acc, curr) => acc + curr.value, 0);
 
   return (
-    <div className="relative h-64 pt-12 w-full">
-      {/* Linhas de Grade de Fundo */}
-      <div className="absolute inset-x-0 bottom-8 h-px bg-slate-200/50" />
-      <div className="absolute inset-x-0 top-12 h-px bg-slate-100/30" />
+    <div className="relative h-64 w-full px-2">
+      {/* Eixo Y linhas de grade */}
+      {[0, 25, 50, 75, 100].map(pct => (
+        <div key={pct} className="absolute left-0 right-0 border-t border-dashed border-slate-100" style={{ bottom: `${pct}%` }} />
+      ))}
       
-      <div className="flex items-end justify-between h-full gap-2 md:gap-4 px-2">
-      {data.map((d, i) => {
-        const percentage = total > 0 ? Math.round((d.value / total) * 100) : 0;
-        const heightPercent = (d.value / max) * 100;
-        
-        return (
-          <div key={i} className="flex-1 flex flex-col items-center gap-4 group h-full">
-            <div className="relative w-full flex flex-col items-center justify-end h-full pb-8">
-              {/* Valor fixo no topo */}
-              <div className="absolute -top-8 left-1/2 -translate-x-1/2 flex flex-col items-center">
-                <span className={`text-[11px] md:text-sm font-black transition-colors duration-300 ${d.value > 0 ? 'text-primary' : 'text-slate-300'}`}>
+      <div className="flex items-end justify-around h-full gap-2 md:gap-4 pt-6 pb-4">
+        {data.map((d, i) => {
+          const percentage = total > 0 ? Math.round((d.value / total) * 100) : 0;
+          const heightPercent = (d.value / max) * 100;
+          
+          return (
+            <div key={i} className="flex-1 flex flex-col items-center gap-2 group h-full justify-end">
+              {/* Valor acima da barra */}
+              <div className="flex flex-col items-center transition-all duration-300 group-hover:-translate-y-1">
+                <span className={`text-[11px] md:text-sm font-black leading-none ${d.value > 0 ? 'text-primary' : 'text-slate-300'}`}>
                   {d.value}
                 </span>
                 {d.value > 0 && (
-                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">
                     {percentage}%
                   </span>
                 )}
               </div>
 
-              {/* Barra de trilha (Track) */}
-              <div className="absolute inset-x-0 bottom-8 top-0 bg-slate-50/50 rounded-2xl border border-slate-100/50" />
-              
-              {/* Barra de dados */}
-              <div 
-                className={`w-full max-w-[48px] ${d.color} rounded-t-xl transition-all duration-1000 ease-out shadow-lg relative group-hover:brightness-110 group-hover:scale-[1.05] group-hover:shadow-2xl`}
-                style={{ height: `${d.value > 0 ? Math.max(heightPercent, 8) : 4}%` }}
-              >
-                {/* Efeito de brilho no topo da barra */}
-                <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/30 to-transparent rounded-t-xl" />
-                
-                {/* Tooltip no hover (opcional, mantido para detalhes) */}
-                <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-3 py-1.5 rounded-xl opacity-0 group-hover:opacity-100 transition-all transform group-hover:-translate-y-1 font-black z-20 shadow-2xl pointer-events-none whitespace-nowrap">
-                  {d.label}: {d.value} ({percentage}%)
+              {/* Barra */}
+              <div className="relative w-full flex-1 flex items-end justify-center max-w-[56px] min-h-[8px]">
+                {/* Track */}
+                <div className="absolute inset-x-1 bottom-0 top-0 bg-slate-50 rounded-xl border border-slate-100" />
+                {/* Fill */}
+                <div 
+                  className={`absolute inset-x-1 bottom-0 ${d.color} rounded-xl transition-all duration-1000 ease-out shadow-md group-hover:shadow-xl group-hover:brightness-110 z-10`}
+                  style={{ height: `${d.value > 0 ? Math.max(heightPercent, 6) : 3}%` }}
+                >
+                  <div className="absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-white/40 to-transparent rounded-t-xl" />
                 </div>
+                {/* Glow sutil na ativa */}
+                {d.value > 0 && (
+                  <div className={`absolute -inset-x-2 bottom-0 ${d.color.replace('bg-', 'bg-')}/20 blur-xl rounded-full`}
+                    style={{ height: `${Math.max(heightPercent, 6)}%` }} />
+                )}
               </div>
-            </div>
-            
-            {/* Label do Eixo X */}
-            <div className="flex flex-col items-center">
-              <span className={`text-[9px] md:text-[11px] font-black uppercase tracking-widest transition-colors duration-300 ${d.value > 0 ? 'text-primary/70' : 'text-slate-300'}`}>
+
+              {/* Label */}
+              <span className={`text-[9px] md:text-[11px] font-black uppercase tracking-widest transition-colors ${d.value > 0 ? 'text-primary/70' : 'text-slate-300'}`}>
                 {d.label}
               </span>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
       </div>
     </div>
   );
@@ -141,71 +139,72 @@ const ColumnChart: React.FC<{ data: { label: string; value: number; color: strin
 
 const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ data }) => {
   const max = Math.max(...data.map(d => d.value), 1);
+  const svgWidth = data.length * 80;
+  const svgHeight = 220;
+  const padding = { top: 20, right: 10, bottom: 30, left: 10 };
+  const chartW = svgWidth - padding.left - padding.right;
+  const chartH = svgHeight - padding.top - padding.bottom;
   
+  const points = data.map((d, i) => ({
+    x: padding.left + (i / (data.length - 1)) * chartW,
+    y: padding.top + chartH - (d.value / max) * chartH,
+    value: d.value
+  }));
+
+  const linePath = points.map((p, i) => 
+    i === 0 ? `M${p.x},${p.y}` : `L${p.x},${p.y}`
+  ).join(' ');
+
+  const areaPath = linePath + ` L${points[points.length - 1].x},${padding.top + chartH} L${points[0].x},${padding.top + chartH} Z`;
+
   return (
-    <div className="relative h-64 pt-12 w-full px-2">
-      {/* Linhas de Grade */}
-      <div className="absolute inset-x-0 bottom-8 h-px bg-slate-100" />
-      <div className="absolute inset-x-0 top-12 h-px bg-slate-50/50" />
-      
-      <div className="absolute inset-0 flex items-end justify-between px-4">
-        {data.map((d, i) => {
-          const heightPercent = (d.value / max) * 100;
-          const nextHeightPercent = i < data.length - 1 ? (data[i+1].value / max) * 100 : 0;
-          
-          return (
-            <div key={i} className="flex-1 flex flex-col items-center justify-end h-full relative group pb-8">
-              {/* Valor fixo no topo se for relevante */}
-              <div className={`absolute left-1/2 -translate-x-1/2 transition-all duration-500 mb-2 ${d.value > 0 ? 'opacity-100' : 'opacity-30'}`}
-                style={{ bottom: `calc(${heightPercent}% + 45px)` }}
-              >
-                <span className="text-[11px] font-black text-primary bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
-                  {d.value}
-                </span>
-              </div>
+    <div className="relative w-full overflow-x-auto no-scrollbar">
+      <svg width={svgWidth} height={svgHeight} className="w-full" style={{ minWidth: '300px' }}>
+        {/* Grid */}
+        {[0, 0.25, 0.5, 0.75, 1].map(pct => (
+          <line key={pct} x1={padding.left} x2={svgWidth - padding.right}
+            y1={padding.top + chartH - pct * chartH} y2={padding.top + chartH - pct * chartH}
+            stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" />
+        ))}
+        
+        {/* Area gradient */}
+        <defs>
+          <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#051934" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#051934" stopOpacity="0.01" />
+          </linearGradient>
+        </defs>
 
-              {/* Área de Gradiente (Simulada com Divs) */}
-              <div 
-                className="absolute bottom-8 w-px bg-gradient-to-t from-primary/20 to-transparent transition-all duration-1000"
-                style={{ height: `${heightPercent}%`, left: '50%' }}
-              />
+        {/* Area fill */}
+        <path d={areaPath} fill="url(#areaGrad)" />
 
-              {/* Ponto (Dot) */}
-              <div 
-                className={`w-4 h-4 rounded-full border-[3px] border-white shadow-xl z-10 transition-all duration-500 group-hover:scale-150 ${
-                  d.value > 0 ? 'bg-primary shadow-primary/30' : 'bg-slate-300'
-                }`}
-                style={{ marginBottom: `${heightPercent}%` }}
-              />
+        {/* Line */}
+        <path d={linePath} fill="none" stroke="#051934" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          className="transition-all duration-500" />
 
-              {/* Linha de Conexão */}
-              {i < data.length - 1 && (
-                <div 
-                  className="absolute h-[2px] bg-gradient-to-r from-primary/40 to-primary/40 origin-left z-0"
-                  style={{ 
-                    left: '50%', 
-                    bottom: `calc(${heightPercent}% + 8px)`, // Ajuste para centralizar no dot
-                    width: '100%',
-                    transform: `rotate(${Math.atan2((data[i+1].value - d.value) * 160 / max, 100) * 180 / Math.PI}deg)`
-                  }}
-                />
-              )}
-
-              {/* Label Eixo X */}
-              <span className={`mt-5 text-[10px] md:text-[11px] font-black uppercase tracking-tight transition-colors ${
-                d.value > 0 ? 'text-primary' : 'text-slate-300'
-              }`}>
-                {d.label}
-              </span>
-
-              {/* Tooltip Hover */}
-              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-3 py-1.5 rounded-xl opacity-0 group-hover:opacity-100 transition-all transform group-hover:-translate-y-1 font-black z-30 shadow-2xl pointer-events-none whitespace-nowrap">
-                {d.label}: {d.value} buscas
-              </div>
-            </div>
-          );
-        })}
-      </div>
+        {/* Dots + labels */}
+        {points.map((p, i) => (
+          <g key={i} className="group/dot">
+            {/* Tooltip bg */}
+            <rect x={p.x - 30} y={p.y - 42} width="60" height="28" rx="8"
+              className="fill-slate-900 opacity-0 group-hover/dot:opacity-100 transition-opacity pointer-events-none" />
+            <text x={p.x} y={p.y - 24} textAnchor="middle"
+              className="fill-white text-[9px] font-black opacity-0 group-hover/dot:opacity-100 transition-opacity pointer-events-none">
+              {p.value} buscas
+            </text>
+            {/* Dot */}
+            <circle cx={p.x} cy={p.y} r="5" fill="#051934" stroke="white" strokeWidth="2.5"
+              className="transition-all duration-300 group-hover/dot:r-7 drop-shadow-md" />
+            {/* Glow */}
+            <circle cx={p.x} cy={p.y} r="8" fill="#051934" className="opacity-10 group-hover/dot:opacity-20 transition-opacity" />
+            {/* Label */}
+            <text x={p.x} y={padding.top + chartH + 18} textAnchor="middle"
+              className="fill-slate-500 text-[9px] font-black uppercase tracking-tight">
+              {data[i].label}
+            </text>
+          </g>
+        ))}
+      </svg>
     </div>
   );
 };
