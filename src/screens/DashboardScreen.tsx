@@ -147,19 +147,18 @@ const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ dat
   }
 
   const max = Math.max(...data.map(d => d.value), 1);
-  const svgWidth = Math.max(data.length * 80, 300);
-  const svgHeight = 220;
-  const padding = { top: 20, right: 10, bottom: 30, left: 10 };
-  const chartW = svgWidth - padding.left - padding.right;
+  const svgHeight = 260;
+  const padding = { top: 45, right: 10, bottom: 30, left: 10 };
+  const chartW = Math.max(data.length * 80, 280) - padding.left - padding.right;
   const chartH = svgHeight - padding.top - padding.bottom;
-  
+
   const points = data.map((d, i) => ({
     x: padding.left + (i / Math.max(data.length - 1, 1)) * chartW,
     y: padding.top + chartH - (d.value / max) * chartH,
     value: d.value
   }));
 
-  const linePath = points.map((p, i) => 
+  const linePath = points.map((p, i) =>
     i === 0 ? `M${p.x},${p.y}` : `L${p.x},${p.y}`
   ).join(' ');
 
@@ -168,11 +167,11 @@ const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ dat
   const areaPath = linePath + ` L${last.x},${padding.top + chartH} L${first.x},${padding.top + chartH} Z`;
 
   return (
-    <div className="relative w-full overflow-x-auto no-scrollbar">
-      <svg width={svgWidth} height={svgHeight} className="w-full" style={{ minWidth: '300px' }}>
+    <div className="relative w-full overflow-visible" style={{ minHeight: svgHeight }}>
+      <svg width="100%" height={svgHeight} viewBox={`0 0 ${Math.max(data.length * 80, 280)} ${svgHeight}`} className="overflow-visible" style={{ minWidth: '280px' }}>
         {/* Grid */}
         {[0, 0.25, 0.5, 0.75, 1].map(pct => (
-          <line key={pct} x1={padding.left} x2={svgWidth - padding.right}
+          <line key={pct} x1={padding.left} x2={padding.left + chartW}
             y1={padding.top + chartH - pct * chartH} y2={padding.top + chartH - pct * chartH}
             stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" />
         ))}
@@ -192,13 +191,13 @@ const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ dat
         <path d={linePath} fill="none" stroke="#051934" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
           className="transition-all duration-500" />
 
-        {/* Dots + labels */}
+        {/* Dots + labels + tooltips */}
         {points.map((p, i) => (
-          <g key={i} className="group/dot">
-            {/* Tooltip bg */}
-            <rect x={p.x - 30} y={p.y - 42} width="60" height="28" rx="8"
+          <g key={i} className="group/dot" style={{ cursor: 'pointer' }}>
+            {/* Tooltip - sempre dentro do SVG */}
+            <rect x={p.x - 32} y={p.y - 38} width="64" height="26" rx="8"
               className="fill-slate-900 opacity-0 group-hover/dot:opacity-100 transition-opacity pointer-events-none" />
-            <text x={p.x} y={p.y - 24} textAnchor="middle"
+            <text x={p.x} y={p.y - 21} textAnchor="middle"
               className="fill-white text-[9px] font-black opacity-0 group-hover/dot:opacity-100 transition-opacity pointer-events-none">
               {p.value} buscas
             </text>
@@ -380,8 +379,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         const total = records.length;
         const atrasadas = alerts['NAO_IDENTIFICADO'] || 0;
         const alterados = records.filter(p => {
-          const alerta = (p.alertas_rastreamento || '').toUpperCase();
-          return alerta.includes('IDENTIFICADO') && !alerta.includes('NÃO IDENTIFICADO');
+          return hasValue(p.cito_laboratorio) || hasValue(p.dna_hpv) || hasValue(p.cito_pep) || hasValue(p.cito_lab);
         }).length;
         const emDia = Math.max(total - atrasadas - alterados, 0);
         const cobertura = total > 0 ? Math.round((emDia / total) * 100) : 0;
@@ -1002,7 +1000,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             </h3>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-              <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden flex flex-col items-center lg:items-stretch text-center lg:text-left">
+              <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-visible flex flex-col items-center lg:items-stretch text-center lg:text-left">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl" />
                 <div className="flex items-center justify-center lg:justify-start gap-3 mb-6 relative z-10 w-full">
                   <div className="p-3 bg-primary/5 text-primary rounded-xl shadow-inner shrink-0">
