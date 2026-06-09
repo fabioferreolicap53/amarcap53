@@ -381,7 +381,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         const alterados = records.filter(p => {
           return hasValue(p.cito_laboratorio) || hasValue(p.dna_hpv) || hasValue(p.cito_pep) || hasValue(p.cito_lab);
         }).length;
-        const emDia = Math.max(total - atrasadas - alterados, 0);
+        const emDia = Math.max(total - atrasadas, 0);
         const cobertura = total > 0 ? Math.round((emDia / total) * 100) : 0;
         const examTrend = lastSixMonths.map(month => ({
           month: month.label,
