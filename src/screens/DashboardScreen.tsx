@@ -220,7 +220,6 @@ const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ dat
 
 const InfoPopover: React.FC<{ content: string }> = ({ content }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isHover, setIsHover] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -231,28 +230,29 @@ const InfoPopover: React.FC<{ content: string }> = ({ content }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const show = isOpen || isHover;
-
   return (
-    <div className="relative inline-flex" ref={ref}>
+    <div className="relative group" ref={ref}>
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
-        onMouseEnter={() => setIsHover(true)}
-        onMouseLeave={() => setIsHover(false)}
         className="w-4 h-4 rounded-full bg-slate-200/60 hover:bg-primary/15 text-slate-400 hover:text-primary flex items-center justify-center transition-all duration-200 flex-shrink-0"
         aria-label="Info"
       >
         <span className="text-[8px] font-black leading-none" style={{ fontFamily: 'serif', fontStyle: 'italic' }}>i</span>
       </button>
-      {show && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50" onClick={(e) => e.stopPropagation()}>
-          <div className="bg-white text-slate-700 text-[11px] leading-relaxed font-medium rounded-xl px-4 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-200/80 max-w-[240px] text-center pointer-events-none whitespace-normal">
+      <div
+        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none"
+        style={{ opacity: isOpen ? 1 : undefined }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="transition-opacity duration-200 opacity-0 group-hover:opacity-100"
+          style={{ opacity: isOpen ? 1 : undefined }}>
+          <div className="bg-white text-slate-700 text-[11px] leading-relaxed font-medium rounded-xl px-4 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-200/80 max-w-[240px] text-center whitespace-normal">
             {content}
           </div>
           <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.08)]"></div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
