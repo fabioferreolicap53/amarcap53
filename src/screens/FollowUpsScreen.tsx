@@ -305,10 +305,13 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       dataBuscaIso = `${y}-${m}-${d}`;
     }
 
+    const rawTipoContato = selectedAcompanhamento.tipo_contato || '';
+    console.log('[DEBUG] tipo_contato raw:', rawTipoContato, '| length:', rawTipoContato.length, '| last chars:', JSON.stringify(rawTipoContato.slice(-10)));
+
     const data = {
       tipo_busca: getSelectLabel(selectedAcompanhamento.tipo_busca, TIPO_BUSCA_OPTIONS),
       data_busca: dataBuscaIso || rawDate,
-      tipo_contato: getSelectLabel(selectedAcompanhamento.tipo_contato, TIPO_CONTATO_OPTIONS),
+      tipo_contato: rawTipoContato,
       situacao_pos_busca: getSelectLabel(selectedAcompanhamento.situacao_pos_busca, SITUACAO_POS_BUSCA_OPTIONS),
       entraves_identificados: Array.isArray(selectedAcompanhamento.entraves_identificados) 
         ? selectedAcompanhamento.entraves_identificados.filter(v => v)
