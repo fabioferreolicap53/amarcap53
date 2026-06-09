@@ -251,10 +251,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [filterUnidade, setFilterUnidade] = useState<string[]>([]);
   const [filterEquipe, setFilterEquipe] = useState<string[]>([]);
   const [filterMicroarea, setFilterMicroarea] = useState<string[]>([]);
-  const [filterTesteDnaHpv, setFilterTesteDnaHpv] = useState('');
-  const [filterIdadeMin, setFilterIdadeMin] = useState('');
-  const [filterIdadeMax, setFilterIdadeMax] = useState('');
-  const [filterAcompanhamento, setFilterAcompanhamento] = useState('');
 
   const [availableGroups, setAvailableGroups] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>(user?.favoritos || []);
@@ -648,19 +644,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           filterParts.push(`(${filterGrupo.map(g => `grupo = "${g}"`).join(' || ')})`);
         }
 
-        // Filtro Teste Molecular DNA-HPV
-        if (filterTesteDnaHpv) {
-          filterParts.push(`teste_dna_hpv = "${filterTesteDnaHpv}"`);
-        }
-
-        // Filtro Idade Min/Max
-        if (filterIdadeMin !== '') {
-          filterParts.push(`idade >= ${parseInt(filterIdadeMin)}`);
-        }
-        if (filterIdadeMax !== '') {
-          filterParts.push(`idade <= ${parseInt(filterIdadeMax)}`);
-        }
-
         if (filterParts.length > 0) {
           options.filter = filterParts.join(' && ');
         }
@@ -675,23 +658,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
               fields: 'id'
             });
             return { id: record.id, total: result.totalItems };
+          })
+        );
 
-          }))
-        ;
-        
-        let pacientesComContagem: any[] = resultList.items.map(record => ({
-          ...record,
-          total_acompanhamentos: counts.find(c => c.id === record.id)?.total || 0
-        }));
-
-        // Filtro "Possui Acompanhamento" (client-side)
-        if (filterAcompanhamento === 'sim') {
-          pacientesComContagem = pacientesComContagem.filter(p => (p as any).total_acompanhamentos > 0);
-        } else if (filterAcompanhamento === 'nao') {
-          pacientesComContagem = pacientesComContagem.filter(p => !(p as any).total_acompanhamentos);
-        }
-
-        let pacientesFormatados = pacientesComContagem.map(record => {
+        let pacientesFormatados = resultList.items.map(record => {
           const count = counts.find(c => c.id === record.id)?.total || 0;
           const p: Paciente = {
             id: record.id,
@@ -731,7 +701,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     };
 
     fetchPacientes();
-  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, searchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterTesteDnaHpv, filterIdadeMin, filterIdadeMax, filterAcompanhamento]);
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, searchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea]);
 
   const resetFilters = () => {
     setSearchTerm('');
@@ -746,10 +716,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     setFilterUnidade([]);
     setFilterEquipe([]);
     setFilterMicroarea([]);
-    setFilterTesteDnaHpv('');
-    setFilterIdadeMin('');
-    setFilterIdadeMax('');
-    setFilterAcompanhamento('');
     setCurrentPage(1);
   };
 
@@ -1019,53 +985,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                       value={filterEntraves}
                       onChange={setFilterEntraves}
                     />
-                  </div>
-
-                  {/* Teste Molecular DNA-HPV? */}
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest">Teste Molecular DNA-HPV?</label>
-                    <select
-                      value={filterTesteDnaHpv}
-                      onChange={(e) => setFilterTesteDnaHpv(e.target.value)}
-                      className="w-full h-[56px] px-4 bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
-                    >
-                      <option value="">Todos</option>
-                      <option value="SIM">SIM</option>
-                      <option value="NÃO">NÃO</option>
-                    </select>
-                  </div>
-
-                  {/* Idade Min/Max */}
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest">Idade</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="number" min="0" max="150" placeholder="Min"
-                        value={filterIdadeMin}
-                        onChange={(e) => setFilterIdadeMin(e.target.value)}
-                        className="w-full h-[56px] px-4 bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
-                      />
-                      <input
-                        type="number" min="0" max="150" placeholder="Max"
-                        value={filterIdadeMax}
-                        onChange={(e) => setFilterIdadeMax(e.target.value)}
-                        className="w-full h-[56px] px-4 bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Possui Acompanhamento? */}
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest">Possui Acompanhamento?</label>
-                    <select
-                      value={filterAcompanhamento}
-                      onChange={(e) => setFilterAcompanhamento(e.target.value)}
-                      className="w-full h-[56px] px-4 bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
-                    >
-                      <option value="">Todos</option>
-                      <option value="sim">Sim</option>
-                      <option value="nao">Não</option>
-                    </select>
                   </div>
 
                   {/* Botões de Ação */}
