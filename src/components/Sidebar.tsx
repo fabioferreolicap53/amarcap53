@@ -89,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
               
               <button 
                 onClick={logout}
-                className="w-full mt-4 flex items-center justify-center gap-2 py-3 bg-rose-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:bg-rose-600 transition-all active:scale-95"
+                className="w-full mt-4 flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 Sair do Sistema
