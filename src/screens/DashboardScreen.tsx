@@ -392,21 +392,64 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           patientFilterParts.push(`(${filterMicroarea.map(m => `microarea ~ "${m}"`).join(' || ')})`);
         }
 
-        // Fetch Pacientes
-        const records = await pb.collection('amarcap53_pacientes').getFullList({
-          filter: patientFilterParts.join(' && '),
-          sort: '-created',
-          requestKey: null
-        });
+        // Build filter strings
+        const patientFilter = patientFilterParts.join(' && ');
+        const showRanking = isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea';
 
-        // Fetch ALL patients for regional ranking (unfiltered)
-        const allRecords = (isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea')
-          ? await pb.collection('amarcap53_pacientes').getFullList({
-              sort: '-created',
-              requestKey: null,
-              fields: 'unidade,equipe,microarea'
-            }).catch(() => [])
-          : [];
+        // Build acomp filters
+        const acompFilterParts: string[] = [];
+        if (!isAdmin) {
+          if (user.role === 'unidade') {
+            acompFilterParts.push(`paciente.unidade = "${user.unidade_saude}"`);
+          } else if (user.role === 'equipe') {
+            acompFilterParts.push(`paciente.unidade = "${user.unidade_saude}"`);
+            acompFilterParts.push(`paciente.equipe = "${user.equipe}"`);
+          } else if (user.role === 'microarea') {
+            acompFilterParts.push(`paciente.unidade = "${user.unidade_saude}"`);
+            acompFilterParts.push(`paciente.equipe = "${user.equipe}"`);
+            acompFilterParts.push(`paciente.microarea ~ "${user.microarea}"`);
+          }
+        }
+        if (filterUnidade.length > 0) {
+          acompFilterParts.push(`(${filterUnidade.map(u => `paciente.unidade = "${u}"`).join(' || ')})`);
+        }
+        if (filterEquipe.length > 0) {
+          acompFilterParts.push(`(${filterEquipe.map(e => `paciente.equipe = "${e}"`).join(' || ')})`);
+        }
+        if (filterMicroarea.length > 0) {
+          acompFilterParts.push(`(${filterMicroarea.map(m => `paciente.microarea ~ "${m}"`).join(' || ')})`);
+        }
+        if (filterDataInicio) {
+          acompFilterParts.push(`data_busca >= "${filterDataInicio} 00:00:00"`);
+        }
+        if (filterDataFim) {
+          acompFilterParts.push(`data_busca <= "${filterDataFim} 23:59:59"`);
+        }
+
+        // Parallel queries for max speed
+        const [records, allRecords, acompRecords] = await Promise.all([
+          // 1. Filtered patients for stats
+          pb.collection('amarcap53_pacientes').getFullList({
+            filter: patientFilter,
+            sort: '-created',
+            requestKey: null,
+            fields: 'cito_laboratorio,dna_hpv,cito_pep,cito_lab,grupo,unidade,equipe,microarea,created'
+          }),
+          // 2. All patients for regional ranking (minimal fields, no filter)
+          showRanking
+            ? pb.collection('amarcap53_pacientes').getFullList({
+                requestKey: null,
+                fields: 'unidade,equipe,microarea'
+              }).catch(() => [] as any[])
+            : Promise.resolve([] as any[]),
+          // 3. Acompanhamentos
+          pb.collection('amarcap53_acompanhamentos').getFullList({
+            filter: acompFilterParts.join(' && '),
+            sort: 'created',
+            requestKey: null,
+            fields: 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created'
+          })
+        ]);
 
         // Preenche breakdowns de todos registros para o ranking
         const allUnidadeBreakdown: Record<string, number> = {};
@@ -479,47 +522,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           pendente: Math.max(total - currentCito - currentHpv, 0)
         };
 
-        // Fetch Acompanhamentos
-        const acompFilters = [];
-        
-        // Base filters from user role (mirroring patient filters)
-        if (!isAdmin) {
-          if (user.role === 'unidade') {
-            acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
-          } else if (user.role === 'equipe') {
-            acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
-            acompFilters.push(`paciente.equipe = "${user.equipe}"`);
-          } else if (user.role === 'microarea') {
-            acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
-            acompFilters.push(`paciente.equipe = "${user.equipe}"`);
-            acompFilters.push(`paciente.microarea ~ "${user.microarea}"`);
-          }
-        }
-
-        // Applied UI filters
-        if (filterUnidade.length > 0) {
-          acompFilters.push(`(${filterUnidade.map(u => `paciente.unidade = "${u}"`).join(' || ')})`);
-        }
-        if (filterEquipe.length > 0) {
-          acompFilters.push(`(${filterEquipe.map(e => `paciente.equipe = "${e}"`).join(' || ')})`);
-        }
-        if (filterMicroarea.length > 0) {
-          acompFilters.push(`(${filterMicroarea.map(m => `paciente.microarea ~ "${m}"`).join(' || ')})`);
-        }
-
-        if (filterDataInicio) {
-          acompFilters.push(`data_busca >= "${filterDataInicio} 00:00:00"`);
-        }
-        if (filterDataFim) {
-          acompFilters.push(`data_busca <= "${filterDataFim} 23:59:59"`);
-        }
-
-        const acompRecords = await pb.collection('amarcap53_acompanhamentos').getFullList({
-          filter: acompFilters.join(' && '),
-          sort: 'created',
-          requestKey: null
-        });
-
+        // Process Acompanhamentos
         const aStats = {
           total: acompRecords.length,
           sucesso: acompRecords.filter(r => {
@@ -824,7 +827,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               description="Percentual de pacientes com pelo menos um exame de rastreamento registrado (cito ou molecular)."
             />
             <StatCard 
-              title="Casos Alterados" 
+              title="CASOS COM RESULTADO" 
               value={stats.resultadosAlterados} 
               icon={<AlertTriangle className="w-6 h-6" />}
               color="bg-rose-500"
