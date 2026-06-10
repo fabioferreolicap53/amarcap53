@@ -1107,7 +1107,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Registro)</span>
                       </div>
                     </th>
-                      {isAdmin && (
+                      {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
                         <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
                           <div className="flex flex-col items-center gap-1">
                             <Building className="w-4 h-4 text-blue-400/60" />
@@ -1131,7 +1131,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Cadastro)</span>
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px]">
                       <div className="flex flex-col items-center gap-1">
                         <FileText className="w-4 h-4 text-blue-400/60" />
                         <div className="flex items-center gap-1.5">
@@ -1141,22 +1141,12 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Coleta)</span>
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px]">
-                      <div className="flex flex-col items-center gap-1">
-                        <TestTube className="w-4 h-4 text-blue-400/60" />
-                        <div className="flex items-center gap-1.5">
-                          <span>DNA-HPV (GAL)</span>
-                          <InfoTooltip content="Data do resultado do teste molecular de DNA-HPV registrada no GAL (Gerenciador de Ambiente Laboratorial)." />
-                        </div>
-                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data GAL)</span>
-                      </div>
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={isAdmin ? 10 : 9} className="px-6 py-20 text-center text-on-surface-variant text-base font-medium italic">
+                      <td colSpan={isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea' ? 8 : 7} className="px-6 py-20 text-center text-on-surface-variant text-base font-medium italic">
                         <div className="flex flex-col items-center gap-4">
                           <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
                           <span className="text-xs font-black uppercase tracking-widest text-primary/40 mt-2">Sincronizando pacientes...</span>
@@ -1165,7 +1155,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     </tr>
                   ) : pacientes.length === 0 ? (
                     <tr>
-                      <td colSpan={isAdmin ? 10 : 9} className="px-6 py-20 text-center">
+                      <td colSpan={isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea' ? 8 : 7} className="px-6 py-20 text-center">
                         <div className="flex flex-col items-center opacity-30">
                           <SearchX className="w-16 h-16 mb-4" />
                           <p className="text-sm font-black uppercase tracking-widest">Nenhum registro encontrado</p>
@@ -1189,13 +1179,13 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                             <Star className={`w-3.5 h-3.5 ${favorites.includes(paciente.id) ? 'fill-current' : ''}`} />
                           </button>
                           <div className="flex flex-col items-center gap-0.5 mt-2">
-                            <p className="text-[11px] md:text-[13px] font-black text-primary uppercase leading-tight break-words" title={paciente.nome}>
+                            <p className="text-[10px] md:text-[11px] font-black text-primary uppercase leading-tight break-words" title={paciente.nome}>
                               {paciente.nome}
                             </p>
-                            <p className="text-[9px] md:text-[11px] font-bold text-slate-500 uppercase tracking-tighter leading-none">
+                            <p className="text-[8px] md:text-[9px] font-bold text-slate-500 uppercase tracking-tighter leading-none">
                               {paciente.cns}
                             </p>
-                            <p className="text-[9px] md:text-[11px] font-bold text-slate-500 uppercase tracking-tighter leading-none">
+                            <p className="text-[8px] md:text-[9px] font-bold text-slate-500 uppercase tracking-tighter leading-none">
                               {formatarData(paciente.data_nascimento)}
                             </p>
                           </div>
@@ -1254,14 +1244,14 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         {/* UNIDADE/EQUIPE */}
                         {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
                           <td className="px-4 py-6 text-center">
-                            <div className="flex flex-col items-center gap-1.5">
-                              <p className="text-[11px] md:text-[13px] font-black text-primary uppercase leading-tight break-words" title={paciente.unidade}>
+                            <div className="flex flex-col items-center gap-0.5">
+                              <p className="text-[9px] md:text-[10px] font-black text-primary uppercase leading-tight break-words" title={paciente.unidade}>
                                 {paciente.unidade}
                               </p>
-                              <p className="text-[10px] md:text-[12px] font-bold text-slate-500 uppercase tracking-tighter">
+                              <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">
                                 {paciente.equipe}
                               </p>
-                              <p className="text-[10px] md:text-[12px] font-bold text-slate-500 uppercase tracking-tighter">
+                              <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">
                                 MA: {paciente.microarea}
                               </p>
                             </div>
@@ -1289,13 +1279,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         <td className="px-4 py-6 text-center">
                           <span className={`inline-block px-3.5 py-2 rounded-lg text-[11px] md:text-[12px] font-black uppercase tracking-tight shadow-sm ${paciente.cito_pep !== '--' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'text-slate-300 italic'}`}>
                             {formatarData(paciente.cito_pep)}
-                          </span>
-                        </td>
-
-                        {/* 10. TESTE MOLECULAR DNA-HPV */}
-                        <td className="px-4 py-6 text-center">
-                          <span className={`inline-block px-3.5 py-2 rounded-lg text-[11px] md:text-[12px] font-black uppercase tracking-tight shadow-sm ${paciente.dna_hpv !== '--' ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'text-slate-300 italic'}`}>
-                            {formatarData(paciente.dna_hpv)}
                           </span>
                         </td>
                       </tr>

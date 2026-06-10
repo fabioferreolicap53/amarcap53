@@ -992,8 +992,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                             <Star className="w-3.5 h-3.5 fill-current" />
                           </button>
                           <div className="flex flex-col items-center gap-0.5 mt-2">
-                            <p className="text-[11px] md:text-[13px] font-black text-primary uppercase leading-tight">{paciente.nome}</p>
-                            <p className="text-[9px] md:text-[11px] font-bold text-slate-500 uppercase">CNS: {paciente.cns}</p>
+                            <p className="text-[10px] md:text-[11px] font-black text-primary uppercase leading-tight break-words" title={paciente.nome}>{paciente.nome}</p>
+                            <p className="text-[8px] md:text-[9px] font-bold text-slate-500 uppercase tracking-tighter leading-none">CNS: {paciente.cns}</p>
                           </div>
                         </td>
                         <td className="px-2 py-6 text-center">
@@ -1035,14 +1035,14 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                         </td>
                         {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
                         <td className="px-4 py-6 text-center">
-                          <div className="flex flex-col items-center gap-1.5">
-                            <p className="text-[11px] md:text-[13px] font-black text-primary uppercase leading-tight break-words" title={paciente.unidade}>
+                          <div className="flex flex-col items-center gap-0.5">
+                            <p className="text-[9px] md:text-[10px] font-black text-primary uppercase leading-tight break-words" title={paciente.unidade}>
                               {paciente.unidade}
                             </p>
-                            <p className="text-[10px] md:text-[12px] font-bold text-slate-500 uppercase tracking-tighter">
+                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">
                               {paciente.equipe}
                             </p>
-                            <p className="text-[10px] md:text-[12px] font-bold text-slate-500 uppercase tracking-tighter">
+                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">
                               MA: {paciente.microarea}
                             </p>
                           </div>
