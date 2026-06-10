@@ -41,12 +41,11 @@ interface DashboardScreenProps {
 
 // Helper Components
 const SimpleProgressBar: React.FC<{ label: string; value: number; total: number; color: string; rank?: number; isHighlighted?: boolean }> = ({ label, value, total, color, rank, isHighlighted }) => (
-  <div className={`group/item relative ${isHighlighted ? 'ring-2 ring-blue-400 bg-blue-50/50 rounded-xl p-3 -mx-3 shadow-sm' : ''}`}>
+  <div className="group/item relative">
     <div className="flex items-center justify-between gap-4 mb-2">
       <div className="flex items-center gap-3 min-w-0">
         {rank !== undefined && (
           <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${
-            isHighlighted ? 'bg-blue-500 text-white ring-2 ring-blue-300' :
             rank === 0 ? 'bg-amber-100 text-amber-600 ring-1 ring-amber-200' : 
             rank === 1 ? 'bg-slate-100 text-slate-500 ring-1 ring-slate-200' :
             rank === 2 ? 'bg-orange-50 text-orange-600 ring-1 ring-orange-100' :
@@ -400,6 +399,25 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           requestKey: null
         });
 
+        // Fetch ALL patients for regional ranking (unfiltered)
+        const allRecords = (isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea')
+          ? await pb.collection('amarcap53_pacientes').getFullList({
+              sort: '-created',
+              requestKey: null,
+              fields: 'unidade,equipe,microarea'
+            }).catch(() => [])
+          : [];
+
+        // Preenche breakdowns de todos registros para o ranking
+        const allUnidadeBreakdown: Record<string, number> = {};
+        const allEquipeBreakdown: Record<string, number> = {};
+        const allMicroareaBreakdown: Record<string, number> = {};
+        allRecords.forEach((p: any) => {
+          if (p.unidade) allUnidadeBreakdown[p.unidade] = (allUnidadeBreakdown[p.unidade] || 0) + 1;
+          if (p.equipe) allEquipeBreakdown[p.equipe] = (allEquipeBreakdown[p.equipe] || 0) + 1;
+          if (p.microarea) allMicroareaBreakdown[p.microarea] = (allMicroareaBreakdown[p.microarea] || 0) + 1;
+        });
+
         // Breakdown de Alertas e Grupos
         const alerts: Record<string, number> = {};
         const groups: Record<string, number> = {};
@@ -515,9 +533,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           tipoBusca: {} as Record<string, number>,
           situacao: {} as Record<string, number>,
           entraves: {} as Record<string, number>,
-          unidadeBreakdown,
-          equipeBreakdown,
-          microareaBreakdown
+          unidadeBreakdown: allUnidadeBreakdown,
+          equipeBreakdown: allEquipeBreakdown,
+          microareaBreakdown: allMicroareaBreakdown
         };
 
         const acompTrendMap = Object.fromEntries(lastSixMonths.map(month => [month.key, 0])) as Record<string, number>;
