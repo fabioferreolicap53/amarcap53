@@ -625,6 +625,16 @@ export function AuthScreen() {
             </div>
           </div>
           <div className="flex flex-col items-center gap-8 mt-8">
+            <div className="flex-col gap-2 flex lg:hidden">
+              <div className="flex items-center gap-2 justify-center">
+                <div className="w-px h-4 bg-slate-300/30" />
+                <p className="text-slate-400 text-[9px] font-bold uppercase tracking-[0.15em]">Coordenadoria Geral de Atenção Primária — AP 5.3</p>
+              </div>
+              <div className="flex items-center gap-2 justify-center">
+                <div className="w-px h-3 bg-slate-300/20" />
+                <p className="text-slate-400/70 text-[9px] font-semibold tracking-[0.2em]">© 2026 AMAR — Todos os direitos reservados</p>
+              </div>
+            </div>
             <p className="text-slate-300 text-[9px] font-bold uppercase tracking-[0.25em] text-center">Desenvolvido por Fabio Ferreira de Oliveira — DAPS/CAP5.3</p>
           </div>
         </div>
