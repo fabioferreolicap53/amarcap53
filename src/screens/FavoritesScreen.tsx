@@ -917,13 +917,13 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                 <table className="w-full text-center border-collapse">
                   <thead>
                     <tr className="bg-[#001b3d] border-b border-white/10 shadow-sm">
-                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[200px] border-r border-white/5">
+                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[240px] border-r border-white/5">
                         <div className="flex flex-col items-center gap-1">
                           <Users className="w-4 h-4 text-blue-400/60" />
                           <span>Paciente</span>
                         </div>
                       </th>
-                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[120px] border-r border-white/5">
+                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
                         <div className="flex flex-col items-center gap-1">
                           <Info className="w-4 h-4 text-blue-400/60" />
                           <span>Status</span>
@@ -935,7 +935,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                           <span>Ação</span>
                         </div>
                       </th>
-                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
+                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[120px] border-r border-white/5">
                         <div className="flex flex-col items-center gap-1">
                           <TestTube className="w-4 h-4 text-blue-400/60" />
                           <div className="flex items-center gap-1.5">
@@ -946,7 +946,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                         </div>
                       </th>
                       {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
-                        <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
+                        <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[220px] border-r border-white/5">
                           <div className="flex flex-col items-center gap-1">
                             <Building className="w-4 h-4 text-blue-400/60" />
                             <span>Unidade<br/>Equipe<br/>Microárea</span>
@@ -992,8 +992,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                             <Star className="w-3.5 h-3.5 fill-current" />
                           </button>
                           <div className="flex flex-col items-center gap-0.5 mt-2">
-                            <p className="text-[10px] md:text-[11px] font-black text-primary uppercase leading-tight break-words" title={paciente.nome}>{paciente.nome}</p>
-                            <p className="text-[8px] md:text-[9px] font-bold text-slate-500 uppercase tracking-tighter leading-none">CNS: {paciente.cns}</p>
+                            <p className="text-[11px] md:text-[12px] font-black text-primary uppercase leading-tight break-words" title={paciente.nome}>{paciente.nome}</p>
+                            <p className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-tighter leading-none">CNS: {paciente.cns}</p>
                           </div>
                         </td>
                         <td className="px-2 py-6 text-center">
@@ -1036,13 +1036,13 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                         {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
                         <td className="px-4 py-6 text-center">
                           <div className="flex flex-col items-center gap-0.5">
-                            <p className="text-[9px] md:text-[10px] font-black text-primary uppercase leading-tight break-words" title={paciente.unidade}>
+                            <p className="text-[10px] md:text-[11px] font-black text-primary uppercase leading-tight truncate max-w-full" title={paciente.unidade}>
                               {paciente.unidade}
                             </p>
-                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
                               {paciente.equipe}
                             </p>
-                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
                               MA: {paciente.microarea}
                             </p>
                           </div>
