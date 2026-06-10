@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Header } from '../components/Header';
-import { Edit2, User, Check, ShieldCheck, MapPin, Moon, AlignJustify, Mail, AlertOctagon, Shield, Terminal, UploadCloud, CheckCircle, AlertTriangle, FileText, History, BarChart3, ChevronRight, Info, Trash2, Database, Activity, Loader2, Search, Users } from 'lucide-react';
+import { Edit2, User, Check, ShieldCheck, MapPin, Moon, AlignJustify, Mail, AlertOctagon, Shield, Terminal, UploadCloud, CheckCircle, AlertTriangle, FileText, History, BarChart3, ChevronRight, Info, Trash2, Database, Activity, Loader2, Search, Users, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Papa from 'papaparse';
 import { pb } from '../lib/pocketbase';
@@ -34,6 +34,17 @@ interface SettingsScreenProps {
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setActiveTab }) => {
   const { user, isAdmin } = useAuth();
+
+  const getRoleLabel = (role?: string) => {
+    const labels: Record<string, string> = {
+      admin: 'Administrador',
+      cap: 'Coordenação CAP',
+      unidade: 'Unidade',
+      equipe: 'Equipe',
+      microarea: 'Microárea',
+    };
+    return role ? labels[role] || role : '—';
+  };
 
   const isCap = user?.role === 'cap';
 
@@ -417,6 +428,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                             <Check className="w-5 h-5" />
                           </button>
                         )}
+                      </div>
+                      {/* Role Badge */}
+                      <div className="flex items-center gap-2 ml-1 mt-2">
+                        <BadgeCheck className="w-4 h-4 text-blue-500" />
+                        <span className="text-[11px] font-black text-blue-600 uppercase tracking-wider bg-blue-50 px-3 py-1 rounded-lg border border-blue-100">
+                          {getRoleLabel(user?.role)}
+                        </span>
                       </div>
                     </div>
 

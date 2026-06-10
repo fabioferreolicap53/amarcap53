@@ -93,47 +93,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       'users';
 
     let cancelled = false;
+    let pendingSync: Promise<void> | null = null;
 
-    const syncCurrentUser = async (reason: string) => {
-      try {
-        const freshUser = await pb.collection(collectionName).getOne(user.id);
-        if (cancelled) return;
-
-        // Só atualiza se houver mudança real para evitar loops e overwrites de optimistic updates
-        const currentFavoritos = JSON.stringify(user.favoritos || []);
-        const freshFavoritos = JSON.stringify((freshUser as UserRecord).favoritos || []);
-        
-        if (currentFavoritos !== freshFavoritos || (freshUser as UserRecord).role !== user.role) {
-          setUser(freshUser as UserRecord);
-          setIsAdmin((freshUser as UserRecord)?.role === 'admin' || (freshUser as UserRecord)?.role === 'cap');
-          pb.authStore.save(pb.authStore.token, freshUser);
-        }
-      } catch (error) {
-        // Erro silencioso no polling
+    const syncCurrentUser = async () => {
+      // Se ja tem uma sync pendente, aguarda ela terminar
+      if (pendingSync) {
+        await pendingSync.catch(() => {});
       }
+
+      const sync = (async () => {
+        try {
+          const freshUser = await pb.collection(collectionName).getOne(user.id, {
+            requestKey: null
+          });
+          if (cancelled) return;
+
+          const currentFavoritos = JSON.stringify(user.favoritos || []);
+          const freshFavoritos = JSON.stringify((freshUser as UserRecord).favoritos || []);
+          
+          if (currentFavoritos !== freshFavoritos || (freshUser as UserRecord).role !== user.role) {
+            setUser(freshUser as UserRecord);
+            setIsAdmin((freshUser as UserRecord)?.role === 'admin' || (freshUser as UserRecord)?.role === 'cap');
+            pb.authStore.save(pb.authStore.token, freshUser);
+          }
+        } catch (error) {
+          // Erro silencioso
+        }
+      })();
+
+      pendingSync = sync;
+      await sync.catch(() => {});
     };
 
-    const intervalId = window.setInterval(() => {
-      syncCurrentUser('interval');
-    }, 5000);
+    const intervalId = window.setInterval(syncCurrentUser, 30000);
 
-    const handleFocus = () => {
-      syncCurrentUser('focus');
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    const debouncedSync = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(syncCurrentUser, 300);
     };
+
+    const handleFocus = debouncedSync;
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        syncCurrentUser('visibility');
+        debouncedSync();
       }
     };
 
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    syncCurrentUser('mount');
+    syncCurrentUser();
 
     return () => {
       cancelled = true;
+      pendingSync = null;
+      clearTimeout(debounceTimer);
       window.clearInterval(intervalId);
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);

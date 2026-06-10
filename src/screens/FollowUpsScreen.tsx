@@ -180,8 +180,6 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     const fetchAcompanhamentos = async () => {
       if (!user) return;
       try {
-        setIsLoading(true);
-
         const acompFilters = [];
         if (!isAdmin) {
           if (user.role === 'unidade') {
@@ -766,9 +764,12 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                         return matchesSearch && matchesTipoBusca && matchesTipoContato && matchesSituacao && matchesEntraves && matchesData;
                       })
                       .map((acomp) => {
-                        const pacienteNome = acomp.expand?.paciente?.nome || 'Paciente Desconhecido';
-                        const pacienteIniciais = pacienteNome.substring(0, 2).toUpperCase();
-                        const cns = acomp.expand?.paciente?.cns || '--';
+                        const p = acomp.expand?.paciente as any || {};
+                        const pacienteNome = p.nome || 'Paciente Desconhecido';
+                        const cns = p.cns || '--';
+                        const unidade = p.unidade || '--';
+                        const equipe = p.equipe || '--';
+                        const microarea = p.microarea !== undefined && p.microarea !== '' ? p.microarea : '--';
                         
                         // Formatando a data
                         const dataFormatada = acomp.data_busca 
@@ -777,15 +778,13 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
                         return (
                           <tr key={acomp.id} className="hover:bg-primary/[0.03] transition-all group">
-                            <td className="px-6 py-6">
-                              <div className="flex items-center justify-center gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black text-xs shadow-inner">
-                                  {pacienteIniciais}
-                                </div>
-                                <div className="text-left">
-                                  <p className="text-sm font-black text-primary uppercase leading-tight truncate max-w-[150px]" title={pacienteNome}>{pacienteNome}</p>
-                                  <p className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-tighter mt-0.5">CNS: {cns}</p>
-                                </div>
+                            <td className="px-4 py-4 text-center align-middle">
+                              <div className="flex flex-col items-center gap-1">
+                                <p className="text-[11px] md:text-[12px] font-black text-primary uppercase leading-snug break-words" title={pacienteNome}>{pacienteNome}</p>
+                                <p className="text-[9px] font-bold text-on-surface-variant/60 uppercase tracking-tighter">CNS: {cns}</p>
+                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter leading-tight">{unidade}</p>
+                                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter leading-tight">{equipe}</p>
+                                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter leading-tight">MA: {microarea}</p>
                               </div>
                             </td>
                             <td className="px-6 py-6 text-center">

@@ -1085,14 +1085,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         <span>Paciente</span>
                       </div>
                     </th>
-                    {isAdmin && (
-                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
-                        <div className="flex flex-col items-center gap-1">
-                          <Building className="w-4 h-4 text-blue-400/60" />
-                          <span>Unidade/Equipe</span>
-                        </div>
-                      </th>
-                    )}
                     <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[120px] border-r border-white/5">
                       <div className="flex flex-col items-center gap-1">
                         <Info className="w-4 h-4 text-blue-400/60" />
@@ -1115,6 +1107,14 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Registro)</span>
                       </div>
                     </th>
+                      {isAdmin && (
+                        <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
+                          <div className="flex flex-col items-center gap-1">
+                            <Building className="w-4 h-4 text-blue-400/60" />
+                            <span>Unidade<br/>Equipe<br/>Microárea</span>
+                          </div>
+                        </th>
+                      )}
                     <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[110px] border-r border-white/5">
                       <div className="flex flex-col items-center gap-1">
                         <Calendar className="w-4 h-4 text-blue-400/60" />
@@ -1201,23 +1201,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           </div>
                         </td>
 
-                        {/* 2. UNIDADE/EQUIPE (Admin Only) */}
-                        {isAdmin && (
-                          <td className="px-4 py-6 text-center">
-                            <div className="flex flex-col items-center gap-1.5">
-                              <p className="text-[11px] md:text-[13px] font-black text-primary uppercase leading-tight break-words" title={paciente.unidade}>
-                                {paciente.unidade}
-                              </p>
-                              <p className="text-[10px] md:text-[12px] font-bold text-slate-500 uppercase tracking-tighter">
-                                {paciente.equipe}
-                              </p>
-                              <p className="text-[10px] md:text-[12px] font-bold text-slate-500 uppercase tracking-tighter">
-                                MA: {paciente.microarea}
-                              </p>
-                            </div>
-                          </td>
-                        )}
-
                         {/* 3. STATUS */}
                         <td className="px-2 py-6 text-center">
                           {paciente.alertas && ALERT_CONFIGS[paciente.alertas] ? (
@@ -1267,6 +1250,23 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                             onChange={(displayDate) => handleUpdateCitoLaboratorio(paciente.id, displayDate)}
                           />
                         </td>
+
+                        {/* UNIDADE/EQUIPE */}
+                        {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
+                          <td className="px-4 py-6 text-center">
+                            <div className="flex flex-col items-center gap-1.5">
+                              <p className="text-[11px] md:text-[13px] font-black text-primary uppercase leading-tight break-words" title={paciente.unidade}>
+                                {paciente.unidade}
+                              </p>
+                              <p className="text-[10px] md:text-[12px] font-bold text-slate-500 uppercase tracking-tighter">
+                                {paciente.equipe}
+                              </p>
+                              <p className="text-[10px] md:text-[12px] font-bold text-slate-500 uppercase tracking-tighter">
+                                MA: {paciente.microarea}
+                              </p>
+                            </div>
+                          </td>
+                        )}
 
                         {/* 7. IDADE / GRUPO */}
                         <td className="px-4 py-6 text-center">

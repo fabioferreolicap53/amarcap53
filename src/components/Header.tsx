@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, Settings, Menu, X, Building, Users, MapPin, LayoutDashboard, LogOut, ClipboardList, Star } from 'lucide-react';
+import { Bell, Settings, Menu, X, Building, Users, MapPin, LayoutDashboard, LogOut, ClipboardList, Star, BadgeCheck } from 'lucide-react';
 import { useSidebar } from '../contexts/SidebarContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -177,10 +177,14 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Lado Direito - Perfil e Logout */}
       <div className="hidden lg:flex items-center gap-2 md:gap-4 h-full ml-auto lg:ml-0">
         <div className="flex items-center gap-2 md:gap-3 pl-2 md:pl-4 border-l border-white/10 h-full">
-          <div className="text-right hidden sm:flex flex-col justify-center min-w-0">
+          <div className="hidden sm:flex flex-col justify-center min-w-0">
             <p className="text-xs md:text-sm font-bold text-white leading-tight truncate max-w-[100px] md:max-w-[150px]">
               {user?.name || user?.email?.split('@')[0]}
             </p>
+            <div className="flex items-center gap-1 mt-0.5">
+              <BadgeCheck className="w-3 h-3 text-blue-300" />
+              <span className="text-[8px] font-black text-blue-200/70 uppercase tracking-wider">{(user?.role === 'admin' || user?.role === 'cap') ? 'ADMIN' : user?.role?.toUpperCase()}</span>
+            </div>
           </div>
           <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-white/20 to-white/5 flex items-center justify-center text-white font-black text-sm ring-1 ring-white/20 shadow-lg shrink-0">
             {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}

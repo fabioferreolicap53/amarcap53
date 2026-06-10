@@ -40,12 +40,13 @@ interface DashboardScreenProps {
 }
 
 // Helper Components
-const SimpleProgressBar: React.FC<{ label: string; value: number; total: number; color: string; rank?: number }> = ({ label, value, total, color, rank }) => (
-  <div className="group/item relative">
+const SimpleProgressBar: React.FC<{ label: string; value: number; total: number; color: string; rank?: number; isHighlighted?: boolean }> = ({ label, value, total, color, rank, isHighlighted }) => (
+  <div className={`group/item relative ${isHighlighted ? 'ring-2 ring-blue-400 bg-blue-50/50 rounded-xl p-3 -mx-3 shadow-sm' : ''}`}>
     <div className="flex items-center justify-between gap-4 mb-2">
       <div className="flex items-center gap-3 min-w-0">
         {rank !== undefined && (
           <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${
+            isHighlighted ? 'bg-blue-500 text-white ring-2 ring-blue-300' :
             rank === 0 ? 'bg-amber-100 text-amber-600 ring-1 ring-amber-200' : 
             rank === 1 ? 'bg-slate-100 text-slate-500 ring-1 ring-slate-200' :
             rank === 2 ? 'bg-orange-50 text-orange-600 ring-1 ring-orange-100' :
@@ -54,7 +55,12 @@ const SimpleProgressBar: React.FC<{ label: string; value: number; total: number;
             {rank + 1}
           </div>
         )}
-        <span className="text-[11px] md:text-xs font-black uppercase tracking-widest text-primary/70 truncate group-hover/item:text-primary transition-colors">{label}</span>
+        <span className={`text-[11px] md:text-xs font-black uppercase tracking-widest truncate group-hover/item:text-primary transition-colors ${
+          isHighlighted ? 'text-blue-600' : 'text-primary/70'
+        }`}>{label}</span>
+        {isHighlighted && (
+          <span className="text-[7px] font-black text-blue-500 uppercase tracking-widest bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200">Você</span>
+        )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <span className="text-sm md:text-base font-black text-primary">{value}</span>
@@ -287,7 +293,6 @@ const StatCard: React.FC<{ title: string; value: number | string; icon: React.Re
       </div>
       <div className="flex items-center gap-2">
         {description && <InfoPopover content={description} />}
-        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/30">Geral</span>
       </div>
     </div>
     <div className={`text-4xl md:text-5xl font-black ${color.replace('bg-', 'text-')} tracking-tighter mb-2 relative z-10`}>{value}</div>
@@ -805,7 +810,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               value={stats.resultadosAlterados} 
               icon={<AlertTriangle className="w-6 h-6" />}
               color="bg-rose-500"
-              description="Pacientes com resultado de teste molecular (DNA-HPV) ou citopatológico registrado. Requerem avaliação."
+              description="Pacientes com resultado de teste molecular (DNA-HPV) ou citopatológico registrado."
             />
           </div>
 
@@ -910,14 +915,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 </div>
               </div>
 
-              <div className="flex-1 w-full overflow-y-auto no-scrollbar max-h-[300px] relative z-10">
+              <div className="flex-1 w-full overflow-y-auto no-scrollbar max-h-[400px] relative z-10">
                 <div className="space-y-6">
                 {(isAdmin || user?.role === 'cap') && (
                   <div className="space-y-4">
                     <p className="text-[9px] font-black text-primary/30 uppercase tracking-[0.2em] border-b border-primary/5 pb-1.5">Unidades</p>
                     {Object.entries(acompStats.unidadeBreakdown)
                       .sort((a, b) => (b[1] as number) - (a[1] as number))
-                      .slice(0, 5)
                       .map(([label, val], idx) => (
                         <SimpleProgressBar 
                           key={label}
@@ -926,6 +930,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                           total={stats.totalPacientes} 
                           color="bg-primary" 
                           rank={idx}
+                          isHighlighted={label === user?.unidade_saude}
                         />
                       ))}
                   </div>
@@ -936,7 +941,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     <p className="text-[9px] font-black text-blue-500/30 uppercase tracking-[0.2em] border-b border-blue-500/5 pb-1.5">Equipes</p>
                     {Object.entries(acompStats.equipeBreakdown)
                       .sort((a, b) => (b[1] as number) - (a[1] as number))
-                      .slice(0, 5)
                       .map(([label, val], idx) => (
                         <SimpleProgressBar 
                           key={label}
@@ -945,6 +949,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                           total={stats.totalPacientes} 
                           color="bg-blue-500" 
                           rank={idx}
+                          isHighlighted={label === user?.equipe}
                         />
                       ))}
                   </div>
@@ -954,7 +959,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     <p className="text-[9px] font-black text-emerald-500/30 uppercase tracking-[0.2em] border-b border-emerald-500/5 pb-1.5">Microáreas</p>
                     {Object.entries(acompStats.microareaBreakdown)
                       .sort((a, b) => (b[1] as number) - (a[1] as number))
-                      .slice(0, 5)
                       .map(([label, val], idx) => (
                         <SimpleProgressBar 
                           key={label}
@@ -963,6 +967,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                           total={stats.totalPacientes} 
                           color="bg-emerald-500" 
                           rank={idx}
+                          isHighlighted={label === String(user?.microarea)}
                         />
                       ))}
                   </div>
