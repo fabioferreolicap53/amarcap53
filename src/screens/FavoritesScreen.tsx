@@ -999,7 +999,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                         <td className="px-2 py-6 text-center">
                           {paciente.alertas && ALERT_CONFIGS[paciente.alertas] && (
                             <div className={`inline-flex flex-col items-center justify-center px-2 py-2 rounded-lg border border-white/10 shadow-lg min-h-[50px] w-full max-w-[140px] mx-auto ${ALERT_CONFIGS[paciente.alertas].bg}`}>
-                              <span className={`text-[8px] md:text-[10px] font-black uppercase leading-tight text-center ${ALERT_CONFIGS[paciente.alertas].color}`}>
+                              <span className={`text-[8px] md:text-[10px] font-bold uppercase leading-tight text-center ${ALERT_CONFIGS[paciente.alertas].color}`}>
                                 {ALERT_CONFIGS[paciente.alertas].label}
                               </span>
                             </div>
