@@ -33,14 +33,14 @@ interface Paciente {
   cito_lab?: string; // Data
   cito_pep?: string; // Data
   dna_hpv?: string;  // Data
-  cito_laboratorio?: string; // Data (Novo campo)
+  dna_hpv_pep?: string; // Data (Novo campo)
   alertas_rastreamento?: string;
   alertas?: string; 
   total_acompanhamentos?: number;
   isFavorite?: boolean;
 }
 
-const CITO_LAB_SYNC_EVENT = 'amarcap53:cito-laboratorio-updated';
+const DNA_HPV_PEP_SYNC_EVENT = 'amarcap53:dna-hpv-pep-updated';
 
 interface PatientsScreenProps {
   activeTab: string;
@@ -317,29 +317,13 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     }
   };
 
+  // Derive available groups from already-loaded patients instead of a separate API call
   useEffect(() => {
-    const fetchGroups = async () => {
-      if (!user) return;
-      try {
-        const filterParts = [];
-        if (!isAdmin && user) {
-          if (user.unidade_saude) filterParts.push(`unidade = "${user.unidade_saude}"`);
-          if (user.equipe) filterParts.push(`equipe = "${user.equipe}"`);
-          if (user.microarea) filterParts.push(`microarea ~ "${user.microarea}"`);
-        }
-
-        const result = await pb.collection('amarcap53_pacientes').getFullList({
-          fields: 'grupo',
-          filter: filterParts.length > 0 ? filterParts.join(' && ') : ''
-        });
-        const groups = Array.from(new Set(result.map(r => r.grupo))).filter(g => g && g !== '--');
-        setAvailableGroups(groups);
-      } catch (error) {
-        console.error("Erro ao buscar grupos:", error);
-      }
-    };
-    fetchGroups();
-  }, [user, isAdmin]);
+    if (pacientes.length > 0) {
+      const groups = Array.from(new Set(pacientes.map(p => p.grupo))).filter(g => g && g !== '--');
+      setAvailableGroups(groups);
+    }
+  }, [pacientes]);
 
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
@@ -460,8 +444,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     // Ordem de prioridade baseada na eficiência da identificação
     
     // 1. RESULTADO DE DNA- HPV REGISTRADO EM PRONTUÁRIO (DATA DO REGISTRO) -> Azul
-    // Campo interativo: cito_laboratorio
-    if (p.cito_laboratorio && p.cito_laboratorio !== '--' && p.cito_laboratorio !== '') return 'PEP_MOLECULAR';
+    // Campo interativo: dna_hpv_pep
+    if (p.dna_hpv_pep && p.dna_hpv_pep !== '--' && p.dna_hpv_pep !== '') return 'PEP_MOLECULAR';
     
     // 2. TESTE MOLECULAR DNA-HPV (DATA DA SOLICITAÇÃO) -> Laranja
     // Campo fixo: dna_hpv
@@ -481,7 +465,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const applyCitoLaboratorioUpdate = (patientId: string, displayDate: string) => {
     setPacientes(prev => prev.map(p => {
       if (p.id === patientId) {
-        const updated = { ...p, cito_laboratorio: displayDate === '' ? '--' : displayDate };
+        const updated = { ...p, dna_hpv_pep: displayDate === '' ? '--' : displayDate };
         updated.alertas = determinarAlerta(updated);
         return updated;
       }
@@ -490,7 +474,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
     setPatientDetails(prev => {
       if (!prev || prev.id !== patientId) return prev;
-      const updated = { ...prev, cito_laboratorio: displayDate === '' ? '--' : displayDate };
+      const updated = { ...prev, dna_hpv_pep: displayDate === '' ? '--' : displayDate };
       updated.alertas = determinarAlerta(updated);
       return updated;
     });
@@ -500,8 +484,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     const normalizedDate = displayDate === '' ? '--' : displayDate;
     const payload = { patientId, displayDate: normalizedDate, source: 'patients' };
 
-    window.dispatchEvent(new CustomEvent(CITO_LAB_SYNC_EVENT, { detail: payload }));
-    localStorage.setItem('amarcap53_cito_laboratorio_sync', JSON.stringify({
+    window.dispatchEvent(new CustomEvent(DNA_HPV_PEP_SYNC_EVENT, { detail: payload }));
+    localStorage.setItem('amarcap53_dna_hpv_pep_sync', JSON.stringify({
       ...payload,
       timestamp: Date.now(),
     }));
@@ -514,7 +498,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     if (displayDate === '' || displayDate === '--' || displayDate.length === 10) {
       try {
         const valueToSave = displayDate === '--' ? '' : displayDate;
-        await pb.collection('amarcap53_pacientes').update(patientId, { cito_laboratorio: valueToSave });
+        await pb.collection('amarcap53_pacientes').update(patientId, { dna_hpv_pep: valueToSave });
       } catch (err) {
         console.error('Erro ao atualizar data no PocketBase:', err);
       }
@@ -529,7 +513,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     };
 
     const handleStorageSync = (event: StorageEvent) => {
-      if (event.key !== 'amarcap53_cito_laboratorio_sync' || !event.newValue) return;
+      if (event.key !== 'amarcap53_dna_hpv_pep_sync' || !event.newValue) return;
 
       try {
         const payload = JSON.parse(event.newValue) as { patientId: string; displayDate: string; source?: string };
@@ -540,11 +524,11 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       }
     };
 
-    window.addEventListener(CITO_LAB_SYNC_EVENT, handleCitoUpdate as EventListener);
+    window.addEventListener(DNA_HPV_PEP_SYNC_EVENT, handleCitoUpdate as EventListener);
     window.addEventListener('storage', handleStorageSync);
 
     return () => {
-      window.removeEventListener(CITO_LAB_SYNC_EVENT, handleCitoUpdate as EventListener);
+      window.removeEventListener(DNA_HPV_PEP_SYNC_EVENT, handleCitoUpdate as EventListener);
       window.removeEventListener('storage', handleStorageSync);
     };
   }, []);
@@ -685,7 +669,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             cito_lab: record.cito_lab || '--',
             cito_pep: record.cito_pep || '--',
             dna_hpv: record.dna_hpv || '--',
-            cito_laboratorio: formatarData(record.cito_laboratorio) || '--',
+            dna_hpv_pep: formatarData(record.dna_hpv_pep) || '--',
             alertas_rastreamento: record.alertas_rastreamento || '--',
             total_acompanhamentos: count,
             isFavorite: favorites.includes(record.id),
@@ -712,7 +696,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           return true;
         };
         pacientesFormatados = pacientesFormatados.filter(p =>
-          dateFilter(p.cito_laboratorio, filterDnaHpvPep) &&
+          dateFilter(p.dna_hpv_pep, filterDnaHpvPep) &&
           dateFilter(p.cito_lab, filterCitoLab) &&
           dateFilter(p.cito_pep, filterCitoPep) &&
           dateFilter(p.dna_hpv, filterDnaHpvGal)
@@ -1141,12 +1125,22 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Coleta)</span>
                       </div>
                     </th>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px]">
+                      <div className="flex flex-col items-center gap-1">
+                        <TestTube className="w-4 h-4 text-blue-400/60" />
+                        <div className="flex items-center gap-1.5">
+                          <span>DNA-HPV (GAL)</span>
+                          <InfoTooltip content="Data do resultado do teste molecular de DNA-HPV registrada no GAL (Gerenciador de Ambiente Laboratorial)." />
+                        </div>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data GAL)</span>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea' ? 8 : 7} className="px-6 py-20 text-center text-on-surface-variant text-base font-medium italic">
+                      <td colSpan={isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea' ? 9 : 8} className="px-6 py-20 text-center text-on-surface-variant text-base font-medium italic">
                         <div className="flex flex-col items-center gap-4">
                           <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
                           <span className="text-xs font-black uppercase tracking-widest text-primary/40 mt-2">Sincronizando pacientes...</span>
@@ -1155,7 +1149,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     </tr>
                   ) : pacientes.length === 0 ? (
                     <tr>
-                      <td colSpan={isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea' ? 8 : 7} className="px-6 py-20 text-center">
+                      <td colSpan={isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea' ? 9 : 8} className="px-6 py-20 text-center">
                         <div className="flex flex-col items-center opacity-30">
                           <SearchX className="w-16 h-16 mb-4" />
                           <p className="text-sm font-black uppercase tracking-widest">Nenhum registro encontrado</p>
@@ -1235,7 +1229,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         {/* 6. RESULTADO DE DNA- HPV REGISTRADO EM PRONTUÁRIO */}
                         <td className="px-4 py-6 text-center">
                           <DatePickerPTBR
-                            value={paciente.cito_laboratorio || ''}
+                            value={paciente.dna_hpv_pep || ''}
                             isISO={false}
                             onChange={(displayDate) => handleUpdateCitoLaboratorio(paciente.id, displayDate)}
                           />
@@ -1279,6 +1273,13 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         <td className="px-4 py-6 text-center">
                           <span className={`inline-block px-3.5 py-2 rounded-lg text-[11px] md:text-[12px] font-black uppercase tracking-tight shadow-sm ${paciente.cito_pep !== '--' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'text-slate-300 italic'}`}>
                             {formatarData(paciente.cito_pep)}
+                          </span>
+                        </td>
+
+                        {/* 10. TESTE MOLECULAR DNA-HPV */}
+                        <td className="px-4 py-6 text-center">
+                          <span className={`inline-block px-3.5 py-2 rounded-lg text-[11px] md:text-[12px] font-black uppercase tracking-tight shadow-sm ${paciente.dna_hpv !== '--' ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'text-slate-300 italic'}`}>
+                            {formatarData(paciente.dna_hpv)}
                           </span>
                         </td>
                       </tr>
@@ -1560,7 +1561,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                       <div className="space-y-2">
                         <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest">DNA-HPV (PEP)</p>
                         <DatePickerPTBR
-                          value={activePatientForDetails.cito_laboratorio || ''}
+                          value={activePatientForDetails.dna_hpv_pep || ''}
                           isISO={false}
                           onChange={(displayDate) => handleUpdateCitoLaboratorio(activePatientForDetails.id, displayDate)}
                         />
@@ -1584,8 +1585,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
                       {/* Datas de Exames */}
                       <div className="flex flex-wrap gap-2">
-                        {activePatientForDetails.cito_laboratorio && activePatientForDetails.cito_laboratorio !== '--' && (
-                          <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-black uppercase">DNA-HPV (PEP): {formatarData(activePatientForDetails.cito_laboratorio)}</span>
+                        {activePatientForDetails.dna_hpv_pep && activePatientForDetails.dna_hpv_pep !== '--' && (
+                          <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-black uppercase">DNA-HPV (PEP): {formatarData(activePatientForDetails.dna_hpv_pep)}</span>
                         )}
                         {activePatientForDetails.dna_hpv !== '--' && (
                           <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase">DNA-HPV (GAL): {formatarData(activePatientForDetails.dna_hpv)}</span>

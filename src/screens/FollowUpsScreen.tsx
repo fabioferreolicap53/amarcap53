@@ -249,7 +249,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         const filtered = records.filter(r => {
           const p = (r as any).expand?.paciente;
           if (!p) return true;
-          return dateFilter(p.cito_laboratorio, filterDnaHpvPep)
+          return dateFilter(p.dna_hpv_pep, filterDnaHpvPep)
             && dateFilter(p.cito_lab, filterCitoLab)
             && dateFilter(p.cito_pep, filterCitoPep)
             && dateFilter(p.dna_hpv, filterDnaHpvGal);
