@@ -81,9 +81,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                   <p className="text-sm font-black text-[#051934] dark:text-white leading-none truncate">
                     {user.name || user.email}
                   </p>
-                  <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">
-                    {user.role === 'cap' ? 'Coordenação CAP' : 'Profissional Saúde'}
-                  </p>
                 </div>
               </div>
               
