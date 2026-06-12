@@ -94,7 +94,7 @@ export function AuthScreen() {
 
       const finalUnidade = perfil === 'cap' ? '' : unidadeSaude;
       const finalEquipe = (perfil === 'cap' || perfil === 'unidade') ? '' : equipe;
-      const finalMicroarea = perfil === 'microarea' ? Number(microarea) : undefined;
+      const finalMicroarea = perfil === 'microarea' ? microarea : 'N/A';
 
       const existingEmail = await pb.collection('amarcap53_users').getFirstListItem(`email="${email}"`).catch(() => null);
       if (existingEmail) {
@@ -111,7 +111,7 @@ export function AuthScreen() {
       } else if (perfil === 'equipe') {
         filterCondition = `unidade_saude="${finalUnidade}" && equipe="${finalEquipe}" && role="equipe"`;
       } else if (perfil === 'microarea') {
-        filterCondition = `unidade_saude="${finalUnidade}" && equipe="${finalEquipe}" && microarea=${finalMicroarea}`;
+        filterCondition = `unidade_saude="${finalUnidade}" && equipe="${finalEquipe}" && microarea="${finalMicroarea}"`;
       }
 
       const existingUser = await pb.collection('amarcap53_users').getFirstListItem(filterCondition).catch(() => null);
@@ -136,12 +136,9 @@ export function AuthScreen() {
         passwordConfirm,
         unidade_saude: finalUnidade,
         equipe: finalEquipe,
-        role: perfil
+        role: perfil,
+        microarea: finalMicroarea
       };
-
-      if (finalMicroarea !== undefined) {
-        data.microarea = finalMicroarea;
-      }
 
       await pb.collection('amarcap53_users').create(data);
       
