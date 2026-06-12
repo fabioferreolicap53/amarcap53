@@ -6,7 +6,7 @@ interface UserRecord extends RecordModel {
   name?: string;
   unidade_saude: string;
   equipe: string;
-  microarea: string;
+  microarea: number;
   role: 'cap' | 'unidade' | 'equipe' | 'microarea' | 'admin' | 'user';
   favoritos?: string[];
 }

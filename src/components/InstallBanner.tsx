@@ -30,7 +30,7 @@ export const InstallBanner: React.FC = () => {
     }
 
     const handler = (e: Event) => {
-      e.preventDefault();
+      // Only preventDefault when user clicks install to avoid Chrome warning
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       if (shouldShow) setShowBanner(true);
     };
@@ -43,6 +43,8 @@ export const InstallBanner: React.FC = () => {
   const handleInstall = async () => {
     if (!deferredPrompt) return;
     
+    // Prevent the default mini-infobar right before showing our prompt
+    deferredPrompt.preventDefault();
     await deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     

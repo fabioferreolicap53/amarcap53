@@ -190,7 +190,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           } else if (user.role === 'microarea') {
             acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
             acompFilters.push(`paciente.equipe = "${user.equipe}"`);
-            acompFilters.push(`paciente.microarea = ${user.microarea}`);
+            acompFilters.push(`paciente.microarea = ${Number(user.microarea)}`);
           }
         }
 
@@ -202,7 +202,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           acompFilters.push(`(${filterEquipe.map(e => `paciente.equipe = "${e}"`).join(' || ')})`);
         }
         if (filterMicroarea.length > 0) {
-          acompFilters.push(`(${filterMicroarea.map(m => `paciente.microarea = ${m}`).join(' || ')})`);
+          acompFilters.push(`(${filterMicroarea.map(m => `paciente.microarea = ${Number(m)}`).join(' || ')})`);
         }
 
         // Outros Filtros UI

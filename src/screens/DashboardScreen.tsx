@@ -377,7 +377,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           } else if (user.role === 'microarea') {
             patientFilterParts.push(`unidade = "${user.unidade_saude}"`);
             patientFilterParts.push(`equipe = "${user.equipe}"`);
-            patientFilterParts.push(`microarea = ${user.microarea}`);
+            patientFilterParts.push(`microarea = ${Number(user.microarea)}`);
           }
         }
 
@@ -389,7 +389,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           patientFilterParts.push(`(${filterEquipe.map(e => `equipe = "${e}"`).join(' || ')})`);
         }
         if (filterMicroarea.length > 0) {
-          patientFilterParts.push(`(${filterMicroarea.map(m => `microarea = ${m}`).join(' || ')})`);
+          patientFilterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
         }
 
         // Build filter strings
@@ -407,7 +407,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           } else if (user.role === 'microarea') {
             acompFilterParts.push(`paciente.unidade = "${user.unidade_saude}"`);
             acompFilterParts.push(`paciente.equipe = "${user.equipe}"`);
-            acompFilterParts.push(`paciente.microarea = ${user.microarea}`);
+            acompFilterParts.push(`paciente.microarea = ${Number(user.microarea)}`);
           }
         }
         if (filterUnidade.length > 0) {
@@ -417,7 +417,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           acompFilterParts.push(`(${filterEquipe.map(e => `paciente.equipe = "${e}"`).join(' || ')})`);
         }
         if (filterMicroarea.length > 0) {
-          acompFilterParts.push(`(${filterMicroarea.map(m => `paciente.microarea = ${m}`).join(' || ')})`);
+          acompFilterParts.push(`(${filterMicroarea.map(m => `paciente.microarea = ${Number(m)}`).join(' || ')})`);
         }
         if (filterDataInicio) {
           acompFilterParts.push(`data_busca >= "${filterDataInicio} 00:00:00"`);
