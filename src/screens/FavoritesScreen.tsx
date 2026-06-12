@@ -406,7 +406,12 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
 
     if (displayDate === '' || displayDate === '--' || displayDate.length === 10) {
       try {
-        const valueToSave = displayDate === '--' ? '' : displayDate;
+        let valueToSave = displayDate === '--' ? '' : displayDate;
+        // Converter DD/MM/YYYY → YYYY-MM-DD para PocketBase type=date
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(valueToSave)) {
+          const [d, m, y] = valueToSave.split('/');
+          valueToSave = `${y}-${m}-${d}`;
+        }
         await pb.collection('amarcap53_pacientes').update(patientId, { dna_hpv_pep: valueToSave });
       } catch (err) {
         console.error('Erro ao atualizar data no PocketBase:', err);
@@ -940,7 +945,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                           <TestTube className="w-4 h-4 text-blue-400/60" />
                           <div className="flex items-center gap-1.5">
                             <span>DNA-HPV (PEP)</span>
-                            <InfoTooltip content="Data de registro do resultado do teste molecular de DNA-HPV no PEP (Prontuário Eletrônico do Paciente)." />
+                            <InfoTooltip content="Data de registro do resultado do teste molecular de DNA-HPV no PEP." />
                           </div>
                           <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Registro)</span>
                         </div>
@@ -974,7 +979,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                           <FileText className="w-4 h-4 text-blue-400/60" />
                           <div className="flex items-center gap-1.5">
                             <span>Cito (PEP)</span>
-                          <InfoTooltip content="Data de coleta do exame citopatológico registrada no PEP (Prontuário Eletrônico do Paciente)." />
+                          <InfoTooltip content="Data de coleta do exame citopatológico registrada no PEP." />
                         </div>
                         <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Coleta)</span>
                       </div>
@@ -984,7 +989,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                         <TestTube className="w-4 h-4 text-blue-400/60" />
                         <div className="flex items-center gap-1.5">
                           <span>DNA-HPV (GAL)</span>
-                          <InfoTooltip content="Data do resultado do teste molecular de DNA-HPV registrada no GAL (Gerenciador de Ambiente Laboratorial)." />
+                          <InfoTooltip content="Data do resultado do teste molecular de DNA-HPV registrada no GAL." />
                         </div>
                         <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data GAL)</span>
                       </div>
