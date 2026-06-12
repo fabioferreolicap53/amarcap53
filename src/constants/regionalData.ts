@@ -26,4 +26,4 @@ export const UNIDADES_EQUIPES: Record<string, string[]> = {
   "SMS CMS SAVIO ANTUNES ANTARES AP 53": ["CAMPO DOS BANDEIRANTES", "PONTE AMARELA", "SEMPRE VIDA"]
 };
 
-export const MICROAREAS = ["1", "2", "3", "4", "5", "6"];
+export const MICROAREAS = ["1", "2", "3", "4", "5", "6", "7"];
