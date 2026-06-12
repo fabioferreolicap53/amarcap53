@@ -321,6 +321,22 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const [filterMicroarea, setFilterMicroarea] = useState<string[]>([]);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
 
+  // Cache localStorage para count queries do CAP (evita full table scan repetido)
+  const STATS_CACHE_KEY = 'dash_stats_cache';
+  const STATS_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+  const getStatsCache = () => {
+    try {
+      const raw = localStorage.getItem(STATS_CACHE_KEY);
+      if (!raw) return null;
+      const cached = JSON.parse(raw);
+      if (Date.now() - cached.ts > STATS_CACHE_TTL) return null;
+      return cached.data;
+    } catch { return null; }
+  };
+  const setStatsCache = (data: any) => {
+    try { localStorage.setItem(STATS_CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch {}
+  };
+
   const [acompStats, setAcompStats] = useState({
     total: 0,
     sucesso: 0,
@@ -362,6 +378,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   };
 
   useEffect(() => {
+    let cancelled = false;
     const fetchStats = async () => {
       if (!user) return;
       try {
@@ -394,7 +411,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
         // Build filter strings
         const patientFilter = patientFilterParts.join(' && ');
-        const showRanking = isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea';
 
         // Build acomp filters
         const acompFilterParts: string[] = [];
@@ -426,101 +442,135 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           acompFilterParts.push(`data_busca <= "${filterDataFim} 23:59:59"`);
         }
 
-        // Parallel queries for max speed
-        const [records, allRecords, acompRecords] = await Promise.all([
-          // 1. Filtered patients for stats
-          pb.collection('amarcap53_pacientes').getFullList({
-            filter: patientFilter,
-            sort: '-created',
-            requestKey: null,
-            fields: 'dna_hpv_pep,dna_hpv_gal,cito_pep,cito_lab,grupo,unidade,equipe,microarea,created'
-          }),
-          // 2. All patients for regional ranking (minimal fields, no filter)
-          showRanking
-            ? pb.collection('amarcap53_pacientes').getFullList({
-                requestKey: null,
-                fields: 'unidade,equipe,microarea'
-              }).catch(() => [] as any[])
-            : Promise.resolve([] as any[]),
-          // 3. Acompanhamentos
-          pb.collection('amarcap53_acompanhamentos').getFullList({
-            filter: acompFilterParts.join(' && '),
-            sort: 'created',
-            requestKey: null,
-            fields: 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created'
-          })
-        ]);
-
-        // Preenche breakdowns de todos registros para o ranking
-        const allUnidadeBreakdown: Record<string, number> = {};
-        const allEquipeBreakdown: Record<string, number> = {};
-        const allMicroareaBreakdown: Record<string, number> = {};
-        allRecords.forEach((p: any) => {
-          if (p.unidade) allUnidadeBreakdown[p.unidade] = (allUnidadeBreakdown[p.unidade] || 0) + 1;
-          if (p.equipe) allEquipeBreakdown[p.equipe] = (allEquipeBreakdown[p.equipe] || 0) + 1;
-          if (p.microarea) allMicroareaBreakdown[p.microarea] = (allMicroareaBreakdown[p.microarea] || 0) + 1;
-        });
-
-        // Breakdown de Alertas e Grupos
-        const alerts: Record<string, number> = {};
-        const groups: Record<string, number> = {};
-        const unidadeBreakdown: Record<string, number> = {};
-        const equipeBreakdown: Record<string, number> = {};
-        const microareaBreakdown: Record<string, number> = {};
-        
+        // Parallel queries
+        const hasUIFilters = filterUnidade.length > 0 || filterEquipe.length > 0 || filterMicroarea.length > 0 || filterDataInicio || filterDataFim;
+        const isScopeQuery = !isAdmin || hasUIFilters;
         const lastSixMonths = getLastSixMonths();
-        const examTrendMap = Object.fromEntries(lastSixMonths.map(month => [month.key, { cito: 0, hpv: 0 }])) as Record<string, { cito: number; hpv: number }>;
-        let currentCito = 0;
-        let currentHpv = 0;
-        
-        records.forEach(p => {
-          let status = 'NAO_IDENTIFICADO';
-          if (hasValue(p.dna_hpv_pep)) status = 'PEP_MOLECULAR';
-          else if (hasValue(p.dna_hpv_gal)) status = 'COLETA_MOLECULAR';
-          else if (hasValue(p.cito_pep)) status = 'PEP_CITO';
-          else if (hasValue(p.cito_lab)) status = 'COLETA_CITO';
-          
-          alerts[status] = (alerts[status] || 0) + 1;
-          groups[p.grupo || 'NÃO INFORMADO'] = (groups[p.grupo || 'NÃO INFORMADO'] || 0) + 1;
-          
-          // Regional breakdowns
-          if (p.unidade) unidadeBreakdown[p.unidade] = (unidadeBreakdown[p.unidade] || 0) + 1;
-          if (p.equipe) equipeBreakdown[p.equipe] = (equipeBreakdown[p.equipe] || 0) + 1;
-          if (p.microarea) microareaBreakdown[p.microarea] = (microareaBreakdown[p.microarea] || 0) + 1;
+        const emptyAcompTrend = lastSixMonths.map(month => ({ month: month.label, total: 0 }));
+        if (isScopeQuery) {
+          // Non-CAP or CAP with UI filters: query limited scope
+          const records = await pb.collection('amarcap53_pacientes').getFullList({
+            filter: patientFilter,
+            batch: 500,
+            requestKey: null,
+            fields: 'dna_hpv_pep,dna_hpv_gal,cito_pep,cito_lab,grupo,unidade,equipe,microarea'
+          });
+          if (cancelled) return;
 
-          const citoDates = [toValidDate(p.cito_lab), toValidDate(p.cito_pep)].filter(Boolean) as Date[];
-          const hpvDates = [toValidDate(p.dna_hpv_gal), toValidDate(p.dna_hpv_pep)].filter(Boolean) as Date[];
+          const totalPacientes = records.length;
+          const alerts: Record<string, number> = {};
+          const groups: Record<string, number> = {};
 
-          if (citoDates.length > 0) currentCito++;
-          if (hpvDates.length > 0) currentHpv++;
-
-          citoDates.forEach(date => {
-            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            if (examTrendMap[key]) examTrendMap[key].cito++;
+          records.forEach(p => {
+            let status = 'NAO_IDENTIFICADO';
+            if (hasValue(p.dna_hpv_pep)) status = 'PEP_MOLECULAR';
+            else if (hasValue(p.dna_hpv_gal)) status = 'COLETA_MOLECULAR';
+            else if (hasValue(p.cito_pep)) status = 'PEP_CITO';
+            else if (hasValue(p.cito_lab)) status = 'COLETA_CITO';
+            alerts[status] = (alerts[status] || 0) + 1;
+            groups[p.grupo || 'NÃO INFORMADO'] = (groups[p.grupo || 'NÃO INFORMADO'] || 0) + 1;
           });
 
-          hpvDates.forEach(date => {
-            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            if (examTrendMap[key]) examTrendMap[key].hpv++;
+          const atrasadas = alerts['NAO_IDENTIFICADO'] || 0;
+          const alterados = (alerts['PEP_MOLECULAR'] || 0) + (alerts['COLETA_MOLECULAR'] || 0) + (alerts['PEP_CITO'] || 0) + (alerts['COLETA_CITO'] || 0);
+          const emDia = Math.max(totalPacientes - atrasadas, 0);
+
+          setStats({
+            totalPacientes,
+            coletasAtrasadas: atrasadas,
+            examesEmDia: emDia,
+            resultadosAlterados: alterados,
+            coberturaPercent: totalPacientes > 0 ? Math.round((emDia / totalPacientes) * 100) : 0,
+            alertBreakdown: alerts,
+            grupoBreakdown: groups,
+            examVolume: { cito: (alerts['PEP_CITO'] || 0) + (alerts['COLETA_CITO'] || 0), hpv: (alerts['PEP_MOLECULAR'] || 0) + (alerts['COLETA_MOLECULAR'] || 0), pendente: atrasadas },
+            examTrend: [],
+            acompTrend: emptyAcompTrend
           });
+        } else {
+          // CAP without UI filters: pure count-based queries (instant)
+          const baseFilter = patientFilter || '';
+          const encode = (s: string) => encodeURIComponent(s);
+
+          const countApi = (field: string) => {
+            const f = baseFilter ? `${baseFilter} && ${field}` : field;
+            return pb.send(`/api/collections/amarcap53_pacientes/records?perPage=0&fields=id&filter=${encode(f)}`, { method: 'GET' });
+          };
+
+          // Mostra cache imediatamente (instantaneo)
+          const cached = getStatsCache();
+          if (cached) {
+            setStats({ ...cached, acompTrend: emptyAcompTrend });
+          }
+
+          try {
+            const [totalRes, pMolRes, cMolRes, pCitoRes, cCitoRes] = await Promise.all([
+              pb.send('/api/collections/amarcap53_pacientes/records?perPage=0&fields=id', { method: 'GET' }),
+              countApi('dna_hpv_pep != ""'),
+              countApi('dna_hpv_gal != ""'),
+              countApi('cito_pep != ""'),
+              countApi('cito_lab != ""'),
+            ]);
+            if (cancelled) return;
+
+            const totalPacientes = totalRes.totalItems;
+            const pepMol = pMolRes.totalItems;
+            const coltMol = cMolRes.totalItems;
+            const pepCito = pCitoRes.totalItems;
+            const coltCito = cCitoRes.totalItems;
+            const withExam = pepMol + coltMol + pepCito + coltCito;
+            const atrasadas = Math.max(totalPacientes - withExam, 0);
+
+            setStats({
+              totalPacientes,
+              coletasAtrasadas: atrasadas,
+              examesEmDia: withExam,
+              resultadosAlterados: withExam,
+              coberturaPercent: totalPacientes > 0 ? Math.round((withExam / totalPacientes) * 100) : 0,
+              alertBreakdown: {
+                NAO_IDENTIFICADO: atrasadas,
+                PEP_MOLECULAR: pepMol,
+                COLETA_MOLECULAR: coltMol,
+                PEP_CITO: pepCito,
+                COLETA_CITO: coltCito
+              },
+              grupoBreakdown: {},
+              examVolume: { cito: pepCito + coltCito, hpv: pepMol + coltMol, pendente: atrasadas },
+              examTrend: [],
+              acompTrend: emptyAcompTrend
+            });
+            // Salva cache para proximo load
+            setStatsCache({
+              totalPacientes,
+              coletasAtrasadas: atrasadas,
+              examesEmDia: withExam,
+              resultadosAlterados: withExam,
+              coberturaPercent: totalPacientes > 0 ? Math.round((withExam / totalPacientes) * 100) : 0,
+              alertBreakdown: { NAO_IDENTIFICADO: atrasadas, PEP_MOLECULAR: pepMol, COLETA_MOLECULAR: coltMol, PEP_CITO: pepCito, COLETA_CITO: coltCito },
+              examVolume: { cito: pepCito + coltCito, hpv: pepMol + coltMol, pendente: atrasadas }
+            });
+          } catch (err) {
+            console.error('Count queries failed:', err);
+            if (!cancelled) {
+              setStats({
+                totalPacientes: 0, coletasAtrasadas: 0, examesEmDia: 0, resultadosAlterados: 0,
+                coberturaPercent: 0, alertBreakdown: {}, grupoBreakdown: {},
+                examVolume: { cito: 0, hpv: 0, pendente: 0 },
+                examTrend: [], acompTrend: emptyAcompTrend
+              });
+            }
+          }
+        }
+
+        // Acompanhamentos (separate, non-blocking for initial render)
+        const acompRecords = await pb.collection('amarcap53_acompanhamentos').getFullList({
+          filter: acompFilterParts.join(' && '),
+          sort: 'created',
+          batch: 500,
+          requestKey: null,
+          fields: 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created'
         });
-
-        const total = records.length;
-        const atrasadas = alerts['NAO_IDENTIFICADO'] || 0;
-        const alterados = records.filter(p => {
-          return hasValue(p.dna_hpv_pep) || hasValue(p.dna_hpv_gal) || hasValue(p.cito_pep) || hasValue(p.cito_lab);
-        }).length;
-        const emDia = Math.max(total - atrasadas, 0);
-        const cobertura = total > 0 ? Math.round((emDia / total) * 100) : 0;
-        const examTrend = lastSixMonths.map(month => ({
-          month: month.label,
-          ...(examTrendMap[month.key] || { cito: 0, hpv: 0 })
-        }));
-        const examVolume = {
-          cito: currentCito,
-          hpv: currentHpv,
-          pendente: Math.max(total - currentCito - currentHpv, 0)
-        };
+        if (cancelled) return;
 
         // Process Acompanhamentos
         const aStats = {
@@ -536,22 +586,21 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           tipoBusca: {} as Record<string, number>,
           situacao: {} as Record<string, number>,
           entraves: {} as Record<string, number>,
-          unidadeBreakdown: allUnidadeBreakdown,
-          equipeBreakdown: allEquipeBreakdown,
-          microareaBreakdown: allMicroareaBreakdown
+          unidadeBreakdown: {} as Record<string, number>,
+          equipeBreakdown: {} as Record<string, number>,
+          microareaBreakdown: {} as Record<string, number>
         };
 
-        const acompTrendMap = Object.fromEntries(lastSixMonths.map(month => [month.key, 0])) as Record<string, number>;
+        const acompTrendMap2 = Object.fromEntries(lastSixMonths.map(month => [month.key, 0])) as Record<string, number>;
         acompRecords.forEach(r => {
           const metodo = getAcompanhamentoMetodo(r);
           if (metodo) aStats.tipoBusca[metodo] = (aStats.tipoBusca[metodo] || 0) + 1;
-          
+
           const canonicalSituacao = getCanonicalValue('situacao_pos_busca', r.situacao_pos_busca || '');
           if (canonicalSituacao) {
             aStats.situacao[canonicalSituacao] = (aStats.situacao[canonicalSituacao] || 0) + 1;
           }
-          
-          // Filtrar entraves reais (ignorar "0- Nenhum" ou similares)
+
           const entravesList = Array.isArray(r.entraves_identificados)
             ? r.entraves_identificados
             : r.entraves_identificados ? [r.entraves_identificados] : [];
@@ -565,25 +614,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           const date = toValidDate(r.data_busca) || toValidDate(r.created);
           if (!date) return;
           const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-          if (key in acompTrendMap) acompTrendMap[key] = (acompTrendMap[key] || 0) + 1;
+          if (key in acompTrendMap2) acompTrendMap2[key] = (acompTrendMap2[key] || 0) + 1;
         });
 
-        const acompTrend = lastSixMonths.map(month => ({ month: month.label, total: acompTrendMap[month.key] || 0 }));
+        // Update stats with trend data
+        const acompTrendFinal = lastSixMonths.map(month => ({ month: month.label, total: acompTrendMap2[month.key] || 0 }));
 
-        setStats({
-          totalPacientes: total,
-          coletasAtrasadas: atrasadas,
-          examesEmDia: emDia,
-          resultadosAlterados: alterados,
-          coberturaPercent: cobertura,
-          alertBreakdown: alerts,
-          grupoBreakdown: groups,
-          examVolume,
-          examTrend,
-          acompTrend
-        });
-
-        setAcompStats(aStats);
+        if (!cancelled) {
+          setStats(prev => ({
+            ...prev,
+            acompTrend: acompTrendFinal
+          }));
+          setAcompStats(aStats);
+        }
       } catch (error: any) {
         if (error?.isAbort) return;
         console.error('Erro ao buscar estatísticas:', error);
@@ -591,7 +634,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     };
 
     fetchStats();
-  }, [user, isAdmin, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea]);
+    return () => { cancelled = true; };
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea]);
 
   const chartData = {
     labels: stats.examTrend.map(t => t.month),
@@ -600,7 +644,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         label: 'Citopatológico',
         data: stats.examTrend.map(t => t.cito),
         backgroundColor: (context: any) => {
-          const ctx = context.chart.ctx;
+          const ctx = context?.chart?.ctx;
+          if (!ctx) return 'rgba(16, 185, 129, 0.9)';
           const gradient = ctx.createLinearGradient(0, 0, 0, 400);
           gradient.addColorStop(0, 'rgba(16, 185, 129, 0.9)');
           gradient.addColorStop(1, 'rgba(16, 185, 129, 0.2)');
@@ -617,7 +662,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         label: 'Molecular DNA',
         data: stats.examTrend.map(t => t.hpv),
         backgroundColor: (context: any) => {
-          const ctx = context.chart.ctx;
+          const ctx = context?.chart?.ctx;
+          if (!ctx) return 'rgba(59, 130, 246, 0.9)';
           const gradient = ctx.createLinearGradient(0, 0, 0, 400);
           gradient.addColorStop(0, 'rgba(59, 130, 246, 0.9)');
           gradient.addColorStop(1, 'rgba(59, 130, 246, 0.2)');
@@ -754,7 +800,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                           setFilterEquipe(val);
                           setFilterMicroarea([]);
                         }}
-                        disabled={filterUnidade.length === 0 && (isAdmin || user?.role === 'cap')}
+                        disabled={filterUnidade.length === 0 && user?.role === 'cap'}
                       />
                     </div>
                   )}
@@ -767,7 +813,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                         options={MICROAREAS.map(ma => ma.toString())}
                         value={filterMicroarea}
                         onChange={setFilterMicroarea}
-                        disabled={filterEquipe.length === 0 && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
+                        disabled={filterEquipe.length === 0 && user?.role === 'cap'}
                       />
                     </div>
                   )}
@@ -883,19 +929,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                           displayColors: true,
                           usePointStyle: true,
                           callbacks: {
-                            label: (context: any) => ` ${context.dataset.label}: ${context.parsed.y}%`
+                            label: (context: any) => ` ${context.dataset.label}: ${context.parsed.y} pacientes`
                           }
                         }
                       },
                       scales: {
                         y: {
                           beginAtZero: true,
-                          max: 100,
                           ticks: {
-                            callback: (value) => `${value}%`,
                             font: { weight: 'bold', size: 10 },
                             color: '#94a3b8',
-                            stepSize: 20
                           },
                           grid: { 
                             color: 'rgba(241, 245, 249, 1)',

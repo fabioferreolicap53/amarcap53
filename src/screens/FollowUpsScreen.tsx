@@ -263,7 +263,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     };
 
     fetchAcompanhamentos();
-  }, [user, filterUnidade, filterEquipe, filterMicroarea, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal]);
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, filterUnidade, filterEquipe, filterMicroarea, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este registro?')) {
@@ -551,7 +551,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                         options={filterUnidade.length > 0 ? Array.from(new Set(filterUnidade.flatMap(u => UNIDADES_EQUIPES[u] || []))) : user?.role === 'unidade' ? UNIDADES_EQUIPES[user.unidade_saude] || [] : []}
                         value={filterEquipe}
                         onChange={(val) => { setFilterEquipe(val); setFilterMicroarea([]); }}
-                        disabled={filterUnidade.length === 0 && (isAdmin || user?.role === 'cap')}
+                        disabled={filterUnidade.length === 0 && user?.role === 'cap'}
                       />
                     </div>
                   )}
@@ -563,7 +563,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                         options={MICROAREAS.map(ma => ma.toString())}
                         value={filterMicroarea}
                         onChange={setFilterMicroarea}
-                        disabled={filterEquipe.length === 0 && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
+                        disabled={filterEquipe.length === 0 && user?.role === 'cap'}
                       />
                     </div>
                   )}

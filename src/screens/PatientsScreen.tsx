@@ -225,6 +225,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [hasClientSideFilter, setHasClientSideFilter] = useState(false);
   const pageSize = 10;
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [patientForDetails, setPatientDetails] = useState<Paciente | null>(null);
@@ -538,7 +539,13 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     };
   }, []);
 
+  // Reseta currentPage para 1 quando filtros mudam (evita pagina vazia)
   useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal]);
+
+  useEffect(() => {
+    let cancelled = false;
     const fetchPacientes = async () => {
       if (!user) return;
       try {
@@ -647,20 +654,25 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         }
         
         const resultList = await pb.collection('amarcap53_pacientes').getList(currentPage, pageSize, options);
+        if (cancelled) return;
         
-        // Busca contagem de acompanhamentos para os pacientes da página
-        const counts = await Promise.all(
-          resultList.items.map(async (record) => {
-            const result = await pb.collection('amarcap53_acompanhamentos').getList(1, 1, {
-              filter: `paciente = "${record.id}"`,
-              fields: 'id'
-            });
-            return { id: record.id, total: result.totalItems };
-          })
-        );
+        // Busca contagem de acompanhamentos em lote (evita N+1)
+        const patientIds = resultList.items.map(r => r.id);
+        const acompCounts = patientIds.length > 0
+          ? await pb.collection('amarcap53_acompanhamentos').getFullList({
+              filter: `(${patientIds.map(id => `paciente = "${id}"`).join(' || ')})`,
+              fields: 'id,paciente',
+              requestKey: null
+            })
+          : [];
+        if (cancelled) return;
+        const countMap = new Map<string, number>();
+        acompCounts.forEach(r => {
+          countMap.set(r.paciente, (countMap.get(r.paciente) || 0) + 1);
+        });
 
         let pacientesFormatados = resultList.items.map(record => {
-          const count = counts.find(c => c.id === record.id)?.total || 0;
+          const count = countMap.get(record.id) || 0;
           const p: Paciente = {
             id: record.id,
             unidade: record.unidade || '--',
@@ -717,6 +729,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     };
 
     fetchPacientes();
+    return () => { cancelled = true; };
   }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, searchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal]);
 
   const resetFilters = () => {
@@ -982,7 +995,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           setFilterEquipe(val);
                           setFilterMicroarea([]);
                         }}
-                        disabled={filterUnidade.length === 0 && (isAdmin || user?.role === 'cap')}
+                        disabled={filterUnidade.length === 0 && user?.role === 'cap'}
                       />
                     </div>
                   )}
@@ -995,7 +1008,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         options={MICROAREAS.map(ma => ma.toString())}
                         value={filterMicroarea}
                         onChange={setFilterMicroarea}
-                        disabled={filterEquipe.length === 0 && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
+                        disabled={filterEquipe.length === 0 && (isAdmin || user?.role === 'cap')}
                       />
                     </div>
                   )}

@@ -434,22 +434,28 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
         sort: 'nome'
       });
 
-      const counts = await Promise.all(
-        resultList.map(async (record) => {
-          const result = await pb.collection('amarcap53_acompanhamentos').getList(1, 1, {
-            filter: `paciente = "${record.id}"`,
+      // Busca acompanhamentos em lote (evita N+1)
+      const patientIds = resultList.map(r => r.id);
+      const acompRecords = patientIds.length > 0
+        ? await pb.collection('amarcap53_acompanhamentos').getFullList({
+            filter: `(${patientIds.map(id => `paciente = "${id}"`).join(' || ')})`,
             sort: '-created',
-          });
-          return { 
-            id: record.id, 
-            total: result.totalItems,
-            lastAcomp: result.items[0] || null
-          };
-        })
-      );
+            fields: 'id,paciente,tipo_busca,tipo_contato,situacao_pos_busca,entraves_identificados,data_cadastro',
+            requestKey: null
+          })
+        : [];
+      const countMap = new Map<string, number>();
+      const lastAcompMap = new Map<string, any>();
+      acompRecords.forEach(r => {
+        countMap.set(r.paciente, (countMap.get(r.paciente) || 0) + 1);
+        if (!lastAcompMap.has(r.paciente)) {
+          lastAcompMap.set(r.paciente, r);
+        }
+      });
 
       const formatados = resultList.map(record => {
-        const acompData = counts.find(c => c.id === record.id);
+        const total = countMap.get(record.id) || 0;
+        const lastAcomp = lastAcompMap.get(record.id) || null;
         const p: any = {
           id: record.id,
           unidade: record.unidade || '--',
@@ -465,8 +471,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
           dna_hpv_gal: record.dna_hpv_gal || '--',
           dna_hpv_pep: formatarData(record.dna_hpv_pep) || '--',
           alertas_rastreamento: record.alertas_rastreamento || '--',
-          total_acompanhamentos: acompData?.total || 0,
-          lastAcomp: acompData?.lastAcomp || null,
+          total_acompanhamentos: total || 0,
+          lastAcomp: lastAcomp || null,
           isFavorite: true,
         };
         p.alertas = determinarAlerta(p);
@@ -824,7 +830,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                         }
                         value={filterEquipe}
                         onChange={(val) => { setFilterEquipe(val); setFilterMicroarea([]); }}
-                        disabled={filterUnidade.length === 0 && (isAdmin || user?.role === 'cap')}
+                        disabled={filterUnidade.length === 0 && user?.role === 'cap'}
                       />
                     </div>
                   )}
@@ -836,7 +842,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                         options={MICROAREAS.map(ma => ma.toString())}
                         value={filterMicroarea}
                         onChange={setFilterMicroarea}
-                        disabled={filterEquipe.length === 0 && (isAdmin || user?.role === 'cap' || user?.role === 'unidade')}
+                        disabled={filterEquipe.length === 0 && user?.role === 'cap'}
                       />
                     </div>
                   )}
