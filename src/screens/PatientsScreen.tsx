@@ -555,7 +555,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           } else if (user.role === 'microarea') {
             filterParts.push(`unidade = "${user.unidade_saude}"`);
             filterParts.push(`equipe = "${user.equipe}"`);
-            filterParts.push(`microarea ~ "${user.microarea}"`);
+            filterParts.push(`microarea = ${user.microarea}`);
           }
         }
 
@@ -567,7 +567,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           filterParts.push(`(${filterEquipe.map(e => `equipe = "${e}"`).join(' || ')})`);
         }
         if (filterMicroarea.length > 0) {
-          filterParts.push(`(${filterMicroarea.map(m => `microarea ~ "${m}"`).join(' || ')})`);
+          filterParts.push(`(${filterMicroarea.map(m => `microarea = ${m}`).join(' || ')})`);
         }
 
         // Filtros de Acompanhamento (Requer busca na outra coleção)
@@ -604,7 +604,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             } else if (user.role === 'microarea') {
               acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
               acompFilters.push(`paciente.equipe = "${user.equipe}"`);
-              acompFilters.push(`paciente.microarea ~ "${user.microarea}"`);
+              acompFilters.push(`paciente.microarea = ${user.microarea}`);
             }
           }
           
@@ -615,7 +615,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             acompFilters.push(`(${filterEquipe.map(e => `paciente.equipe = "${e}"`).join(' || ')})`);
           }
           if (filterMicroarea.length > 0) {
-            acompFilters.push(`(${filterMicroarea.map(m => `paciente.microarea ~ "${m}"`).join(' || ')})`);
+            acompFilters.push(`(${filterMicroarea.map(m => `paciente.microarea = ${m}`).join(' || ')})`);
           }
           
           const acompRecords = await pb.collection('amarcap53_acompanhamentos').getFullList({
