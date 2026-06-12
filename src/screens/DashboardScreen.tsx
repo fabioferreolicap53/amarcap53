@@ -433,7 +433,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             filter: patientFilter,
             sort: '-created',
             requestKey: null,
-            fields: 'dna_hpv_pep,dna_hpv,cito_pep,cito_lab,grupo,unidade,equipe,microarea,created'
+            fields: 'dna_hpv_pep,dna_hpv_gal,cito_pep,cito_lab,grupo,unidade,equipe,microarea,created'
           }),
           // 2. All patients for regional ranking (minimal fields, no filter)
           showRanking
@@ -476,7 +476,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         records.forEach(p => {
           let status = 'NAO_IDENTIFICADO';
           if (hasValue(p.dna_hpv_pep)) status = 'PEP_MOLECULAR';
-          else if (hasValue(p.dna_hpv)) status = 'COLETA_MOLECULAR';
+          else if (hasValue(p.dna_hpv_gal)) status = 'COLETA_MOLECULAR';
           else if (hasValue(p.cito_pep)) status = 'PEP_CITO';
           else if (hasValue(p.cito_lab)) status = 'COLETA_CITO';
           
@@ -489,7 +489,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           if (p.microarea) microareaBreakdown[p.microarea] = (microareaBreakdown[p.microarea] || 0) + 1;
 
           const citoDates = [toValidDate(p.cito_lab), toValidDate(p.cito_pep)].filter(Boolean) as Date[];
-          const hpvDates = [toValidDate(p.dna_hpv), toValidDate(p.dna_hpv_pep)].filter(Boolean) as Date[];
+          const hpvDates = [toValidDate(p.dna_hpv_gal), toValidDate(p.dna_hpv_pep)].filter(Boolean) as Date[];
 
           if (citoDates.length > 0) currentCito++;
           if (hpvDates.length > 0) currentHpv++;
@@ -508,7 +508,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         const total = records.length;
         const atrasadas = alerts['NAO_IDENTIFICADO'] || 0;
         const alterados = records.filter(p => {
-          return hasValue(p.dna_hpv_pep) || hasValue(p.dna_hpv) || hasValue(p.cito_pep) || hasValue(p.cito_lab);
+          return hasValue(p.dna_hpv_pep) || hasValue(p.dna_hpv_gal) || hasValue(p.cito_pep) || hasValue(p.cito_lab);
         }).length;
         const emDia = Math.max(total - atrasadas, 0);
         const cobertura = total > 0 ? Math.round((emDia / total) * 100) : 0;

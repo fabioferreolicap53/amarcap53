@@ -252,7 +252,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           return dateFilter(p.dna_hpv_pep, filterDnaHpvPep)
             && dateFilter(p.cito_lab, filterCitoLab)
             && dateFilter(p.cito_pep, filterCitoPep)
-            && dateFilter(p.dna_hpv, filterDnaHpvGal);
+            && dateFilter(p.dna_hpv_gal, filterDnaHpvGal);
         });
         setAcompanhamentos(filtered);
       } catch (error) {

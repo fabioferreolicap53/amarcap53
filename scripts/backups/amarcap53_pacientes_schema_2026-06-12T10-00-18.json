@@ -1,0 +1,180 @@
+{
+  "id": "uvs7ykosz111bj6",
+  "created": "2026-03-25 18:37:24.739Z",
+  "updated": "2026-06-12 09:43:57.899Z",
+  "name": "amarcap53_pacientes",
+  "type": "base",
+  "system": false,
+  "schema": [
+    {
+      "system": false,
+      "id": "ikdkqtza",
+      "name": "nome",
+      "type": "text",
+      "required": false,
+      "presentable": false,
+      "unique": false,
+      "options": {
+        "min": null,
+        "max": null,
+        "pattern": ""
+      }
+    },
+    {
+      "system": false,
+      "id": "436mveg5",
+      "name": "cns",
+      "type": "text",
+      "required": false,
+      "presentable": false,
+      "unique": false,
+      "options": {
+        "min": null,
+        "max": null,
+        "pattern": ""
+      }
+    },
+    {
+      "system": false,
+      "id": "5q5rba4d",
+      "name": "data_nascimento",
+      "type": "date",
+      "required": false,
+      "presentable": false,
+      "unique": false,
+      "options": {
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "system": false,
+      "id": "mlzehrr0",
+      "name": "dna_hpv_pep",
+      "type": "date",
+      "required": false,
+      "presentable": false,
+      "unique": false,
+      "options": {
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "system": false,
+      "id": "n6lu9pfu",
+      "name": "unidade",
+      "type": "text",
+      "required": false,
+      "presentable": false,
+      "unique": false,
+      "options": {
+        "min": null,
+        "max": null,
+        "pattern": ""
+      }
+    },
+    {
+      "system": false,
+      "id": "jjj8cjcm",
+      "name": "equipe",
+      "type": "text",
+      "required": false,
+      "presentable": false,
+      "unique": false,
+      "options": {
+        "min": null,
+        "max": null,
+        "pattern": ""
+      }
+    },
+    {
+      "system": false,
+      "id": "iwwcg9o0",
+      "name": "microarea",
+      "type": "number",
+      "required": false,
+      "presentable": false,
+      "unique": false,
+      "options": {
+        "min": null,
+        "max": null,
+        "noDecimal": false
+      }
+    },
+    {
+      "system": false,
+      "id": "64roweg8",
+      "name": "idade",
+      "type": "number",
+      "required": false,
+      "presentable": false,
+      "unique": false,
+      "options": {
+        "min": null,
+        "max": null,
+        "noDecimal": false
+      }
+    },
+    {
+      "system": false,
+      "id": "nnegalpv",
+      "name": "grupo",
+      "type": "text",
+      "required": false,
+      "presentable": false,
+      "unique": false,
+      "options": {
+        "min": null,
+        "max": null,
+        "pattern": ""
+      }
+    },
+    {
+      "system": false,
+      "id": "lv7puml3",
+      "name": "cito_lab",
+      "type": "date",
+      "required": false,
+      "presentable": false,
+      "unique": false,
+      "options": {
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "system": false,
+      "id": "poewkagb",
+      "name": "cito_pep",
+      "type": "date",
+      "required": false,
+      "presentable": false,
+      "unique": false,
+      "options": {
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "system": false,
+      "id": "k3sko0wv",
+      "name": "dna_hpv_gal",
+      "type": "date",
+      "required": false,
+      "presentable": false,
+      "unique": false,
+      "options": {
+        "min": "",
+        "max": ""
+      }
+    }
+  ],
+  "indexes": [],
+  "listRule": "@request.auth.id != \"\"",
+  "viewRule": "@request.auth.id != \"\"",
+  "createRule": "@request.auth.id != \"\"",
+  "updateRule": "@request.auth.id != \"\"",
+  "deleteRule": "@request.auth.id != \"\"",
+  "options": {}
+}

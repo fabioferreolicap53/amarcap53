@@ -31,7 +31,7 @@ interface Paciente {
   grupo: string;
   cito_lab?: string;
   cito_pep?: string;
-  dna_hpv?: string;
+  dna_hpv_gal?: string;
   dna_hpv_pep?: string;
   alertas_rastreamento?: string;
   alertas?: string; 
@@ -365,7 +365,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
 
   const determinarAlerta = (p: any) => {
     if (p.dna_hpv_pep && p.dna_hpv_pep !== '--' && p.dna_hpv_pep !== '') return 'PEP_MOLECULAR';
-    if (p.dna_hpv && p.dna_hpv !== '--' && p.dna_hpv !== '') return 'COLETA_MOLECULAR';
+    if (p.dna_hpv_gal && p.dna_hpv_gal !== '--' && p.dna_hpv_gal !== '') return 'COLETA_MOLECULAR';
     if (p.cito_pep && p.cito_pep !== '--' && p.cito_pep !== '') return 'PEP_CITO';
     if (p.cito_lab && p.cito_lab !== '--' && p.cito_lab !== '') return 'COLETA_CITO';
     return 'NAO_IDENTIFICADO';
@@ -457,7 +457,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
           grupo: record.grupo || '--',
           cito_lab: record.cito_lab || '--',
           cito_pep: record.cito_pep || '--',
-          dna_hpv: record.dna_hpv || '--',
+          dna_hpv_gal: record.dna_hpv_gal || '--',
           dna_hpv_pep: formatarData(record.dna_hpv_pep) || '--',
           alertas_rastreamento: record.alertas_rastreamento || '--',
           total_acompanhamentos: acompData?.total || 0,
@@ -535,7 +535,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       && dateFilter(p.dna_hpv_pep, filterDnaHpvPep)
       && dateFilter(p.cito_lab, filterCitoLab)
       && dateFilter(p.cito_pep, filterCitoPep)
-      && dateFilter(p.dna_hpv, filterDnaHpvGal);
+      && dateFilter(p.dna_hpv_gal, filterDnaHpvGal);
   });
 
   const handleOpenDetails = (paciente: Paciente) => {
@@ -1071,8 +1071,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                           <span className="inline-block px-3.5 py-2 rounded-lg text-[11px] md:text-[12px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-100 shadow-sm">{formatarData(paciente.cito_pep)}</span>
                         </td>
                         <td className="px-4 py-6 text-center">
-                          <span className={`inline-block px-3.5 py-2 rounded-lg text-[11px] md:text-[12px] font-black uppercase tracking-tight shadow-sm ${paciente.dna_hpv !== '--' ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'text-slate-300 italic'}`}>
-                            {formatarData(paciente.dna_hpv)}
+                          <span className={`inline-block px-3.5 py-2 rounded-lg text-[11px] md:text-[12px] font-black uppercase tracking-tight shadow-sm ${paciente.dna_hpv_gal !== '--' ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'text-slate-300 italic'}`}>
+                            {formatarData(paciente.dna_hpv_gal)}
                           </span>
                         </td>
                       </tr>
@@ -1313,8 +1313,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                         {activePatientForDetails.dna_hpv_pep && activePatientForDetails.dna_hpv_pep !== '--' && (
                           <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-black uppercase">DNA-HPV (PEP): {formatarData(activePatientForDetails.dna_hpv_pep)}</span>
                         )}
-                        {activePatientForDetails.dna_hpv !== '--' && (
-                          <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase">DNA-HPV (GAL): {formatarData(activePatientForDetails.dna_hpv)}</span>
+                        {activePatientForDetails.dna_hpv_gal !== '--' && (
+                          <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase">DNA-HPV (GAL): {formatarData(activePatientForDetails.dna_hpv_gal)}</span>
                         )}
                         {activePatientForDetails.cito_pep !== '--' && (
                           <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase">CITO (PEP): {formatarData(activePatientForDetails.cito_pep)}</span>

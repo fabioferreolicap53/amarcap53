@@ -302,7 +302,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                 if (citoPep) record.cito_pep = citoPep;
 
                 const dnaHpv = parseCSVDate(row['DNA-HPV'] || row['TESTE MOLECULAR DNA-HPV']);
-                if (dnaHpv) record.dna_hpv = dnaHpv;
+                if (dnaHpv) record.dna_hpv_gal = dnaHpv;
 
                 const alertas = row['ALERTAS RASTREAMENTO']?.trim();
                 if (alertas) record.alertas_rastreamento = alertas;
