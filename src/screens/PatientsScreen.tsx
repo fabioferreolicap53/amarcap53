@@ -265,7 +265,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [availableGroups, setAvailableGroups] = useState<string[]>(() => {
     // Carrega cache instantaneamente (evita flash de loading)
     try {
-      const raw = localStorage.getItem('patient_groups_cache');
+      const raw = localStorage.getItem('patient_groups_cache_v2');
       if (raw) {
         const cached = JSON.parse(raw);
         if (Date.now() - cached.ts < 300_000) return cached.data; // 5min TTL
@@ -329,28 +329,58 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     }
   };
 
-  // Busca grupos distintos da base (independente de páginação)
+  // Busca grupos distintos: tenta groupBy + suplemento multi-página
   useEffect(() => {
     let cancelled = false;
     const fetchGroups = async () => {
-      // Só faz requisição se não tiver cache válido
       try {
-        const raw = localStorage.getItem('patient_groups_cache');
+        const raw = localStorage.getItem('patient_groups_cache_v2');
         if (raw) {
           const cached = JSON.parse(raw);
-          if (Date.now() - cached.ts < 300_000) return; // Cache ainda válido
+          if (Date.now() - cached.ts < 300_000) { setAvailableGroups(cached.data); return; }
         }
       } catch {}
       setIsLoadingGroups(true);
       try {
-        const records = await pb.collection('amarcap53_pacientes').getFullList({
-          fields: 'grupo',
-          requestKey: null,
-        });
+        const allGroups = new Set<string>();
+
+        // Tenta groupBy (PocketBase v0.26+, 1 request)
+        try {
+          const result = await pb.collection('amarcap53_pacientes').getList(1, 200, {
+            groupBy: 'grupo',
+            fields: 'grupo',
+            skipTotal: true,
+            requestKey: 'fetch_groups_groupby',
+          });
+          if (cancelled) return;
+          result.items.forEach(r => { if (r.grupo && r.grupo !== '--') allGroups.add(r.grupo); });
+        } catch (e) {
+          // groupBy não suportado → ignora
+        }
+
+        // Suplemento multi-página: garante grupos raros como "64>"
+        // (groupBy pode falhar com > ou servidor não suportar)
+        const MAX_PAGES = 15;
+        for (let page = 1; page <= MAX_PAGES; page++) {
+          if (cancelled) return;
+          try {
+            const result = await pb.collection('amarcap53_pacientes').getList(page, 200, {
+              fields: 'grupo',
+              skipTotal: true,
+              requestKey: null,
+            });
+            if (cancelled) return;
+            result.items.forEach(r => { if (r.grupo && r.grupo !== '--') allGroups.add(r.grupo); });
+            if (result.items.length < 200) break; // última página
+          } catch {
+            break;
+          }
+        }
+
         if (cancelled) return;
-        const groups = Array.from(new Set(records.map(r => r.grupo))).filter(g => g && g !== '--').sort();
+        const groups = [...allGroups].sort();
         setAvailableGroups(groups);
-        localStorage.setItem('patient_groups_cache', JSON.stringify({ ts: Date.now(), data: groups }));
+        localStorage.setItem('patient_groups_cache_v2', JSON.stringify({ ts: Date.now(), data: groups }));
       } catch (err) {
         console.error('Erro ao buscar grupos:', err);
       } finally {
