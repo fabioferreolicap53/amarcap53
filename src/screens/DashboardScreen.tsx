@@ -400,10 +400,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
         // Applied UI filters
         if (filterUnidade.length > 0) {
-          patientFilterParts.push(`(${filterUnidade.map(u => `unidade = "${u}"`).join(' || ')})`);
+          patientFilterParts.push(`(${filterUnidade.map(u => `unidade = "${u.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
         }
         if (filterEquipe.length > 0) {
-          patientFilterParts.push(`(${filterEquipe.map(e => `equipe = "${e}"`).join(' || ')})`);
+          patientFilterParts.push(`(${filterEquipe.map(e => `equipe = "${e.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
         }
         if (filterMicroarea.length > 0) {
           patientFilterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
@@ -427,10 +427,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           }
         }
         if (filterUnidade.length > 0) {
-          acompFilterParts.push(`(${filterUnidade.map(u => `paciente.unidade = "${u}"`).join(' || ')})`);
+          acompFilterParts.push(`(${filterUnidade.map(u => `paciente.unidade = "${u.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
         }
         if (filterEquipe.length > 0) {
-          acompFilterParts.push(`(${filterEquipe.map(e => `paciente.equipe = "${e}"`).join(' || ')})`);
+          acompFilterParts.push(`(${filterEquipe.map(e => `paciente.equipe = "${e.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
         }
         if (filterMicroarea.length > 0) {
           acompFilterParts.push(`(${filterMicroarea.map(m => `paciente.microarea = ${Number(m)}`).join(' || ')})`);

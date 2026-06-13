@@ -196,10 +196,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
         // Regional UI Filters
         if (filterUnidade.length > 0) {
-          acompFilters.push(`(${filterUnidade.map(u => `paciente.unidade = "${u}"`).join(' || ')})`);
+          acompFilters.push(`(${filterUnidade.map(u => `paciente.unidade = "${u.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
         }
         if (filterEquipe.length > 0) {
-          acompFilters.push(`(${filterEquipe.map(e => `paciente.equipe = "${e}"`).join(' || ')})`);
+          acompFilters.push(`(${filterEquipe.map(e => `paciente.equipe = "${e.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
         }
         if (filterMicroarea.length > 0) {
           acompFilters.push(`(${filterMicroarea.map(m => `paciente.microarea = ${Number(m)}`).join(' || ')})`);

@@ -48,6 +48,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
   const isCap = user?.role === 'cap';
 
+  // Normaliza whitespace: trim + colapsa múltiplos espaços internos
+  const normalizeWhitespace = (s: string) => s.trim().replace(/\s+/g, ' ');
+
   const [isUploading, setIsUploading] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [userName, setUserName] = useState('');
@@ -194,6 +197,42 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
   const [isCleaning, setIsCleaning] = useState(false);
 
+  // Normaliza whitespace de todos os pacientes na base (corrige espaços duplicados)
+  const handleNormalizeData = async () => {
+    if (!window.confirm('Isso vai normalizar os campos de texto (unidade, equipe, nome) de todos os pacientes. Deseja continuar?')) return;
+    setIsCleaning(true);
+    try {
+      const records = await pb.collection('amarcap53_pacientes').getFullList({
+        fields: 'id,unidade,equipe,nome',
+        requestKey: null,
+      });
+      const batchSize = 100;
+      let updated = 0;
+      for (let i = 0; i < records.length; i += batchSize) {
+        const chunk = records.slice(i, i + batchSize);
+        await Promise.all(chunk.map(async (r) => {
+          const upd: Record<string, any> = {};
+          const nu = normalizeWhitespace(r.unidade || '');
+          const ne = normalizeWhitespace(r.equipe || '');
+          const nn = normalizeWhitespace(r.nome || '');
+          if (nu !== r.unidade) upd.unidade = nu;
+          if (ne !== r.equipe) upd.equipe = ne;
+          if (nn !== r.nome) upd.nome = nn;
+          if (Object.keys(upd).length > 0) {
+            await pb.collection('amarcap53_pacientes').update(r.id, upd, { $autoCancel: false });
+          }
+        }));
+        updated += chunk.length;
+      }
+      alert(`Normalização concluída! ${updated} registros processados.`);
+    } catch (err) {
+      console.error('Erro ao normalizar dados:', err);
+      alert('Erro ao normalizar dados. Verifique o console.');
+    } finally {
+      setIsCleaning(false);
+    }
+  };
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -271,14 +310,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                 row[normalizedKey] = rawRow[key];
               });
 
-              const unidade = row['UNIDADE']?.trim();
-              const equipe = row['EQUIPE']?.trim();
-              const microarea = row['MICROÁREA']?.trim() || row['MICROAREA']?.trim() || row['MICRO']?.trim();
-              const cns = row['CNS']?.trim();
-              const nome = row['NOME']?.trim();
-              const dataNascimento = row['NASC.']?.trim() || row['DATA DE NASCIMENTO']?.trim() || row['DATA NASCIMENTO']?.trim() || row['NASCIMENTO']?.trim();
-              const idade = row['IDADE']?.trim();
-              const grupo = row['GRUPO']?.trim() || row['FAIXA ETÁRIA']?.trim() || row['FAIXA ETARIA']?.trim() || '';
+              // normalizeWhitespace: trim + colapsa espaços internos (evita mismatch em filtros)
+              const normalize = normalizeWhitespace;
+              const unidade = normalize(row['UNIDADE'] || '');
+              const equipe = normalize(row['EQUIPE'] || '');
+              const microarea = normalize(row['MICROÁREA'] || '') || normalize(row['MICROAREA'] || '') || normalize(row['MICRO'] || '');
+              const cns = (row['CNS'] || '').trim();
+              const nome = normalize(row['NOME'] || '');
+              const dataNascimento = (row['NASC.'] || '').trim() || (row['DATA DE NASCIMENTO'] || '').trim() || (row['DATA NASCIMENTO'] || '').trim() || (row['NASCIMENTO'] || '').trim();
+              const idade = (row['IDADE'] || '').trim();
+              const grupo = normalize(row['GRUPO'] || '') || normalize(row['FAIXA ETÁRIA'] || '') || normalize(row['FAIXA ETARIA'] || '') || '';
 
               if (unidade && equipe && cns && nome && dataNascimento) {
                 const parsedDate = parseCSVDate(dataNascimento);
@@ -720,6 +761,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                         <p className="text-[10px] font-black text-rose-800 uppercase leading-tight">{uploadStatus.message}</p>
                       </motion.div>
                     )}
+                  </div>
+
+                  {/* Card: Normalizar Dados */}
+                  <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60">
+                    <div className="mb-6">
+                      <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Normalizar Dados</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Corrige espaços duplicados em registros existentes</p>
+                    </div>
+                    <button
+                      onClick={handleNormalizeData}
+                      disabled={isCleaning}
+                      className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:from-amber-600 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-200"
+                    >
+                      {isCleaning ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Database className="w-4 h-4" />
+                      )}
+                      {isCleaning ? 'Normalizando...' : 'Normalizar Agora'}
+                    </button>
                   </div>
 
                   {/* Histórico de Operações */}

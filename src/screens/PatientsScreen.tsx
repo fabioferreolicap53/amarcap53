@@ -568,10 +568,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
         // Regional UI Filters
         if (filterUnidade.length > 0) {
-          filterParts.push(`(${filterUnidade.map(u => `unidade = "${u}"`).join(' || ')})`);
+          filterParts.push(`(${filterUnidade.map(u => `unidade = "${u.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
         }
         if (filterEquipe.length > 0) {
-          filterParts.push(`(${filterEquipe.map(e => `equipe = "${e}"`).join(' || ')})`);
+          filterParts.push(`(${filterEquipe.map(e => `equipe = "${e.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
         }
         if (filterMicroarea.length > 0) {
           filterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
@@ -616,10 +616,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           }
           
           if (filterUnidade.length > 0) {
-            acompFilters.push(`(${filterUnidade.map(u => `paciente.unidade = "${u}"`).join(' || ')})`);
+            acompFilters.push(`(${filterUnidade.map(u => `paciente.unidade = "${u.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
           }
           if (filterEquipe.length > 0) {
-            acompFilters.push(`(${filterEquipe.map(e => `paciente.equipe = "${e}"`).join(' || ')})`);
+            acompFilters.push(`(${filterEquipe.map(e => `paciente.equipe = "${e.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
           }
           if (filterMicroarea.length > 0) {
             acompFilters.push(`(${filterMicroarea.map(m => `paciente.microarea = ${Number(m)}`).join(' || ')})`);
