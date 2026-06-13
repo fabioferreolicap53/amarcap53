@@ -262,7 +262,18 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [filterCitoPep, setFilterCitoPep] = useState<string[]>([]);
   const [filterDnaHpvGal, setFilterDnaHpvGal] = useState<string[]>([]);
 
-  const [availableGroups, setAvailableGroups] = useState<string[]>([]);
+  const [availableGroups, setAvailableGroups] = useState<string[]>(() => {
+    // Carrega cache instantaneamente (evita flash de loading)
+    try {
+      const raw = localStorage.getItem('patient_groups_cache');
+      if (raw) {
+        const cached = JSON.parse(raw);
+        if (Date.now() - cached.ts < 300_000) return cached.data; // 5min TTL
+      }
+    } catch {}
+    return [];
+  });
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [favorites, setFavorites] = useState<string[]>(user?.favoritos || []);
 
   // Sincroniza estado local com o usuário do AuthContext (que vem do PocketBase)
@@ -318,13 +329,37 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     }
   };
 
-  // Derive available groups from already-loaded patients instead of a separate API call
+  // Busca grupos distintos da base (independente de páginação)
   useEffect(() => {
-    if (pacientes.length > 0) {
-      const groups = Array.from(new Set(pacientes.map(p => p.grupo))).filter(g => g && g !== '--');
-      setAvailableGroups(groups);
-    }
-  }, [pacientes]);
+    let cancelled = false;
+    const fetchGroups = async () => {
+      // Só faz requisição se não tiver cache válido
+      try {
+        const raw = localStorage.getItem('patient_groups_cache');
+        if (raw) {
+          const cached = JSON.parse(raw);
+          if (Date.now() - cached.ts < 300_000) return; // Cache ainda válido
+        }
+      } catch {}
+      setIsLoadingGroups(true);
+      try {
+        const records = await pb.collection('amarcap53_pacientes').getFullList({
+          fields: 'grupo',
+          requestKey: null,
+        });
+        if (cancelled) return;
+        const groups = Array.from(new Set(records.map(r => r.grupo))).filter(g => g && g !== '--').sort();
+        setAvailableGroups(groups);
+        localStorage.setItem('patient_groups_cache', JSON.stringify({ ts: Date.now(), data: groups }));
+      } catch (err) {
+        console.error('Erro ao buscar grupos:', err);
+      } finally {
+        if (!cancelled) setIsLoadingGroups(false);
+      }
+    };
+    fetchGroups();
+    return () => { cancelled = true; };
+  }, []);
 
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
@@ -646,7 +681,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
         // Filtro de Grupo
         if (filterGrupo.length > 0) {
-          filterParts.push(`(${filterGrupo.map(g => `grupo = "${g}"`).join(' || ')})`);
+          filterParts.push(`(${filterGrupo.map(g => `grupo = "${g.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
         }
 
         if (filterParts.length > 0) {
