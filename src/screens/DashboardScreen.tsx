@@ -500,7 +500,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           // Mostra cache imediatamente (instantaneo)
           const cached = getStatsCache();
           if (cached) {
-            setStats({ ...cached, acompTrend: emptyAcompTrend });
+            setStats({ ...cached, examTrend: [], grupoBreakdown: {}, acompTrend: emptyAcompTrend });
           }
 
           try {
