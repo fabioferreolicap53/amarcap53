@@ -221,8 +221,25 @@ const calcularIdade = (dataNascimento: string) => {
 
 export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, setActiveTab }) => {
   const { user, isAdmin } = useAuth();
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  const FAV_CACHE_KEY = `favorites_cache_${user?.id}`;
+  const FAV_CACHE_TTL = 5 * 60 * 1000;
+  const getFavCache = () => {
+    try {
+      const raw = localStorage.getItem(FAV_CACHE_KEY);
+      if (!raw) return null;
+      const c = JSON.parse(raw);
+      if (Date.now() - c.ts > FAV_CACHE_TTL) return null;
+      return c.data;
+    } catch { return null; }
+  };
+  const setFavCache = (data: any) => {
+    try { localStorage.setItem(FAV_CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch {}
+  };
+
+  const _favInit = getFavCache();
+  const [pacientes, setPacientes] = useState<Paciente[]>(_favInit ?? []);
+  const [isLoading, setIsLoading] = useState(!_favInit);
   
   // Estados de Busca e Filtro
   const [searchTerm, setSearchTerm] = useState('');
@@ -480,6 +497,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       });
 
       setPacientes(formatados);
+      setFavCache(formatados);
       
       // Coleta grupos únicos dos favoritos
       const groups = Array.from(new Set(formatados.map(p => p.grupo))).filter(g => g && g !== '--');
@@ -1179,14 +1197,12 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                   {/* Entraves Identificados */}
                   <MultiSelect 
                     label="Entraves Identificados"
-                    placeholder={modalEntravesInformadoPor ? "Selecione" : "Selecione quem informou primeiro"}
+                    placeholder="Selecione"
                     className="col-span-1 md:col-span-2"
                     options={ENTRAVES_IDENTIFICADOS_OPTIONS}
                     value={modalEntraves}
                     onChange={setModalEntraves}
                     showSearch={false}
-                    disabled={!modalEntravesInformadoPor}
-                    required={!!modalEntravesInformadoPor}
                   />
 
                   {/* Observações */}

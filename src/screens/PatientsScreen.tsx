@@ -221,10 +221,27 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
   const { user, isAdmin } = useAuth();
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  const PAT_CACHE_KEY = `patients_cache_${user?.id}`;
+  const PAT_CACHE_TTL = 5 * 60 * 1000;
+  const getPatCache = () => {
+    try {
+      const raw = localStorage.getItem(PAT_CACHE_KEY);
+      if (!raw) return null;
+      const c = JSON.parse(raw);
+      if (Date.now() - c.ts > PAT_CACHE_TTL) return null;
+      return c.data;
+    } catch { return null; }
+  };
+  const setPatCache = (data: any) => {
+    try { localStorage.setItem(PAT_CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch {}
+  };
+
+  const _patInit = getPatCache();
+  const [pacientes, setPacientes] = useState<Paciente[]>(_patInit?.pacientes ?? []);
+  const [isLoading, setIsLoading] = useState(!_patInit);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
+  const [totalItems, setTotalItems] = useState(_patInit?.totalItems ?? 0);
   const [hasClientSideFilter, setHasClientSideFilter] = useState(false);
   const pageSize = 10;
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -642,6 +659,30 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           filterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
         }
 
+        // Build patient region filter for scoping acomp queries (reliable direct field filters)
+        const patientRegionFilterParts: string[] = [];
+        if (!isAdmin && user) {
+          if (user.role === 'unidade') {
+            patientRegionFilterParts.push(`unidade = "${user.unidade_saude}"`);
+          } else if (user.role === 'equipe') {
+            patientRegionFilterParts.push(`unidade = "${user.unidade_saude}"`);
+            patientRegionFilterParts.push(`equipe = "${user.equipe}"`);
+          } else if (user.role === 'microarea') {
+            patientRegionFilterParts.push(`unidade = "${user.unidade_saude}"`);
+            patientRegionFilterParts.push(`equipe = "${user.equipe}"`);
+            patientRegionFilterParts.push(`microarea = ${Number(user.microarea)}`);
+          }
+        }
+        if (filterUnidade.length > 0) {
+          patientRegionFilterParts.push(`(${filterUnidade.map(u => `unidade = "${u.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
+        }
+        if (filterEquipe.length > 0) {
+          patientRegionFilterParts.push(`(${filterEquipe.map(e => `equipe = "${e.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
+        }
+        if (filterMicroarea.length > 0) {
+          patientRegionFilterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
+        }
+
         // Filtros de Acompanhamento (Requer busca na outra coleção)
         const hasAcompFilter = filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDataInicio || filterDataFim;
         
@@ -666,30 +707,28 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           if (filterDataFim) {
             acompFilters.push(`data_busca <= "${filterDataFim} 23:59:59"`);
           }
-          
-          // Mirror regional filters to acomp query for accuracy
-          if (!isAdmin && user) {
-            if (user.role === 'unidade') acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
-            else if (user.role === 'equipe') {
-              acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
-              acompFilters.push(`paciente.equipe = "${user.equipe}"`);
-            } else if (user.role === 'microarea') {
-              acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
-              acompFilters.push(`paciente.equipe = "${user.equipe}"`);
-              acompFilters.push(`paciente.microarea = ${Number(user.microarea)}`);
+
+          // Patient ID-based scoping (replaces unreliable paciente.unidade filter syntax)
+          if (patientRegionFilterParts.length > 0) {
+            const regionFilter = patientRegionFilterParts.join(' && ');
+            const regionPatients = await pb.collection('amarcap53_pacientes').getFullList({
+              filter: regionFilter,
+              batch: 500,
+              requestKey: null,
+              fields: 'id'
+            });
+            const regionIds = regionPatients.map(p => p.id).filter(Boolean);
+            if (regionIds.length > 0) {
+              const chunkSize = 200;
+              const idChunks: string[][] = [];
+              for (let i = 0; i < regionIds.length; i += chunkSize) {
+                idChunks.push(regionIds.slice(i, i + chunkSize));
+              }
+              const idFilterStr = idChunks.map(chunk => `(${chunk.map(id => `paciente = "${id}"`).join(' || ')})`).join(' || ');
+              acompFilters.push(`(${idFilterStr})`);
             }
           }
-          
-          if (filterUnidade.length > 0) {
-            acompFilters.push(`(${filterUnidade.map(u => `paciente.unidade = "${u.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
-          }
-          if (filterEquipe.length > 0) {
-            acompFilters.push(`(${filterEquipe.map(e => `paciente.equipe = "${e.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
-          }
-          if (filterMicroarea.length > 0) {
-            acompFilters.push(`(${filterMicroarea.map(m => `paciente.microarea = ${Number(m)}`).join(' || ')})`);
-          }
-          
+
           const acompRecords = await pb.collection('amarcap53_acompanhamentos').getFullList({
             filter: acompFilters.join(' && '),
             fields: 'paciente'
@@ -786,6 +825,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
         setPacientes(pacientesFormatados);
         setTotalItems(resultList.totalItems);
+        setPatCache({ pacientes: pacientesFormatados, totalItems: resultList.totalItems });
       } catch (error) {
         console.error("Erro ao buscar pacientes:", error);
       } finally {
@@ -1526,14 +1566,12 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   {/* Entraves Identificados */}
                   <MultiSelect 
                     label="Entraves Identificados"
-                    placeholder={modalEntravesInformadoPor ? "Selecione" : "Selecione quem informou primeiro"}
+                    placeholder="Selecione"
                     className="col-span-1 md:col-span-2"
                     options={ENTRAVES_IDENTIFICADOS_OPTIONS}
                     value={modalEntraves}
                     onChange={setModalEntraves}
                     showSearch={false}
-                    disabled={!modalEntravesInformadoPor}
-                    required={!!modalEntravesInformadoPor}
                   />
 
                 {/* Observações */}

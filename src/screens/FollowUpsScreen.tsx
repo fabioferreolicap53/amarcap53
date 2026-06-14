@@ -63,8 +63,25 @@ const SIM_NAO_OPTIONS = [
 
 export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, setActiveTab }) => {
   const { user, isAdmin } = useAuth();
-  const [acompanhamentos, setAcompanhamentos] = useState<Acompanhamento[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  const FOLLOWUP_CACHE_KEY = `followup_cache_${user?.id}`;
+  const FOLLOWUP_CACHE_TTL = 5 * 60 * 1000;
+  const getFUCache = () => {
+    try {
+      const raw = localStorage.getItem(FOLLOWUP_CACHE_KEY);
+      if (!raw) return null;
+      const c = JSON.parse(raw);
+      if (Date.now() - c.ts > FOLLOWUP_CACHE_TTL) return null;
+      return c.data;
+    } catch { return null; }
+  };
+  const setFUCache = (data: any) => {
+    try { localStorage.setItem(FOLLOWUP_CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch {}
+  };
+
+  const _fuInit = getFUCache();
+  const [acompanhamentos, setAcompanhamentos] = useState<Acompanhamento[]>(_fuInit ?? []);
+  const [isLoading, setIsLoading] = useState(!_fuInit);
   
   // Modal de edição state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -180,29 +197,53 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     const fetchAcompanhamentos = async () => {
       if (!user) return;
       try {
-        const acompFilters = [];
+        // Build patient region filter (same logic as pacientes queries — reliable direct field filters)
+        const patientRegionFilterParts: string[] = [];
         if (!isAdmin) {
           if (user.role === 'unidade') {
-            acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
+            patientRegionFilterParts.push(`unidade = "${user.unidade_saude}"`);
           } else if (user.role === 'equipe') {
-            acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
-            acompFilters.push(`paciente.equipe = "${user.equipe}"`);
+            patientRegionFilterParts.push(`unidade = "${user.unidade_saude}"`);
+            patientRegionFilterParts.push(`equipe = "${user.equipe}"`);
           } else if (user.role === 'microarea') {
-            acompFilters.push(`paciente.unidade = "${user.unidade_saude}"`);
-            acompFilters.push(`paciente.equipe = "${user.equipe}"`);
-            acompFilters.push(`paciente.microarea = ${Number(user.microarea)}`);
+            patientRegionFilterParts.push(`unidade = "${user.unidade_saude}"`);
+            patientRegionFilterParts.push(`equipe = "${user.equipe}"`);
+            patientRegionFilterParts.push(`microarea = ${Number(user.microarea)}`);
           }
         }
-
-        // Regional UI Filters
         if (filterUnidade.length > 0) {
-          acompFilters.push(`(${filterUnidade.map(u => `paciente.unidade = "${u.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
+          patientRegionFilterParts.push(`(${filterUnidade.map(u => `unidade = "${u.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
         }
         if (filterEquipe.length > 0) {
-          acompFilters.push(`(${filterEquipe.map(e => `paciente.equipe = "${e.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
+          patientRegionFilterParts.push(`(${filterEquipe.map(e => `equipe = "${e.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
         }
         if (filterMicroarea.length > 0) {
-          acompFilters.push(`(${filterMicroarea.map(m => `paciente.microarea = ${Number(m)}`).join(' || ')})`);
+          patientRegionFilterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
+        }
+
+        // Fetch patient IDs for region/role scoping (replaces unreliable paciente.unidade filter syntax)
+        let scopedAcompPatientIds: string[] = [];
+        if (patientRegionFilterParts.length > 0) {
+          const regionFilter = patientRegionFilterParts.join(' && ');
+          const regionPatients = await pb.collection('amarcap53_pacientes').getFullList({
+            filter: regionFilter,
+            batch: 500,
+            requestKey: null,
+            fields: 'id'
+          });
+          scopedAcompPatientIds = regionPatients.map(p => p.id).filter(Boolean);
+        }
+
+        const acompFilters = [];
+        // Add patient ID filter for role/region scoping
+        if (scopedAcompPatientIds.length > 0) {
+          const chunkSize = 200;
+          const idChunks: string[][] = [];
+          for (let i = 0; i < scopedAcompPatientIds.length; i += chunkSize) {
+            idChunks.push(scopedAcompPatientIds.slice(i, i + chunkSize));
+          }
+          const idFilterStr = idChunks.map(chunk => `(${chunk.map(id => `paciente = "${id}"`).join(' || ')})`).join(' || ');
+          acompFilters.push(`(${idFilterStr})`);
         }
 
         // Outros Filtros UI
@@ -255,6 +296,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
             && dateFilter(p.dna_hpv_gal, filterDnaHpvGal);
         });
         setAcompanhamentos(filtered);
+        setFUCache(filtered);
       } catch (error) {
         console.error('Erro ao buscar acompanhamentos:', error);
       } finally {
@@ -934,14 +976,12 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                   {/* Entraves Identificados */}
                   <MultiSelect 
                     label="Entraves Identificados"
-                    placeholder={selectedAcompanhamento.entraves_informado_por ? "Selecione" : "Selecione quem informou primeiro"}
+                    placeholder="Selecione"
                     className="col-span-1 md:col-span-2"
                     options={ENTRAVES_IDENTIFICADOS_OPTIONS}
                     value={selectedAcompanhamento.entraves_identificados || []}
                     onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_identificados: val})}
                     showSearch={false}
-                    disabled={!selectedAcompanhamento.entraves_informado_por}
-                    required={!!selectedAcompanhamento.entraves_informado_por}
                   />
 
                   {/* Observações */}

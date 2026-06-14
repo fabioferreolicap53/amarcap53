@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, Activity, HeartPulse, Calendar, BadgeCheck, TrendingUp, Phone, MessageSquare, ClipboardList, PieChart, BarChart3, MapPin, LayoutDashboard, Filter, CheckCircle, AlertCircle, Target, Building2, Building, X } from 'lucide-react';
+import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, HeartPulse, Calendar, BadgeCheck, TrendingUp, Phone, MessageSquare, ClipboardList, PieChart, BarChart3, MapPin, LayoutDashboard, Filter, CheckCircle, AlertCircle, Building2, Building, X, Trophy, Award, Medal, UserCheck } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -142,86 +142,7 @@ const ColumnChart: React.FC<{ data: { label: string; value: number; color: strin
   );
 };
 
-const LineChart: React.FC<{ data: { label: string; value: number }[] }> = ({ data }) => {
-  if (!data || data.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64 text-slate-300 text-[10px] font-black uppercase tracking-widest">
-        Sem dados
-      </div>
-    );
-  }
 
-  const max = Math.max(...data.map(d => d.value), 1);
-  const svgHeight = 260;
-  const padding = { top: 45, right: 10, bottom: 30, left: 10 };
-  const chartW = Math.max(data.length * 80, 280) - padding.left - padding.right;
-  const chartH = svgHeight - padding.top - padding.bottom;
-
-  const points = data.map((d, i) => ({
-    x: padding.left + (i / Math.max(data.length - 1, 1)) * chartW,
-    y: padding.top + chartH - (d.value / max) * chartH,
-    value: d.value
-  }));
-
-  const linePath = points.map((p, i) =>
-    i === 0 ? `M${p.x},${p.y}` : `L${p.x},${p.y}`
-  ).join(' ');
-
-  const last = points[points.length - 1];
-  const first = points[0];
-  const areaPath = linePath + ` L${last.x},${padding.top + chartH} L${first.x},${padding.top + chartH} Z`;
-
-  return (
-    <div className="relative w-full overflow-visible" style={{ minHeight: svgHeight }}>
-      <svg width="100%" height={svgHeight} viewBox={`0 0 ${Math.max(data.length * 80, 280)} ${svgHeight}`} className="overflow-visible" style={{ minWidth: '280px' }}>
-        {/* Grid */}
-        {[0, 0.25, 0.5, 0.75, 1].map(pct => (
-          <line key={pct} x1={padding.left} x2={padding.left + chartW}
-            y1={padding.top + chartH - pct * chartH} y2={padding.top + chartH - pct * chartH}
-            stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" />
-        ))}
-        
-        {/* Area gradient */}
-        <defs>
-          <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#051934" stopOpacity="0.15" />
-            <stop offset="100%" stopColor="#051934" stopOpacity="0.01" />
-          </linearGradient>
-        </defs>
-
-        {/* Area fill */}
-        <path d={areaPath} fill="url(#areaGrad)" />
-
-        {/* Line */}
-        <path d={linePath} fill="none" stroke="#051934" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-          className="transition-all duration-500" />
-
-        {/* Dots + labels + tooltips */}
-        {points.map((p, i) => (
-          <g key={i} className="group/dot" style={{ cursor: 'pointer' }}>
-            {/* Tooltip abaixo do dot */}
-            <rect x={p.x - 32} y={p.y + 14} width="64" height="26" rx="8"
-              className="fill-slate-900 opacity-0 group-hover/dot:opacity-100 transition-opacity pointer-events-none" />
-            <text x={p.x} y={p.y + 31} textAnchor="middle"
-              className="fill-white text-[9px] font-black opacity-0 group-hover/dot:opacity-100 transition-opacity pointer-events-none">
-              {p.value} buscas
-            </text>
-            {/* Dot */}
-            <circle cx={p.x} cy={p.y} r="5" fill="#051934" stroke="white" strokeWidth="2.5"
-              className="transition-all duration-300 group-hover/dot:r-7 drop-shadow-md" />
-            {/* Glow */}
-            <circle cx={p.x} cy={p.y} r="8" fill="#051934" className="opacity-10 group-hover/dot:opacity-20 transition-opacity" />
-            {/* Label */}
-            <text x={p.x} y={padding.top + chartH + 18} textAnchor="middle"
-              className="fill-slate-500 text-[9px] font-black uppercase tracking-tight">
-              {data[i].label}
-            </text>
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
-};
 
 const InfoPopover: React.FC<{ content: string }> = ({ content }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -301,7 +222,26 @@ const StatCard: React.FC<{ title: string; value: number | string; icon: React.Re
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, setActiveTab }) => {
   const { user, isAdmin } = useAuth();
-  const [stats, setStats] = useState({
+
+  // Cache localStorage (evita full table scan repetido)
+  const STATS_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+  const getCache = (key: string) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const cached = JSON.parse(raw);
+      if (Date.now() - cached.ts > STATS_CACHE_TTL) return null;
+      return cached.data;
+    } catch { return null; }
+  };
+  const setCache = (key: string, data: any) => {
+    try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
+  };
+  const STATS_CACHE_KEY = `dash_stats_cache_${user?.id}`;
+  const ACOMP_CACHE_KEY = `dash_acomp_cache_${user?.id}`;
+
+  const _sInit = getCache(STATS_CACHE_KEY);
+  const [stats, setStats] = useState(_sInit ?? {
     totalPacientes: 0,
     coletasAtrasadas: 0,
     examesEmDia: 0,
@@ -321,23 +261,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const [filterMicroarea, setFilterMicroarea] = useState<string[]>([]);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
 
-  // Cache localStorage para count queries do CAP (evita full table scan repetido)
-  const STATS_CACHE_KEY = 'dash_stats_cache';
-  const STATS_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
-  const getStatsCache = () => {
-    try {
-      const raw = localStorage.getItem(STATS_CACHE_KEY);
-      if (!raw) return null;
-      const cached = JSON.parse(raw);
-      if (Date.now() - cached.ts > STATS_CACHE_TTL) return null;
-      return cached.data;
-    } catch { return null; }
-  };
-  const setStatsCache = (data: any) => {
-    try { localStorage.setItem(STATS_CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch {}
-  };
-
-  const [acompStats, setAcompStats] = useState({
+  const _aInit = getCache(ACOMP_CACHE_KEY);
+  const [acompStats, setAcompStats] = useState(_aInit?.acompStats ?? {
     total: 0,
     sucesso: 0,
     contatos: 0,
@@ -348,6 +273,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     equipeBreakdown: {} as Record<string, number>,
     microareaBreakdown: {} as Record<string, number>
   });
+  const [terrRanking, setTerrRanking] = useState<{ unidade: { nome: string; total: number; agendamentos: number; contatos: number; taxa: number }[]; equipe: { nome: string; total: number; agendamentos: number; contatos: number; taxa: number }[]; microarea: { nome: string; total: number; agendamentos: number; contatos: number; taxa: number }[] }>(_aInit?.terrRanking ?? { unidade: [], equipe: [], microarea: [] });
+  const [rankContato, setRankContato] = useState<{ unidade: { nome: string; total: number; contatos: number; agendamentos: number; taxa: number }[]; equipe: typeof terrRanking.equipe; microarea: typeof terrRanking.microarea }>(_aInit?.rankContato ?? { unidade: [], equipe: [], microarea: [] });
+  const [rankingTab, setRankingTab] = useState<'unidade' | 'equipe' | 'microarea'>('unidade');
+  const [contatoTab, setContatoTab] = useState<'unidade' | 'equipe' | 'microarea'>('unidade');
 
   const formatEnumLabel = (value?: string) => value || '';
   const hasValue = (value: any) => value !== undefined && value !== null && value !== '' && value !== '--';
@@ -412,29 +341,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         // Build filter strings
         const patientFilter = patientFilterParts.join(' && ');
 
-        // Build acomp filters
+        // Build acomp filters (only acomp-specific fields, not role/regional — handled via patient IDs below)
         const acompFilterParts: string[] = [];
-        if (!isAdmin) {
-          if (user.role === 'unidade') {
-            acompFilterParts.push(`paciente.unidade = "${user.unidade_saude}"`);
-          } else if (user.role === 'equipe') {
-            acompFilterParts.push(`paciente.unidade = "${user.unidade_saude}"`);
-            acompFilterParts.push(`paciente.equipe = "${user.equipe}"`);
-          } else if (user.role === 'microarea') {
-            acompFilterParts.push(`paciente.unidade = "${user.unidade_saude}"`);
-            acompFilterParts.push(`paciente.equipe = "${user.equipe}"`);
-            acompFilterParts.push(`paciente.microarea = ${Number(user.microarea)}`);
-          }
-        }
-        if (filterUnidade.length > 0) {
-          acompFilterParts.push(`(${filterUnidade.map(u => `paciente.unidade = "${u.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
-        }
-        if (filterEquipe.length > 0) {
-          acompFilterParts.push(`(${filterEquipe.map(e => `paciente.equipe = "${e.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
-        }
-        if (filterMicroarea.length > 0) {
-          acompFilterParts.push(`(${filterMicroarea.map(m => `paciente.microarea = ${Number(m)}`).join(' || ')})`);
-        }
         if (filterDataInicio) {
           acompFilterParts.push(`data_busca >= "${filterDataInicio} 00:00:00"`);
         }
@@ -447,15 +355,22 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         const isScopeQuery = !isAdmin || hasUIFilters;
         const lastSixMonths = getLastSixMonths();
         const emptyAcompTrend = lastSixMonths.map(month => ({ month: month.label, total: 0 }));
+        const emptyExamTrend = lastSixMonths.map(month => ({ month: month.label, cito: 0, hpv: 0 }));
+        // Regional breakdown — populated from global pacientes below
+        let regionalUnidade: Record<string, number> = {};
+        let regionalEquipe: Record<string, number> = {};
+        let regionalMicroarea: Record<string, number> = {};
+        let scopedPatientIds: string[] = [];
         if (isScopeQuery) {
           // Non-CAP or CAP with UI filters: query limited scope
           const records = await pb.collection('amarcap53_pacientes').getFullList({
             filter: patientFilter,
             batch: 500,
             requestKey: null,
-            fields: 'dna_hpv_pep,dna_hpv_gal,cito_pep,cito_lab,grupo,unidade,equipe,microarea'
+            fields: 'id,dna_hpv_pep,dna_hpv_gal,cito_pep,cito_lab,grupo,unidade,equipe,microarea'
           });
           if (cancelled) return;
+          scopedPatientIds = records.map(p => p.id).filter(Boolean);
 
           const totalPacientes = records.length;
           const alerts: Record<string, number> = {};
@@ -484,8 +399,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             alertBreakdown: alerts,
             grupoBreakdown: groups,
             examVolume: { cito: (alerts['PEP_CITO'] || 0) + (alerts['COLETA_CITO'] || 0), hpv: (alerts['PEP_MOLECULAR'] || 0) + (alerts['COLETA_MOLECULAR'] || 0), pendente: atrasadas },
-            examTrend: [],
+            examTrend: emptyExamTrend,
             acompTrend: emptyAcompTrend
+          });
+          setCache(STATS_CACHE_KEY, {
+            totalPacientes, coletasAtrasadas: atrasadas, examesEmDia: emDia, resultadosAlterados: alterados,
+            coberturaPercent: totalPacientes > 0 ? Math.round((emDia / totalPacientes) * 100) : 0,
+            alertBreakdown: alerts, grupoBreakdown: groups,
+            examVolume: { cito: (alerts['PEP_CITO'] || 0) + (alerts['COLETA_CITO'] || 0), hpv: (alerts['PEP_MOLECULAR'] || 0) + (alerts['COLETA_MOLECULAR'] || 0), pendente: atrasadas }
           });
         } else {
           // CAP without UI filters: pure count-based queries (instant)
@@ -498,9 +419,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           };
 
           // Mostra cache imediatamente (instantaneo)
-          const cached = getStatsCache();
+          const cached = getCache(STATS_CACHE_KEY);
           if (cached) {
-            setStats({ ...cached, examTrend: [], grupoBreakdown: {}, acompTrend: emptyAcompTrend });
+            setStats({ ...cached, examTrend: emptyExamTrend, grupoBreakdown: {}, acompTrend: emptyAcompTrend });
           }
 
           try {
@@ -536,11 +457,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               },
               grupoBreakdown: {},
               examVolume: { cito: pepCito + coltCito, hpv: pepMol + coltMol, pendente: atrasadas },
-              examTrend: [],
+              examTrend: emptyExamTrend,
               acompTrend: emptyAcompTrend
             });
             // Salva cache para proximo load
-            setStatsCache({
+            setCache(STATS_CACHE_KEY, {
               totalPacientes,
               coletasAtrasadas: atrasadas,
               examesEmDia: withExam,
@@ -556,21 +477,110 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 totalPacientes: 0, coletasAtrasadas: 0, examesEmDia: 0, resultadosAlterados: 0,
                 coberturaPercent: 0, alertBreakdown: {}, grupoBreakdown: {},
                 examVolume: { cito: 0, hpv: 0, pendente: 0 },
-                examTrend: [], acompTrend: emptyAcompTrend
+                examTrend: emptyExamTrend, acompTrend: emptyAcompTrend
               });
             }
           }
         }
 
+        // Cache de acompanhamentos: renderiza instantâneo, busca em background
+        const aCached = getCache(ACOMP_CACHE_KEY);
+        if (aCached && !cancelled) {
+          setAcompStats(aCached.acompStats);
+          setTerrRanking(aCached.terrRanking);
+          setRankContato(aCached.rankContato);
+        }
+
         // Acompanhamentos (separate, non-blocking for initial render)
+        // Use scoped patient IDs from the pacientes query (role + UI filters) to avoid unreliable paciente.unidade filter syntax
+        if (scopedPatientIds.length > 0) {
+          const chunkSize = 200;
+          const idChunks: string[][] = [];
+          for (let i = 0; i < scopedPatientIds.length; i += chunkSize) {
+            idChunks.push(scopedPatientIds.slice(i, i + chunkSize));
+          }
+          const idFilter = idChunks.map(chunk => `(${chunk.map(id => `paciente = "${id}"`).join(' || ')})`).join(' || ');
+          acompFilterParts.unshift(`(${idFilter})`);
+        }
         const acompRecords = await pb.collection('amarcap53_acompanhamentos').getFullList({
           filter: acompFilterParts.join(' && '),
           sort: 'created',
           batch: 500,
           requestKey: null,
-          fields: 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created'
+          fields: 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created,paciente'
         });
         if (cancelled) return;
+
+        // Global regional breakdown from ALL pacientes (independent of scope/filters)
+        const globalPacientesForRegional = await pb.collection('amarcap53_pacientes').getFullList({
+          batch: 500,
+          requestKey: null,
+          fields: 'id,unidade,equipe,microarea'
+        });
+        if (cancelled) return;
+        const pacienteRegionMap = {} as Record<string, { unidade?: string; equipe?: string; microarea?: any }>;
+        globalPacientesForRegional.forEach(p => {
+          pacienteRegionMap[p.id] = { unidade: p.unidade, equipe: p.equipe, microarea: p.microarea };
+          if (p.unidade) regionalUnidade[p.unidade] = (regionalUnidade[p.unidade] || 0) + 1;
+          if (p.equipe) regionalEquipe[p.equipe] = (regionalEquipe[p.equipe] || 0) + 1;
+          if (p.microarea !== undefined && p.microarea !== null && p.microarea !== '') {
+            const maKey = p.equipe ? `${p.equipe}/${p.microarea}` : String(p.microarea);
+            regionalMicroarea[maKey] = (regionalMicroarea[maKey] || 0) + 1;
+          }
+        });
+
+        // Territorial ranking: performance by Unidade, Equipe, Microárea
+        const terrUnidade = {} as Record<string, { total: number; agendamentos: number; contatos: number }>;
+        const terrEquipe = {} as Record<string, { total: number; agendamentos: number; contatos: number }>;
+        const terrMicroarea = {} as Record<string, { total: number; agendamentos: number; contatos: number }>;
+        acompRecords.forEach(r => {
+          const region = r.paciente ? pacienteRegionMap[r.paciente] : undefined;
+          if (!region) return;
+          const valContato = String(r.tipo_contato || '').toLowerCase();
+          const temContato = valContato && !valContato.includes('não houve contato');
+          const valSitu = String(r.situacao_pos_busca || '').toLowerCase();
+          const ehAgendamento = valSitu && valSitu.includes('agendamento');
+
+          if (region.unidade) {
+            if (!terrUnidade[region.unidade]) terrUnidade[region.unidade] = { total: 0, agendamentos: 0, contatos: 0 };
+            terrUnidade[region.unidade].total++;
+            if (temContato) terrUnidade[region.unidade].contatos++;
+            if (ehAgendamento) terrUnidade[region.unidade].agendamentos++;
+          }
+          if (region.equipe) {
+            if (!terrEquipe[region.equipe]) terrEquipe[region.equipe] = { total: 0, agendamentos: 0, contatos: 0 };
+            terrEquipe[region.equipe].total++;
+            if (temContato) terrEquipe[region.equipe].contatos++;
+            if (ehAgendamento) terrEquipe[region.equipe].agendamentos++;
+          }
+          if (region.microarea !== undefined && region.microarea !== null && region.microarea !== '') {
+            const maKey = region.equipe ? `${region.equipe}/${region.microarea}` : String(region.microarea);
+            if (!terrMicroarea[maKey]) terrMicroarea[maKey] = { total: 0, agendamentos: 0, contatos: 0 };
+            terrMicroarea[maKey].total++;
+            if (temContato) terrMicroarea[maKey].contatos++;
+            if (ehAgendamento) terrMicroarea[maKey].agendamentos++;
+          }
+        });
+        const calcRanking = (obj: Record<string, { total: number; agendamentos: number; contatos: number }>, minTotal = 1) =>
+          Object.entries(obj)
+            .map(([nome, v]) => ({ nome, total: v.total, agendamentos: v.agendamentos, contatos: v.contatos, taxa: v.total > 0 ? Math.round((v.agendamentos / v.total) * 100) : 0 }))
+            .filter(v => v.total >= minTotal)
+            .sort((a, b) => b.taxa - a.taxa || b.total - a.total)
+            .slice(0, 20);
+        const unidadeRanking = calcRanking(terrUnidade);
+        const equipeRanking = calcRanking(terrEquipe);
+        const microareaRanking = calcRanking(terrMicroarea);
+
+        // Contato ranking (same data, different metric: taxa de contato)
+        const calcRankingContato = (obj: Record<string, { total: number; agendamentos: number; contatos: number }>, minTotal = 1) =>
+          Object.entries(obj)
+            .map(([nome, v]) => ({ nome, total: v.total, agendamentos: v.agendamentos, contatos: v.contatos, taxa: v.total > 0 ? Math.round((v.contatos / v.total) * 100) : 0 }))
+            .filter(v => v.total >= minTotal)
+            .sort((a, b) => b.taxa - a.taxa || b.total - a.total)
+            .slice(0, 20);
+        const contatoUnidadeRanking = calcRankingContato(terrUnidade);
+        const contatoEquipeRanking = calcRankingContato(terrEquipe);
+        const contatoMicroareaRanking = calcRankingContato(terrMicroarea);
 
         // Process Acompanhamentos
         const aStats = {
@@ -586,12 +596,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           tipoBusca: {} as Record<string, number>,
           situacao: {} as Record<string, number>,
           entraves: {} as Record<string, number>,
-          unidadeBreakdown: {} as Record<string, number>,
-          equipeBreakdown: {} as Record<string, number>,
-          microareaBreakdown: {} as Record<string, number>
+          unidadeBreakdown: regionalUnidade,
+          equipeBreakdown: regionalEquipe,
+          microareaBreakdown: regionalMicroarea
         };
 
         const acompTrendMap2 = Object.fromEntries(lastSixMonths.map(month => [month.key, 0])) as Record<string, number>;
+        const trendComContato = Object.fromEntries(lastSixMonths.map(month => [month.key, 0])) as Record<string, number>;
+        const trendSemContato = Object.fromEntries(lastSixMonths.map(month => [month.key, 0])) as Record<string, number>;
         acompRecords.forEach(r => {
           const metodo = getAcompanhamentoMetodo(r);
           if (metodo) aStats.tipoBusca[metodo] = (aStats.tipoBusca[metodo] || 0) + 1;
@@ -615,17 +627,35 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           if (!date) return;
           const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
           if (key in acompTrendMap2) acompTrendMap2[key] = (acompTrendMap2[key] || 0) + 1;
+
+          // Exam trend from acompanhamentos: com contato / sem contato
+          const valContato = String(r.tipo_contato || '').toLowerCase();
+          const temContato = valContato && !valContato.includes('não houve contato');
+          if (key in trendComContato) {
+            if (temContato) trendComContato[key]++;
+            else trendSemContato[key]++;
+          }
         });
 
         // Update stats with trend data
         const acompTrendFinal = lastSixMonths.map(month => ({ month: month.label, total: acompTrendMap2[month.key] || 0 }));
+        const examTrendFinal = lastSixMonths.map(month => ({ month: month.label, cito: trendComContato[month.key] || 0, hpv: trendSemContato[month.key] || 0 }));
 
         if (!cancelled) {
           setStats(prev => ({
             ...prev,
+            examTrend: examTrendFinal,
             acompTrend: acompTrendFinal
           }));
           setAcompStats(aStats);
+          setTerrRanking({ unidade: unidadeRanking, equipe: equipeRanking, microarea: microareaRanking });
+          setRankContato({ unidade: contatoUnidadeRanking, equipe: contatoEquipeRanking, microarea: contatoMicroareaRanking });
+          // Salva cache de acompanhamentos
+          setCache(ACOMP_CACHE_KEY, {
+            acompStats: aStats,
+            terrRanking: { unidade: unidadeRanking, equipe: equipeRanking, microarea: microareaRanking },
+            rankContato: { unidade: contatoUnidadeRanking, equipe: contatoEquipeRanking, microarea: contatoMicroareaRanking }
+          });
         }
       } catch (error: any) {
         if (error?.isAbort) return;
@@ -636,48 +666,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     fetchStats();
     return () => { cancelled = true; };
   }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea]);
-
-  const chartData = {
-    labels: stats.examTrend.map(t => t.month),
-    datasets: [
-      {
-        label: 'Citopatológico',
-        data: stats.examTrend.map(t => t.cito),
-        backgroundColor: (context: any) => {
-          const ctx = context?.chart?.ctx;
-          if (!ctx) return 'rgba(16, 185, 129, 0.9)';
-          const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-          gradient.addColorStop(0, 'rgba(16, 185, 129, 0.9)');
-          gradient.addColorStop(1, 'rgba(16, 185, 129, 0.2)');
-          return gradient;
-        },
-        borderColor: 'rgb(16, 185, 129)',
-        borderWidth: 1,
-        borderRadius: { topLeft: 12, topRight: 12, bottomLeft: 0, bottomRight: 0 },
-        borderSkipped: false,
-        barThickness: 32,
-        hoverBackgroundColor: 'rgba(16, 185, 129, 1)',
-      },
-      {
-        label: 'Molecular DNA',
-        data: stats.examTrend.map(t => t.hpv),
-        backgroundColor: (context: any) => {
-          const ctx = context?.chart?.ctx;
-          if (!ctx) return 'rgba(59, 130, 246, 0.9)';
-          const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-          gradient.addColorStop(0, 'rgba(59, 130, 246, 0.9)');
-          gradient.addColorStop(1, 'rgba(59, 130, 246, 0.2)');
-          return gradient;
-        },
-        borderColor: 'rgb(59, 130, 246)',
-        borderWidth: 1,
-        borderRadius: { topLeft: 12, topRight: 12, bottomLeft: 0, bottomRight: 0 },
-        borderSkipped: false,
-        barThickness: 32,
-        hoverBackgroundColor: 'rgba(59, 130, 246, 1)',
-      }
-    ]
-  };
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-surface">
@@ -882,164 +870,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           </div>
 
           {/* Gráficos e Tabelas */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 items-stretch">
-            {/* Gráfico de Meta Territorial */}
-            <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden flex flex-col">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl" />
-              <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-8 relative z-10 text-center sm:text-left">
-                <div className="flex flex-col items-center sm:items-start">
-                  <h3 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight flex items-center gap-3">
-                    <Target className="w-6 h-6 text-emerald-500" />
-                    Meta Territorial
-                  </h3>
-                  <p className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Status de Rastreamento (%)</p>
-                </div>
-              </div>
-              
-              <div 
-                key={`meta-territorial-chart-wrapper-${stats.totalPacientes}`}
-                className="flex-1 w-full min-h-[250px] flex items-center justify-center relative z-10"
-              >
-                <div className="w-full h-full max-w-[600px] mx-auto">
-                  <Bar 
-                    data={chartData} 
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        legend: { 
-                          display: true,
-                          position: 'top',
-                          align: 'end',
-                          labels: {
-                            boxWidth: 8,
-                            usePointStyle: true,
-                            pointStyle: 'circle',
-                            font: { size: 10, weight: 'bold' },
-                            padding: 20,
-                            color: '#64748b'
-                          }
-                        },
-                        tooltip: {
-                          backgroundColor: '#051934',
-                          titleFont: { size: 12, weight: 'bold' },
-                          bodyFont: { size: 11 },
-                          padding: 12,
-                          cornerRadius: 12,
-                          displayColors: true,
-                          usePointStyle: true,
-                          callbacks: {
-                            label: (context: any) => ` ${context.dataset.label}: ${context.parsed.y} pacientes`
-                          }
-                        }
-                      },
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          ticks: {
-                            font: { weight: 'bold', size: 10 },
-                            color: '#94a3b8',
-                          },
-                          grid: { 
-                            color: 'rgba(241, 245, 249, 1)',
-                            drawTicks: false
-                          },
-                          border: { display: false }
-                        },
-                        x: {
-                          grid: { display: false },
-                          border: { display: false },
-                          ticks: {
-                            font: { weight: 'bold', size: 10 },
-                            color: '#64748b',
-                            padding: 10
-                          }
-                        }
-                      },
-                      interaction: {
-                        mode: 'index',
-                        intersect: false,
-                      }
-                    }} 
-                  />
-                </div>
-              </div>
-            </div>
 
-            {/* Distribuição por Unidade / Equipe */}
-            <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden flex flex-col">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl" />
-              <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-8 relative z-10 text-center sm:text-left">
-                <div className="flex flex-col items-center sm:items-start">
-                  <h3 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight flex items-center gap-3">
-                    <Building2 className="w-6 h-6 text-blue-500" />
-                    Ranking Regional
-                  </h3>
-                  <p className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Desempenho por Unidade</p>
-                </div>
-              </div>
-
-              <div className="flex-1 w-full overflow-y-auto no-scrollbar max-h-[400px] relative z-10">
-                <div className="space-y-6">
-                {(isAdmin || user?.role === 'cap') && (
-                  <div className="space-y-4">
-                    <p className="text-[9px] font-black text-primary/30 uppercase tracking-[0.2em] border-b border-primary/5 pb-1.5">Unidades</p>
-                    {Object.entries(acompStats.unidadeBreakdown)
-                      .sort((a, b) => (b[1] as number) - (a[1] as number))
-                      .map(([label, val], idx) => (
-                        <SimpleProgressBar 
-                          key={label}
-                          label={label} 
-                          value={val} 
-                          total={stats.totalPacientes} 
-                          color="bg-primary" 
-                          rank={idx}
-                          isHighlighted={label === user?.unidade_saude}
-                        />
-                      ))}
-                  </div>
-                )}
-
-                {(isAdmin || user?.role === 'cap' || user?.role === 'unidade') && (
-                  <div className="space-y-4">
-                    <p className="text-[9px] font-black text-blue-500/30 uppercase tracking-[0.2em] border-b border-blue-500/5 pb-1.5">Equipes</p>
-                    {Object.entries(acompStats.equipeBreakdown)
-                      .sort((a, b) => (b[1] as number) - (a[1] as number))
-                      .map(([label, val], idx) => (
-                        <SimpleProgressBar 
-                          key={label}
-                          label={label} 
-                          value={val} 
-                          total={stats.totalPacientes} 
-                          color="bg-blue-500" 
-                          rank={idx}
-                          isHighlighted={label === user?.equipe}
-                        />
-                      ))}
-                  </div>
-                )}
-                {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && Object.keys(acompStats.microareaBreakdown).length > 0 && (
-                  <div className="space-y-4">
-                    <p className="text-[9px] font-black text-emerald-500/30 uppercase tracking-[0.2em] border-b border-emerald-500/5 pb-1.5">Microáreas</p>
-                    {Object.entries(acompStats.microareaBreakdown)
-                      .sort((a, b) => (b[1] as number) - (a[1] as number))
-                      .map(([label, val], idx) => (
-                        <SimpleProgressBar 
-                          key={label}
-                          label={`MA ${label}`} 
-                          value={val} 
-                          total={stats.totalPacientes} 
-                          color="bg-emerald-500" 
-                          rank={idx}
-                          isHighlighted={label === String(user?.microarea)}
-                        />
-                      ))}
-                  </div>
-                )}
-                </div>
-              </div>
-            </div>
-          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             {/* Gráfico de Status de Rastreamento Real */}
@@ -1129,50 +960,190 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             </div>
           </div>
 
-          <div className="space-y-6">
-            <h3 className="text-lg md:text-xl font-black text-primary flex items-center gap-3 uppercase tracking-tight px-2">
-              <TrendingUp className="w-6 h-6 text-tertiary" />
-              Tendências
-            </h3>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-              <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-visible flex flex-col items-center lg:items-stretch text-center lg:text-left">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl" />
-                <div className="flex items-center justify-center lg:justify-start gap-3 mb-6 relative z-10 w-full">
-                  <div className="p-3 bg-primary/5 text-primary rounded-xl shadow-inner shrink-0">
-                    <Activity className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg md:text-xl font-black text-primary uppercase tracking-tight">Fluxo Mensal</h3>
-                    <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Buscas Ativas</p>
-                  </div>
-                </div>
-                <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
-                  <LineChart data={stats.acompTrend.map(t => ({ label: t.month, value: t.total }))} />
-                </div>
-              </div>
-
-              <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden flex flex-col items-center lg:items-stretch text-center lg:text-left">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/5 rounded-full blur-3xl" />
-                <div className="flex items-center justify-center lg:justify-start gap-3 mb-6 relative z-10 w-full">
-                  <div className="p-3 bg-secondary/5 text-secondary rounded-xl shadow-inner shrink-0">
-                    <BarChart3 className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg md:text-xl font-black text-primary uppercase tracking-tight">Volumetria</h3>
-                    <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Cito vs Molecular</p>
-                  </div>
-                </div>
-                <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
-                  <ColumnChart data={[
-                    { label: 'Cito', value: stats.examVolume.cito, color: 'bg-emerald-500' },
-                    { label: 'DNA', value: stats.examVolume.hpv, color: 'bg-blue-500' },
-                    { label: 'Pendente', value: stats.examVolume.pendente, color: 'bg-rose-500' },
-                  ]} />
-                </div>
+          {/* Ranking + Contato lado a lado */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+          {/* Ranking de Performance Territorial */}
+          <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl" />
+            <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-6 relative z-10 text-center sm:text-left">
+              <div className="flex flex-col items-center sm:items-start">
+                <h3 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight flex items-center gap-3">
+                  <Trophy className="w-6 h-6 text-amber-500" />
+                  Ranking Territorial
+                </h3>
+                <p className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">
+                  Taxa de Agendamento por Região
+                  <span className="ml-2 text-[8px] font-black text-amber-500/60 bg-amber-500/10 px-1.5 py-0.5 rounded-full">GLOBAL</span>
+                </p>
               </div>
             </div>
+            {/* Tabs */}
+            <div className="flex gap-1 mb-6 relative z-10 bg-slate-100/50 rounded-xl p-1 w-fit mx-auto sm:mx-0">
+              {(['unidade', 'equipe', 'microarea'] as const).map(tab => {
+                const label = tab === 'unidade' ? 'Unidades' : tab === 'equipe' ? 'Equipes' : 'Microáreas';
+                const active = rankingTab === tab;
+                return (
+                  <button key={tab}
+                    onClick={() => setRankingTab(tab)}
+                    className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${active ? 'bg-white text-primary shadow-sm' : 'text-primary/40 hover:text-primary/70'}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="space-y-4 relative z-10 min-h-[100px]">
+              {(() => {
+                const data = rankingTab === 'unidade' ? terrRanking.unidade :
+                            rankingTab === 'equipe' ? terrRanking.equipe :
+                            terrRanking.microarea;
+                if (data.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-8 opacity-40">
+                      <Building2 className="w-10 h-10 text-primary mb-2" />
+                      <p className="text-xs font-black uppercase tracking-widest text-primary/50">Nenhum dado disponível</p>
+                    </div>
+                  );
+                }
+                return data.map((item, idx) => {
+                  const medalColor = idx === 0 ? 'bg-amber-100 text-amber-600 ring-1 ring-amber-200' :
+                                    idx === 1 ? 'bg-slate-100 text-slate-500 ring-1 ring-slate-200' :
+                                    idx === 2 ? 'bg-orange-50 text-orange-600 ring-1 ring-orange-100' :
+                                    'bg-primary/5 text-primary/40';
+                  const icon = idx === 0 ? <Trophy className="w-3.5 h-3.5" /> :
+                              idx === 1 ? <Award className="w-3.5 h-3.5" /> :
+                              idx === 2 ? <Medal className="w-3.5 h-3.5" /> : null;
+                  const isHighlighted = (rankingTab === 'unidade' && item.nome === user?.unidade_saude) ||
+                                       (rankingTab === 'equipe' && item.nome === user?.equipe) ||
+                                       (rankingTab === 'microarea' && user?.equipe && item.nome === `${user.equipe}/${user.microarea}`);
+                  return (
+                    <div key={item.nome} className="group/item relative">
+                      <div className="flex items-center justify-between gap-4 mb-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${medalColor}`}>
+                            {icon || (idx + 1)}
+                          </div>
+                          <span className={`text-[11px] md:text-xs font-black uppercase tracking-widest truncate group-hover/item:text-primary transition-colors ${isHighlighted ? 'text-blue-600' : 'text-primary/70'}`}>
+                            {item.nome}
+                          </span>
+                          {isHighlighted && (
+                            <span className="text-[7px] font-black text-blue-500 uppercase tracking-widest bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200">Você</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-sm md:text-base font-black text-primary">{item.taxa}%</span>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-black text-primary/40 uppercase tracking-tighter leading-none">Agend.</span>
+                            <span className="text-[10px] font-black text-primary/60 mt-0.5">{item.agendamentos}/{item.total}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="h-3 w-full bg-slate-100/50 rounded-full overflow-hidden border border-outline-variant/10 shadow-inner relative">
+                        <div className={`h-full transition-all duration-1000 ease-out shadow-lg rounded-full relative overflow-hidden ${item.taxa >= 70 ? 'bg-emerald-500' : item.taxa >= 40 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                          style={{ width: `${item.taxa > 0 ? item.taxa : 2}%` }}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
           </div>
+
+          {/* Ranking de Taxa de Contato */}
+          <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/5 rounded-full blur-3xl" />
+            <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-6 relative z-10 text-center sm:text-left">
+              <div className="flex flex-col items-center sm:items-start">
+                <h3 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight flex items-center gap-3">
+                  <Phone className="w-6 h-6 text-violet-500" />
+                  Taxa de Contato
+                </h3>
+                <p className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">
+                  Contato Efetivo por Região
+                  <span className="ml-2 text-[8px] font-black text-violet-500/60 bg-violet-500/10 px-1.5 py-0.5 rounded-full">GLOBAL</span>
+                </p>
+              </div>
+            </div>
+            {/* Tabs */}
+            <div className="flex gap-1 mb-6 relative z-10 bg-slate-100/50 rounded-xl p-1 w-fit mx-auto sm:mx-0">
+              {(['unidade', 'equipe', 'microarea'] as const).map(tab => {
+                const label = tab === 'unidade' ? 'Unidades' : tab === 'equipe' ? 'Equipes' : 'Microáreas';
+                const active = contatoTab === tab;
+                return (
+                  <button key={tab}
+                    onClick={() => setContatoTab(tab)}
+                    className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${active ? 'bg-white text-primary shadow-sm' : 'text-primary/40 hover:text-primary/70'}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="space-y-4 relative z-10 min-h-[100px]">
+              {(() => {
+                const data = contatoTab === 'unidade' ? rankContato.unidade :
+                            contatoTab === 'equipe' ? rankContato.equipe :
+                            rankContato.microarea;
+                if (data.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-8 opacity-40">
+                      <MessageSquare className="w-10 h-10 text-primary mb-2" />
+                      <p className="text-xs font-black uppercase tracking-widest text-primary/50">Nenhum dado disponível</p>
+                    </div>
+                  );
+                }
+                return data.map((item, idx) => {
+                  const medalColor = idx === 0 ? 'bg-amber-100 text-amber-600 ring-1 ring-amber-200' :
+                                    idx === 1 ? 'bg-slate-100 text-slate-500 ring-1 ring-slate-200' :
+                                    idx === 2 ? 'bg-orange-50 text-orange-600 ring-1 ring-orange-100' :
+                                    'bg-primary/5 text-primary/40';
+                  const icon = idx === 0 ? <Trophy className="w-3.5 h-3.5" /> :
+                              idx === 1 ? <Award className="w-3.5 h-3.5" /> :
+                              idx === 2 ? <Medal className="w-3.5 h-3.5" /> : null;
+                  const isHighlighted = (contatoTab === 'unidade' && item.nome === user?.unidade_saude) ||
+                                       (contatoTab === 'equipe' && item.nome === user?.equipe) ||
+                                       (contatoTab === 'microarea' && user?.equipe && item.nome === `${user.equipe}/${user.microarea}`);
+                  return (
+                    <div key={item.nome} className="group/item relative">
+                      <div className="flex items-center justify-between gap-4 mb-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${medalColor}`}>
+                            {icon || (idx + 1)}
+                          </div>
+                          <span className={`text-[11px] md:text-xs font-black uppercase tracking-widest truncate group-hover/item:text-primary transition-colors ${isHighlighted ? 'text-blue-600' : 'text-primary/70'}`}>
+                            {item.nome}
+                          </span>
+                          {isHighlighted && (
+                            <span className="text-[7px] font-black text-blue-500 uppercase tracking-widest bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200">Você</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-sm md:text-base font-black text-primary">{item.taxa}%</span>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-black text-primary/40 uppercase tracking-tighter leading-none">Contato</span>
+                            <span className="text-[10px] font-black text-primary/60 mt-0.5">{item.contatos}/{item.total}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="h-3 w-full bg-slate-100/50 rounded-full overflow-hidden border border-outline-variant/10 shadow-inner relative">
+                        <div className={`h-full transition-all duration-1000 ease-out shadow-lg rounded-full relative overflow-hidden ${item.taxa >= 70 ? 'bg-violet-500' : item.taxa >= 40 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                          style={{ width: `${item.taxa > 0 ? item.taxa : 2}%` }}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+          </div>
+
+
           <Footer />
         </div>
       </div>
