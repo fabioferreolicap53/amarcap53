@@ -445,7 +445,22 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
 
     try {
       if (!silent) setIsLoading(true);
-      const filterStr = favorites.map(id => `id = "${id}"`).join(' || ');
+      const regionFilters: string[] = [];
+      if (!isAdmin) {
+        if (user.role === 'unidade') {
+          regionFilters.push(`unidade = "${user.unidade_saude}"`);
+        } else if (user.role === 'equipe') {
+          regionFilters.push(`unidade = "${user.unidade_saude}"`);
+          regionFilters.push(`equipe = "${user.equipe}"`);
+        } else if (user.role === 'microarea') {
+          regionFilters.push(`unidade = "${user.unidade_saude}"`);
+          regionFilters.push(`equipe = "${user.equipe}"`);
+          regionFilters.push(`microarea = ${Number(user.microarea)}`);
+        }
+      }
+      const regionFilter = regionFilters.length > 0 ? `(${regionFilters.join(' && ')})` : '';
+      const favFilter = favorites.map(id => `id = "${id}"`).join(' || ');
+      const filterStr = regionFilter ? `(${regionFilter}) && (${favFilter})` : favFilter;
       const resultList = await pb.collection('amarcap53_pacientes').getFullList({
         filter: filterStr,
         sort: 'nome'
