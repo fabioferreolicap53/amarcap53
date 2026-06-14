@@ -173,7 +173,7 @@ const normalizeOptionText = (value: string) => {
   return value.trim().replace(/\s+/g, ' ').toLowerCase();
 };
 
-const escapeFilterValue = (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+export const escapeFilterValue = (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
 export const getCanonicalSelectValue = (value: string | string[] | undefined, options: SelectOption[]) => {
   if (!value || (Array.isArray(value) && value.length === 0)) return '';

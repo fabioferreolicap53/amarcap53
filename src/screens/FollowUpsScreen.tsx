@@ -22,6 +22,10 @@ import {
   getCanonicalValue
 } from '../constants/followUpOptions';
 
+// Remove acentos via Unicode NFD decomposition (ex: "ESPERANÇA" → "ESPERANCA")
+const normalizeText = (str: string) =>
+  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+
 interface Acompanhamento {
   id: string;
   created: string;
@@ -197,25 +201,33 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     const fetchAcompanhamentos = async () => {
       if (!user) return;
       try {
-        // Build patient region filter (same logic as pacientes queries — reliable direct field filters)
+        // Build patient region filter (normalize accents: DB stores unaccented)
         const patientRegionFilterParts: string[] = [];
         if (!isAdmin) {
           if (user.role === 'unidade') {
-            patientRegionFilterParts.push(`unidade = "${user.unidade_saude}"`);
+            patientRegionFilterParts.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude) }));
           } else if (user.role === 'equipe') {
-            patientRegionFilterParts.push(`unidade = "${user.unidade_saude}"`);
-            patientRegionFilterParts.push(`equipe = "${user.equipe}"`);
+            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude), e: normalizeText(user.equipe) }));
           } else if (user.role === 'microarea') {
-            patientRegionFilterParts.push(`unidade = "${user.unidade_saude}"`);
-            patientRegionFilterParts.push(`equipe = "${user.equipe}"`);
+            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude), e: normalizeText(user.equipe) }));
             patientRegionFilterParts.push(`microarea = ${Number(user.microarea)}`);
           }
         }
         if (filterUnidade.length > 0) {
-          patientRegionFilterParts.push(`(${filterUnidade.map(u => `unidade = "${u.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
+          const uParams: Record<string, string> = {};
+          const uClauses = filterUnidade.map((u, i) => {
+            uParams[`u${i}`] = normalizeText(u.trim().replace(/\s+/g, ' '));
+            return `unidade ~ {:u${i}}`;
+          });
+          patientRegionFilterParts.push(pb.filter(uClauses.join(' || '), uParams));
         }
         if (filterEquipe.length > 0) {
-          patientRegionFilterParts.push(`(${filterEquipe.map(e => `equipe = "${e.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
+          const eParams: Record<string, string> = {};
+          const eClauses = filterEquipe.map((e, i) => {
+            eParams[`e${i}`] = normalizeText(e.trim().replace(/\s+/g, ' '));
+            return `equipe ~ {:e${i}}`;
+          });
+          patientRegionFilterParts.push(pb.filter(eClauses.join(' || '), eParams));
         }
         if (filterMicroarea.length > 0) {
           patientRegionFilterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
@@ -267,36 +279,58 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           acompFilters.push(`data_busca <= "${filterDataFim} 23:59:59"`);
         }
 
-        const filterString = acompFilters.join(' && ');
+        // If SIM/NÃO filters active, pre-filter patient IDs server-side
+        const hasSimNaoFilter = filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0;
+        if (hasSimNaoFilter) {
+          const simNaoFilter = (field: string, vals: string[]) => {
+            if (vals.length === 0) return null;
+            const wantSim = vals.includes('SIM');
+            const wantNao = vals.includes('NÃO');
+            if (wantSim && wantNao) return null;
+            if (wantSim) return `${field} != ""`;
+            if (wantNao) return `${field} = ""`;
+            return null;
+          };
+          const patFilters: string[] = [];
+          const f1 = simNaoFilter('dna_hpv_pep', filterDnaHpvPep);
+          if (f1) patFilters.push(f1);
+          const f2 = simNaoFilter('cito_lab', filterCitoLab);
+          if (f2) patFilters.push(f2);
+          const f3 = simNaoFilter('cito_pep', filterCitoPep);
+          if (f3) patFilters.push(f3);
+          const f4 = simNaoFilter('dna_hpv_gal', filterDnaHpvGal);
+          if (f4) patFilters.push(f4);
 
-        // Expandimos o paciente para pegar o nome e cns
+          if (patFilters.length > 0) {
+            const matchingPatients = await pb.collection('amarcap53_pacientes').getFullList({
+              filter: patFilters.join(' && '),
+              fields: 'id',
+              batch: 500,
+              requestKey: null
+            });
+            const matchingIds = matchingPatients.map(p => p.id).filter(Boolean);
+            if (matchingIds.length > 0) {
+              const chunkSize = 200;
+              const idChunks: string[][] = [];
+              for (let i = 0; i < matchingIds.length; i += chunkSize) {
+                idChunks.push(matchingIds.slice(i, i + chunkSize));
+              }
+              const idFilterStr = idChunks.map(chunk => `(${chunk.map(id => `paciente = "${id}"`).join(' || ')})`).join(' || ');
+              acompFilters.push(`(${idFilterStr})`);
+            } else {
+              acompFilters.push('id = "none"');
+            }
+          }
+        }
+
         const records = await pb.collection('amarcap53_acompanhamentos').getFullList({
           sort: '-created',
           expand: 'paciente',
-          filter: filterString,
+          filter: acompFilters.join(' && '),
           requestKey: null
         });
-        // Filtro client-side: data dos exames do paciente (expand)
-        const dateFilter = (field: string | undefined, filterVals: string[]) => {
-          if (filterVals.length === 0) return true;
-          const hasVal = field && field !== '--' && field !== '';
-          const wantSim = filterVals.includes('SIM');
-          const wantNao = filterVals.includes('NÃO');
-          if (wantSim && wantNao) return true;
-          if (wantSim) return !!hasVal;
-          if (wantNao) return !hasVal;
-          return true;
-        };
-        const filtered = records.filter(r => {
-          const p = (r as any).expand?.paciente;
-          if (!p) return true;
-          return dateFilter(p.dna_hpv_pep, filterDnaHpvPep)
-            && dateFilter(p.cito_lab, filterCitoLab)
-            && dateFilter(p.cito_pep, filterCitoPep)
-            && dateFilter(p.dna_hpv_gal, filterDnaHpvGal);
-        });
-        setAcompanhamentos(filtered);
-        setFUCache(filtered);
+        setAcompanhamentos(records);
+        setFUCache(records);
       } catch (error) {
         console.error('Erro ao buscar acompanhamentos:', error);
       } finally {

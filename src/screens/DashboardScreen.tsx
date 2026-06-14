@@ -22,6 +22,10 @@ import { pb } from '../lib/pocketbase';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 import { getCanonicalValue } from '../constants/followUpOptions';
 
+// Remove acentos via Unicode NFD decomposition (ex: "ESPERANÇA" → "ESPERANCA")
+const normalizeText = (str: string) =>
+  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -312,27 +316,35 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
       if (!user) return;
       try {
         const patientFilterParts: string[] = [];
-        
-        // Base filters from user role
+
+        // Base filters from user role (normalize accents: DB stores unaccented)
         if (!isAdmin) {
           if (user.role === 'unidade') {
-            patientFilterParts.push(`unidade = "${user.unidade_saude}"`);
+            patientFilterParts.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude) }));
           } else if (user.role === 'equipe') {
-            patientFilterParts.push(`unidade = "${user.unidade_saude}"`);
-            patientFilterParts.push(`equipe = "${user.equipe}"`);
+            patientFilterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude), e: normalizeText(user.equipe) }));
           } else if (user.role === 'microarea') {
-            patientFilterParts.push(`unidade = "${user.unidade_saude}"`);
-            patientFilterParts.push(`equipe = "${user.equipe}"`);
+            patientFilterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude), e: normalizeText(user.equipe) }));
             patientFilterParts.push(`microarea = ${Number(user.microarea)}`);
           }
         }
 
-        // Applied UI filters
+        // Applied UI filters (normalize accents)
         if (filterUnidade.length > 0) {
-          patientFilterParts.push(`(${filterUnidade.map(u => `unidade = "${u.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
+          const uParams: Record<string, string> = {};
+          const uClauses = filterUnidade.map((u, i) => {
+            uParams[`u${i}`] = normalizeText(u.trim().replace(/\s+/g, ' '));
+            return `unidade ~ {:u${i}}`;
+          });
+          patientFilterParts.push(pb.filter(uClauses.join(' || '), uParams));
         }
         if (filterEquipe.length > 0) {
-          patientFilterParts.push(`(${filterEquipe.map(e => `equipe = "${e.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
+          const eParams: Record<string, string> = {};
+          const eClauses = filterEquipe.map((e, i) => {
+            eParams[`e${i}`] = normalizeText(e.trim().replace(/\s+/g, ' '));
+            return `equipe ~ {:e${i}}`;
+          });
+          patientFilterParts.push(pb.filter(eClauses.join(' || '), eParams));
         }
         if (filterMicroarea.length > 0) {
           patientFilterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);

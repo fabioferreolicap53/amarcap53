@@ -42,6 +42,10 @@ interface Paciente {
 
 const DNA_HPV_PEP_SYNC_EVENT = 'amarcap53:dna-hpv-pep-updated';
 
+// Remove acentos via Unicode NFD decomposition (ex: "ESPERANÇA" → "ESPERANCA")
+const normalizeText = (str: string) =>
+  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+
 interface PatientsScreenProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
@@ -637,23 +641,32 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         const filterParts = [];
         if (!isAdmin && user) {
           if (user.role === 'unidade') {
-            filterParts.push(`unidade = "${user.unidade_saude}"`);
+            filterParts.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude) }));
           } else if (user.role === 'equipe') {
-            filterParts.push(`unidade = "${user.unidade_saude}"`);
-            filterParts.push(`equipe = "${user.equipe}"`);
+            filterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude), e: normalizeText(user.equipe) }));
           } else if (user.role === 'microarea') {
-            filterParts.push(`unidade = "${user.unidade_saude}"`);
-            filterParts.push(`equipe = "${user.equipe}"`);
+            filterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude), e: normalizeText(user.equipe) }));
             filterParts.push(`microarea = ${Number(user.microarea)}`);
           }
         }
 
         // Regional UI Filters
         if (filterUnidade.length > 0) {
-          filterParts.push(`(${filterUnidade.map(u => `unidade = "${u.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
+          const uParams: Record<string, string> = {};
+          const uClauses = filterUnidade.map((u, i) => {
+            uParams[`u${i}`] = normalizeText(u.trim().replace(/\s+/g, ' '));
+            return `unidade ~ {:u${i}}`;
+          });
+          filterParts.push(pb.filter(uClauses.join(' || '), uParams));
         }
         if (filterEquipe.length > 0) {
-          filterParts.push(`(${filterEquipe.map(e => `equipe = "${e.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
+          // Normaliza acentos (DB: "ESPERANCA" / UI: "ESPERANÇA") + uppercase
+          const eParams: Record<string, string> = {};
+          const eClauses = filterEquipe.map((e, i) => {
+            eParams[`e${i}`] = normalizeText(e.trim().replace(/\s+/g, ' '));
+            return `equipe ~ {:e${i}}`;
+          });
+          filterParts.push(pb.filter(eClauses.join(' || '), eParams));
         }
         if (filterMicroarea.length > 0) {
           filterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
@@ -663,21 +676,29 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         const patientRegionFilterParts: string[] = [];
         if (!isAdmin && user) {
           if (user.role === 'unidade') {
-            patientRegionFilterParts.push(`unidade = "${user.unidade_saude}"`);
+            patientRegionFilterParts.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude) }));
           } else if (user.role === 'equipe') {
-            patientRegionFilterParts.push(`unidade = "${user.unidade_saude}"`);
-            patientRegionFilterParts.push(`equipe = "${user.equipe}"`);
+            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude), e: normalizeText(user.equipe) }));
           } else if (user.role === 'microarea') {
-            patientRegionFilterParts.push(`unidade = "${user.unidade_saude}"`);
-            patientRegionFilterParts.push(`equipe = "${user.equipe}"`);
+            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude), e: normalizeText(user.equipe) }));
             patientRegionFilterParts.push(`microarea = ${Number(user.microarea)}`);
           }
         }
         if (filterUnidade.length > 0) {
-          patientRegionFilterParts.push(`(${filterUnidade.map(u => `unidade = "${u.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
+          const puParams: Record<string, string> = {};
+          const puClauses = filterUnidade.map((u, i) => {
+            puParams[`u${i}`] = normalizeText(u.trim().replace(/\s+/g, ' '));
+            return `unidade ~ {:u${i}}`;
+          });
+          patientRegionFilterParts.push(pb.filter(puClauses.join(' || '), puParams));
         }
         if (filterEquipe.length > 0) {
-          patientRegionFilterParts.push(`(${filterEquipe.map(e => `equipe = "${e.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
+          const peParams: Record<string, string> = {};
+          const peClauses = filterEquipe.map((e, i) => {
+            peParams[`e${i}`] = normalizeText(e.trim().replace(/\s+/g, ' '));
+            return `equipe ~ {:e${i}}`;
+          });
+          patientRegionFilterParts.push(pb.filter(peClauses.join(' || '), peParams));
         }
         if (filterMicroarea.length > 0) {
           patientRegionFilterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
@@ -753,6 +774,49 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           filterParts.push(`(${filterGrupo.map(g => `grupo = "${g.trim().replace(/\s+/g, ' ')}"`).join(' || ')})`);
         }
 
+        // Filtro de Status de Rastreamento (server-side)
+        // Alerta logic: PEP_MOLECULAR=dna_hpv_pep, COLETA_MOLECULAR=dna_hpv_gal, PEP_CITO=cito_pep, COLETA_CITO=cito_lab, NAO_IDENTIFICADO=nenhum
+        if (filterStatus.length > 0) {
+          const statusClauses: string[] = [];
+          if (filterStatus.includes('PEP_MOLECULAR')) {
+            statusClauses.push('dna_hpv_pep != ""');
+          }
+          if (filterStatus.includes('COLETA_MOLECULAR')) {
+            statusClauses.push('(dna_hpv_gal != "" && dna_hpv_pep = "")');
+          }
+          if (filterStatus.includes('PEP_CITO')) {
+            statusClauses.push('(cito_pep != "" && dna_hpv_gal = "" && dna_hpv_pep = "")');
+          }
+          if (filterStatus.includes('COLETA_CITO')) {
+            statusClauses.push('(cito_lab != "" && cito_pep = "" && dna_hpv_gal = "" && dna_hpv_pep = "")');
+          }
+          if (filterStatus.includes('NAO_IDENTIFICADO')) {
+            statusClauses.push('(dna_hpv_pep = "" && dna_hpv_gal = "" && cito_pep = "" && cito_lab = "")');
+          }
+          if (statusClauses.length > 0) {
+            filterParts.push(`(${statusClauses.join(' || ')})`);
+          }
+        }
+
+        // Filtros SIM/NÃO de exames (server-side)
+        const simNaoFilter = (field: string, vals: string[]) => {
+          if (vals.length === 0) return null;
+          const wantSim = vals.includes('SIM');
+          const wantNao = vals.includes('NÃO');
+          if (wantSim && wantNao) return null; // ambos = sem filtro
+          if (wantSim) return `${field} != ""`;
+          if (wantNao) return `${field} = ""`;
+          return null;
+        };
+        const dnaHpvPepF = simNaoFilter('dna_hpv_pep', filterDnaHpvPep);
+        if (dnaHpvPepF) filterParts.push(dnaHpvPepF);
+        const citoLabF = simNaoFilter('cito_lab', filterCitoLab);
+        if (citoLabF) filterParts.push(citoLabF);
+        const citoPepF = simNaoFilter('cito_pep', filterCitoPep);
+        if (citoPepF) filterParts.push(citoPepF);
+        const dnaHpvGalF = simNaoFilter('dna_hpv_gal', filterDnaHpvGal);
+        if (dnaHpvGalF) filterParts.push(dnaHpvGalF);
+
         if (filterParts.length > 0) {
           options.filter = filterParts.join(' && ');
         }
@@ -799,29 +863,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           p.alertas = determinarAlerta(p);
           return p;
         });
-
-        // Filtro de Status no Frontend (após calcular o status)
-        if (filterStatus.length > 0) {
-          pacientesFormatados = pacientesFormatados.filter(p => p.alertas && filterStatus.includes(p.alertas));
-        }
-        
-        // Filtros de data dos exames (SIM/NÃO)
-        const dateFilter = (field: string | undefined, filterVals: string[]) => {
-          if (filterVals.length === 0) return true;
-          const hasVal = field && field !== '--' && field !== '';
-          const wantSim = filterVals.includes('SIM');
-          const wantNao = filterVals.includes('NÃO');
-          if (wantSim && wantNao) return true;
-          if (wantSim) return !!hasVal;
-          if (wantNao) return !hasVal;
-          return true;
-        };
-        pacientesFormatados = pacientesFormatados.filter(p =>
-          dateFilter(p.dna_hpv_pep, filterDnaHpvPep) &&
-          dateFilter(p.cito_lab, filterCitoLab) &&
-          dateFilter(p.cito_pep, filterCitoPep) &&
-          dateFilter(p.dna_hpv_gal, filterDnaHpvGal)
-        );
 
         setPacientes(pacientesFormatados);
         setTotalItems(resultList.totalItems);
