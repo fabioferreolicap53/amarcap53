@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
+import { LoadingOverlay } from '../components/LoadingOverlay';
 import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
@@ -956,9 +957,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
           </div>
 
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20 opacity-30">
-              <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-              <p className="mt-4 text-xs font-black uppercase tracking-widest">Carregando seus favoritos...</p>
+            <div className="relative bg-surface-container-lowest rounded-2xl overflow-hidden shadow-[0px_20px_50px_rgba(0,0,0,0.06)] border border-outline-variant/15 min-h-[200px]">
             </div>
           ) : filteredPacientes.length === 0 ? (
             <div className="bg-white rounded-[2rem] p-20 text-center shadow-xl border border-primary/5">

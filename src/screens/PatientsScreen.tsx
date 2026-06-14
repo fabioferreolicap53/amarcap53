@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
+import { LoadingOverlay } from '../components/LoadingOverlay';
 import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
@@ -1302,16 +1303,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan={isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea' ? 9 : 8} className="px-6 py-20 text-center text-on-surface-variant text-base font-medium italic">
-                        <div className="flex flex-col items-center gap-4">
-                          <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                          <span className="text-xs font-black uppercase tracking-widest text-primary/40 mt-2">Sincronizando pacientes...</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : pacientes.length === 0 ? (
+                  {pacientes.length === 0 ? (
                     <tr>
                       <td colSpan={isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea' ? 9 : 8} className="px-6 py-20 text-center">
                         <div className="flex flex-col items-center opacity-30">
@@ -1514,6 +1506,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           <Footer />
         </div>
       </div>
+
+      <LoadingOverlay visible={isLoading} message="Sincronizando pacientes..." />
 
       {/* Modal Premium */}
       {isModalOpen && selectedPaciente && (

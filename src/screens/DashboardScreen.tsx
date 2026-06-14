@@ -17,6 +17,7 @@ import { Header } from '../components/Header';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { MultiSelect } from '../components/MultiSelect';
 import { Footer } from '../components/Footer';
+import { LoadingOverlay } from '../components/LoadingOverlay';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
@@ -264,6 +265,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const [filterEquipe, setFilterEquipe] = useState<string[]>([]);
   const [filterMicroarea, setFilterMicroarea] = useState<string[]>([]);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const _aInit = getCache(ACOMP_CACHE_KEY);
   const [acompStats, setAcompStats] = useState(_aInit?.acompStats ?? {
@@ -672,6 +674,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
       } catch (error: any) {
         if (error?.isAbort) return;
         console.error('Erro ao buscar estatísticas:', error);
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     };
 
@@ -1159,6 +1163,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           <Footer />
         </div>
       </div>
+
+      <LoadingOverlay visible={isLoading} message="Carregando resumo..." />
     </div>
   );
 };
