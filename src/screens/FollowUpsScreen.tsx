@@ -121,10 +121,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const [filterUnidade, setFilterUnidade] = useState<string[]>([]);
   const [filterEquipe, setFilterEquipe] = useState<string[]>([]);
   const [filterMicroarea, setFilterMicroarea] = useState<string[]>([]);
-  const [filterDnaHpvPep, setFilterDnaHpvPep] = useState<string[]>([]);
-  const [filterCitoLab, setFilterCitoLab] = useState<string[]>([]);
-  const [filterCitoPep, setFilterCitoPep] = useState<string[]>([]);
-  const [filterDnaHpvGal, setFilterDnaHpvGal] = useState<string[]>([]);
+  const [filterDnaHpvPep, setFilterDnaHpvPep] = useState('');
+  const [filterCitoLab, setFilterCitoLab] = useState('');
+  const [filterCitoPep, setFilterCitoPep] = useState('');
+  const [filterDnaHpvGal, setFilterDnaHpvGal] = useState('');
 
   const resetFilters = () => {
     setSearchTerm('');
@@ -137,10 +137,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     setFilterUnidade([]);
     setFilterEquipe([]);
     setFilterMicroarea([]);
-    setFilterDnaHpvPep([]);
-    setFilterCitoLab([]);
-    setFilterCitoPep([]);
-    setFilterDnaHpvGal([]);
+    setFilterDnaHpvPep('');
+    setFilterCitoLab('');
+    setFilterCitoPep('');
+    setFilterDnaHpvGal('');
   };
 
   const normalizeCanalLabel = (value?: string) => value || '';
@@ -303,13 +303,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
             }).then(r => r.map(p => p.id).filter(Boolean))
           : Promise.resolve([]);
 
-        const simNaoFilter = (field: string, vals: string[]) => {
-          if (vals.length === 0) return null;
-          const wantSim = vals.includes('SIM');
-          const wantNao = vals.includes('NÃO');
-          if (wantSim && wantNao) return null;
-          if (wantSim) return `${field} != ""`;
-          if (wantNao) return `${field} = ""`;
+        const simNaoFilter = (field: string, val: string) => {
+          if (!val) return null;
+          if (val === 'SIM') return `${field} != ""`;
+          if (val === 'NÃO') return `${field} = ""`;
           return null;
         };
         const hasSimNaoFilter = filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0;
@@ -727,39 +724,47 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
                   {/* Exames SIM/NÃO */}
                   <div className="space-y-2">
-                    <MultiSelect 
+                    <SingleSelect
                       label="DNA-HPV (PEP)"
                       placeholder="SIM / NÃO"
                       options={SIM_NAO_OPTIONS}
                       value={filterDnaHpvPep}
                       onChange={setFilterDnaHpvPep}
+                      icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                      showSearch={false}
                     />
                   </div>
                   <div className="space-y-2">
-                    <MultiSelect 
+                    <SingleSelect
                       label="Cito (Lab)"
                       placeholder="SIM / NÃO"
                       options={SIM_NAO_OPTIONS}
                       value={filterCitoLab}
                       onChange={setFilterCitoLab}
+                      icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                      showSearch={false}
                     />
                   </div>
                   <div className="space-y-2">
-                    <MultiSelect 
+                    <SingleSelect
                       label="Cito (PEP)"
                       placeholder="SIM / NÃO"
                       options={SIM_NAO_OPTIONS}
                       value={filterCitoPep}
                       onChange={setFilterCitoPep}
+                      icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                      showSearch={false}
                     />
                   </div>
                   <div className="space-y-2">
-                    <MultiSelect 
+                    <SingleSelect
                       label="DNA-HPV (GAL)"
                       placeholder="SIM / NÃO"
                       options={SIM_NAO_OPTIONS}
                       value={filterDnaHpvGal}
                       onChange={setFilterDnaHpvGal}
+                      icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                      showSearch={false}
                     />
                   </div>
 
