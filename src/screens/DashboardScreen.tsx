@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, HeartPulse, Calendar, BadgeCheck, TrendingUp, Phone, MessageSquare, ClipboardList, PieChart, BarChart3, MapPin, LayoutDashboard, Filter, CheckCircle, AlertCircle, Building2, Building, X, Trophy, Award, Medal, UserCheck } from 'lucide-react';
+import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, HeartPulse, Calendar, BadgeCheck, TrendingUp, ClipboardList, PieChart, BarChart3, MapPin, LayoutDashboard, Filter, CheckCircle, AlertCircle, Building, X, UserCheck } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -279,10 +279,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     equipeBreakdown: {} as Record<string, number>,
     microareaBreakdown: {} as Record<string, number>
   });
-  const [terrRanking, setTerrRanking] = useState<{ unidade: { nome: string; total: number; agendamentos: number; contatos: number; taxa: number }[]; equipe: { nome: string; total: number; agendamentos: number; contatos: number; taxa: number }[]; microarea: { nome: string; total: number; agendamentos: number; contatos: number; taxa: number }[] }>(_aInit?.terrRanking ?? { unidade: [], equipe: [], microarea: [] });
-  const [rankContato, setRankContato] = useState<{ unidade: { nome: string; total: number; contatos: number; agendamentos: number; taxa: number }[]; equipe: typeof terrRanking.equipe; microarea: typeof terrRanking.microarea }>(_aInit?.rankContato ?? { unidade: [], equipe: [], microarea: [] });
-  const [rankingTab, setRankingTab] = useState<'unidade' | 'equipe' | 'microarea'>('unidade');
-  const [contatoTab, setContatoTab] = useState<'unidade' | 'equipe' | 'microarea'>('unidade');
+
 
   const formatEnumLabel = (value?: string) => value || '';
   const hasValue = (value: any) => value !== undefined && value !== null && value !== '' && value !== '--';
@@ -501,8 +498,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         const aCached = getCache(ACOMP_CACHE_KEY);
         if (aCached && !cancelled) {
           setAcompStats(aCached.acompStats);
-          setTerrRanking(aCached.terrRanking);
-          setRankContato(aCached.rankContato);
+
         }
 
         // Acompanhamentos (separate, non-blocking for initial render)
@@ -532,9 +528,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           fields: 'id,unidade,equipe,microarea'
         });
         if (cancelled) return;
-        const pacienteRegionMap = {} as Record<string, { unidade?: string; equipe?: string; microarea?: any }>;
         globalPacientesForRegional.forEach(p => {
-          pacienteRegionMap[p.id] = { unidade: p.unidade, equipe: p.equipe, microarea: p.microarea };
           if (p.unidade) regionalUnidade[p.unidade] = (regionalUnidade[p.unidade] || 0) + 1;
           if (p.equipe) regionalEquipe[p.equipe] = (regionalEquipe[p.equipe] || 0) + 1;
           if (p.microarea !== undefined && p.microarea !== null && p.microarea !== '') {
@@ -542,59 +536,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             regionalMicroarea[maKey] = (regionalMicroarea[maKey] || 0) + 1;
           }
         });
-
-        // Territorial ranking: performance by Unidade, Equipe, Microárea
-        const terrUnidade = {} as Record<string, { total: number; agendamentos: number; contatos: number }>;
-        const terrEquipe = {} as Record<string, { total: number; agendamentos: number; contatos: number }>;
-        const terrMicroarea = {} as Record<string, { total: number; agendamentos: number; contatos: number }>;
-        acompRecords.forEach(r => {
-          const region = r.paciente ? pacienteRegionMap[r.paciente] : undefined;
-          if (!region) return;
-          const valContato = String(r.tipo_contato || '').toLowerCase();
-          const temContato = valContato && !valContato.includes('não houve contato');
-          const valSitu = String(r.situacao_pos_busca || '').toLowerCase();
-          const ehAgendamento = valSitu && valSitu.includes('agendamento');
-
-          if (region.unidade) {
-            if (!terrUnidade[region.unidade]) terrUnidade[region.unidade] = { total: 0, agendamentos: 0, contatos: 0 };
-            terrUnidade[region.unidade].total++;
-            if (temContato) terrUnidade[region.unidade].contatos++;
-            if (ehAgendamento) terrUnidade[region.unidade].agendamentos++;
-          }
-          if (region.equipe) {
-            if (!terrEquipe[region.equipe]) terrEquipe[region.equipe] = { total: 0, agendamentos: 0, contatos: 0 };
-            terrEquipe[region.equipe].total++;
-            if (temContato) terrEquipe[region.equipe].contatos++;
-            if (ehAgendamento) terrEquipe[region.equipe].agendamentos++;
-          }
-          if (region.microarea !== undefined && region.microarea !== null && region.microarea !== '') {
-            const maKey = region.equipe ? `${region.equipe}/${region.microarea}` : String(region.microarea);
-            if (!terrMicroarea[maKey]) terrMicroarea[maKey] = { total: 0, agendamentos: 0, contatos: 0 };
-            terrMicroarea[maKey].total++;
-            if (temContato) terrMicroarea[maKey].contatos++;
-            if (ehAgendamento) terrMicroarea[maKey].agendamentos++;
-          }
-        });
-        const calcRanking = (obj: Record<string, { total: number; agendamentos: number; contatos: number }>, minTotal = 1) =>
-          Object.entries(obj)
-            .map(([nome, v]) => ({ nome, total: v.total, agendamentos: v.agendamentos, contatos: v.contatos, taxa: v.total > 0 ? Math.round((v.agendamentos / v.total) * 100) : 0 }))
-            .filter(v => v.total >= minTotal)
-            .sort((a, b) => b.taxa - a.taxa || b.total - a.total)
-            .slice(0, 20);
-        const unidadeRanking = calcRanking(terrUnidade);
-        const equipeRanking = calcRanking(terrEquipe);
-        const microareaRanking = calcRanking(terrMicroarea);
-
-        // Contato ranking (same data, different metric: taxa de contato)
-        const calcRankingContato = (obj: Record<string, { total: number; agendamentos: number; contatos: number }>, minTotal = 1) =>
-          Object.entries(obj)
-            .map(([nome, v]) => ({ nome, total: v.total, agendamentos: v.agendamentos, contatos: v.contatos, taxa: v.total > 0 ? Math.round((v.contatos / v.total) * 100) : 0 }))
-            .filter(v => v.total >= minTotal)
-            .sort((a, b) => b.taxa - a.taxa || b.total - a.total)
-            .slice(0, 20);
-        const contatoUnidadeRanking = calcRankingContato(terrUnidade);
-        const contatoEquipeRanking = calcRankingContato(terrEquipe);
-        const contatoMicroareaRanking = calcRankingContato(terrMicroarea);
 
         // Process Acompanhamentos
         const aStats = {
@@ -662,13 +603,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             acompTrend: acompTrendFinal
           }));
           setAcompStats(aStats);
-          setTerrRanking({ unidade: unidadeRanking, equipe: equipeRanking, microarea: microareaRanking });
-          setRankContato({ unidade: contatoUnidadeRanking, equipe: contatoEquipeRanking, microarea: contatoMicroareaRanking });
           // Salva cache de acompanhamentos
           setCache(ACOMP_CACHE_KEY, {
             acompStats: aStats,
-            terrRanking: { unidade: unidadeRanking, equipe: equipeRanking, microarea: microareaRanking },
-            rankContato: { unidade: contatoUnidadeRanking, equipe: contatoEquipeRanking, microarea: contatoMicroareaRanking }
           });
         }
       } catch (error: any) {
@@ -976,188 +913,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             </div>
           </div>
 
-          {/* Ranking + Contato lado a lado */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-          {/* Ranking de Performance Territorial */}
-          <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl" />
-            <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-6 relative z-10 text-center sm:text-left">
-              <div className="flex flex-col items-center sm:items-start">
-                <h3 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight flex items-center gap-3">
-                  <Trophy className="w-6 h-6 text-amber-500" />
-                  Ranking Territorial
-                </h3>
-                <p className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">
-                  Taxa de Agendamento por Região
-                  <span className="ml-2 text-[8px] font-black text-amber-500/60 bg-amber-500/10 px-1.5 py-0.5 rounded-full">GLOBAL</span>
-                </p>
-              </div>
-            </div>
-            {/* Tabs */}
-            <div className="flex gap-1 mb-6 relative z-10 bg-slate-100/50 rounded-xl p-1 w-fit mx-auto sm:mx-0">
-              {(['unidade', 'equipe', 'microarea'] as const).map(tab => {
-                const label = tab === 'unidade' ? 'Unidades' : tab === 'equipe' ? 'Equipes' : 'Microáreas';
-                const active = rankingTab === tab;
-                return (
-                  <button key={tab}
-                    onClick={() => setRankingTab(tab)}
-                    className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${active ? 'bg-white text-primary shadow-sm' : 'text-primary/40 hover:text-primary/70'}`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="space-y-4 relative z-10 min-h-[100px]">
-              {(() => {
-                const data = rankingTab === 'unidade' ? terrRanking.unidade :
-                            rankingTab === 'equipe' ? terrRanking.equipe :
-                            terrRanking.microarea;
-                if (data.length === 0) {
-                  return (
-                    <div className="flex flex-col items-center justify-center py-8 opacity-40">
-                      <Building2 className="w-10 h-10 text-primary mb-2" />
-                      <p className="text-xs font-black uppercase tracking-widest text-primary/50">Nenhum dado disponível</p>
-                    </div>
-                  );
-                }
-                return data.map((item, idx) => {
-                  const medalColor = idx === 0 ? 'bg-amber-100 text-amber-600 ring-1 ring-amber-200' :
-                                    idx === 1 ? 'bg-slate-100 text-slate-500 ring-1 ring-slate-200' :
-                                    idx === 2 ? 'bg-orange-50 text-orange-600 ring-1 ring-orange-100' :
-                                    'bg-primary/5 text-primary/40';
-                  const icon = idx === 0 ? <Trophy className="w-3.5 h-3.5" /> :
-                              idx === 1 ? <Award className="w-3.5 h-3.5" /> :
-                              idx === 2 ? <Medal className="w-3.5 h-3.5" /> : null;
-                  const isHighlighted = (rankingTab === 'unidade' && item.nome === user?.unidade_saude) ||
-                                       (rankingTab === 'equipe' && item.nome === user?.equipe) ||
-                                       (rankingTab === 'microarea' && user?.equipe && item.nome === `${user.equipe}/${user.microarea}`);
-                  return (
-                    <div key={item.nome} className="group/item relative">
-                      <div className="flex items-center justify-between gap-4 mb-2">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${medalColor}`}>
-                            {icon || (idx + 1)}
-                          </div>
-                          <span className={`text-[11px] md:text-xs font-black uppercase tracking-widest truncate group-hover/item:text-primary transition-colors ${isHighlighted ? 'text-blue-600' : 'text-primary/70'}`}>
-                            {item.nome}
-                          </span>
-                          {isHighlighted && (
-                            <span className="text-[7px] font-black text-blue-500 uppercase tracking-widest bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200">Você</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-sm md:text-base font-black text-primary">{item.taxa}%</span>
-                          <div className="flex flex-col items-end">
-                            <span className="text-[9px] font-black text-primary/40 uppercase tracking-tighter leading-none">Agend.</span>
-                            <span className="text-[10px] font-black text-primary/60 mt-0.5">{item.agendamentos}/{item.total}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="h-3 w-full bg-slate-100/50 rounded-full overflow-hidden border border-outline-variant/10 shadow-inner relative">
-                        <div className={`h-full transition-all duration-1000 ease-out shadow-lg rounded-full relative overflow-hidden ${item.taxa >= 70 ? 'bg-emerald-500' : item.taxa >= 40 ? 'bg-amber-500' : 'bg-rose-500'}`}
-                          style={{ width: `${item.taxa > 0 ? item.taxa : 2}%` }}
-                        >
-                          <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent" />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          </div>
 
-          {/* Ranking de Taxa de Contato */}
-          <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/5 rounded-full blur-3xl" />
-            <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-6 relative z-10 text-center sm:text-left">
-              <div className="flex flex-col items-center sm:items-start">
-                <h3 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight flex items-center gap-3">
-                  <Phone className="w-6 h-6 text-violet-500" />
-                  Taxa de Contato
-                </h3>
-                <p className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">
-                  Contato Efetivo por Região
-                  <span className="ml-2 text-[8px] font-black text-violet-500/60 bg-violet-500/10 px-1.5 py-0.5 rounded-full">GLOBAL</span>
-                </p>
-              </div>
-            </div>
-            {/* Tabs */}
-            <div className="flex gap-1 mb-6 relative z-10 bg-slate-100/50 rounded-xl p-1 w-fit mx-auto sm:mx-0">
-              {(['unidade', 'equipe', 'microarea'] as const).map(tab => {
-                const label = tab === 'unidade' ? 'Unidades' : tab === 'equipe' ? 'Equipes' : 'Microáreas';
-                const active = contatoTab === tab;
-                return (
-                  <button key={tab}
-                    onClick={() => setContatoTab(tab)}
-                    className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${active ? 'bg-white text-primary shadow-sm' : 'text-primary/40 hover:text-primary/70'}`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="space-y-4 relative z-10 min-h-[100px]">
-              {(() => {
-                const data = contatoTab === 'unidade' ? rankContato.unidade :
-                            contatoTab === 'equipe' ? rankContato.equipe :
-                            rankContato.microarea;
-                if (data.length === 0) {
-                  return (
-                    <div className="flex flex-col items-center justify-center py-8 opacity-40">
-                      <MessageSquare className="w-10 h-10 text-primary mb-2" />
-                      <p className="text-xs font-black uppercase tracking-widest text-primary/50">Nenhum dado disponível</p>
-                    </div>
-                  );
-                }
-                return data.map((item, idx) => {
-                  const medalColor = idx === 0 ? 'bg-amber-100 text-amber-600 ring-1 ring-amber-200' :
-                                    idx === 1 ? 'bg-slate-100 text-slate-500 ring-1 ring-slate-200' :
-                                    idx === 2 ? 'bg-orange-50 text-orange-600 ring-1 ring-orange-100' :
-                                    'bg-primary/5 text-primary/40';
-                  const icon = idx === 0 ? <Trophy className="w-3.5 h-3.5" /> :
-                              idx === 1 ? <Award className="w-3.5 h-3.5" /> :
-                              idx === 2 ? <Medal className="w-3.5 h-3.5" /> : null;
-                  const isHighlighted = (contatoTab === 'unidade' && item.nome === user?.unidade_saude) ||
-                                       (contatoTab === 'equipe' && item.nome === user?.equipe) ||
-                                       (contatoTab === 'microarea' && user?.equipe && item.nome === `${user.equipe}/${user.microarea}`);
-                  return (
-                    <div key={item.nome} className="group/item relative">
-                      <div className="flex items-center justify-between gap-4 mb-2">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${medalColor}`}>
-                            {icon || (idx + 1)}
-                          </div>
-                          <span className={`text-[11px] md:text-xs font-black uppercase tracking-widest truncate group-hover/item:text-primary transition-colors ${isHighlighted ? 'text-blue-600' : 'text-primary/70'}`}>
-                            {item.nome}
-                          </span>
-                          {isHighlighted && (
-                            <span className="text-[7px] font-black text-blue-500 uppercase tracking-widest bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200">Você</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-sm md:text-base font-black text-primary">{item.taxa}%</span>
-                          <div className="flex flex-col items-end">
-                            <span className="text-[9px] font-black text-primary/40 uppercase tracking-tighter leading-none">Contato</span>
-                            <span className="text-[10px] font-black text-primary/60 mt-0.5">{item.contatos}/{item.total}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="h-3 w-full bg-slate-100/50 rounded-full overflow-hidden border border-outline-variant/10 shadow-inner relative">
-                        <div className={`h-full transition-all duration-1000 ease-out shadow-lg rounded-full relative overflow-hidden ${item.taxa >= 70 ? 'bg-violet-500' : item.taxa >= 40 ? 'bg-amber-500' : 'bg-rose-500'}`}
-                          style={{ width: `${item.taxa > 0 ? item.taxa : 2}%` }}
-                        >
-                          <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent" />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          </div>
-          </div>
 
 
           <Footer />
