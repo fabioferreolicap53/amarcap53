@@ -92,6 +92,14 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
           )}
+
+          {/* CAP Badge - Mobile/Tablet */}
+          {user.role === 'cap' && (
+            <div className="flex items-center gap-2 mt-2">
+              <Building className="w-5 h-5 text-white/70" />
+              <span className="text-[13px] font-black text-white/80 uppercase tracking-[0.15em]">Coordenação CAP5.3</span>
+            </div>
+          )}
         </div>
       )}
 
