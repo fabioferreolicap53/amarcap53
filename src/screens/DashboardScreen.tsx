@@ -422,13 +422,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         } else {
           // CAP without UI filters: pure count-based queries (instant)
           const baseFilter = patientFilter || '';
-          const encode = (s: string) => encodeURIComponent(s);
-
-          const countApi = (field: string) => {
-            const f = baseFilter ? `${baseFilter} && ${field}` : field;
-            return pb.send(`/api/collections/amarcap53_pacientes/records?perPage=0&fields=id&filter=${encode(f)}`, { method: 'GET' });
-          };
-
           // Mostra cache imediatamente (instantaneo)
           const cached = getCache(STATS_CACHE_KEY);
           if (cached) {
@@ -436,12 +429,23 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           }
 
           try {
+            const countPromise = (field?: string) => {
+              const f = field
+                ? (baseFilter ? `${baseFilter} && ${field}` : field)
+                : baseFilter || '';
+              return pb.collection('amarcap53_pacientes').getList(1, 1, {
+                filter: f,
+                fields: 'id',
+                requestKey: null,
+              });
+            };
+
             const [totalRes, pMolRes, cMolRes, pCitoRes, cCitoRes] = await Promise.all([
-              pb.send('/api/collections/amarcap53_pacientes/records?perPage=0&fields=id', { method: 'GET' }),
-              countApi('dna_hpv_pep != ""'),
-              countApi('dna_hpv_gal != ""'),
-              countApi('cito_pep != ""'),
-              countApi('cito_lab != ""'),
+              countPromise(),
+              countPromise('dna_hpv_pep != ""'),
+              countPromise('dna_hpv_gal != ""'),
+              countPromise('cito_pep != ""'),
+              countPromise('cito_lab != ""'),
             ]);
             if (cancelled) return;
 

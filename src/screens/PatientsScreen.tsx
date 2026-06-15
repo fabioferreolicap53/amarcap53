@@ -722,7 +722,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             acompFilters.push(buildSelectFilter('situacao_pos_busca', filterSituacao, SITUACAO_POS_BUSCA_OPTIONS));
           }
           if (filterEntraves.length > 0) {
-            acompFilters.push(`(${filterEntraves.map(v => `entraves_identificados ~ "${v}"`).join(' || ')})`);
+            const escapedEntraves = filterEntraves.map(v => v.replace(/[()]/g, '\\$&'));
+            acompFilters.push(`(${escapedEntraves.map(v => `entraves_identificados ~ "${v}"`).join(' || ')})`);
           }
           
           if (filterDataInicio) {
@@ -769,7 +770,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
         // Filtro de Busca (Nome ou CNS)
         if (searchTerm) {
-          filterParts.push(`(nome ~ "${searchTerm}" || cns ~ "${searchTerm}")`);
+          const safeSearch = searchTerm.replace(/"/g, '\\"');
+          filterParts.push(`(nome ~ "${safeSearch}" || cns ~ "${safeSearch}")`);
         }
 
         // Filtro de Grupo
@@ -831,7 +833,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         const patientIds = resultList.items.map(r => r.id);
         const acompCounts = patientIds.length > 0
           ? await pb.collection('amarcap53_acompanhamentos').getFullList({
-              filter: `(${patientIds.map(id => `paciente = "${id}"`).join(' || ')})`,
+              filter: `(${patientIds.slice(0, 200).map(id => `paciente = "${id}"`).join(' || ')})`,
               fields: 'id,paciente',
               requestKey: null
             })

@@ -3,7 +3,7 @@ import { Header } from '../components/Header';
 import { ScrollIndicator } from '../components/ScrollIndicator';
 import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2, RotateCcw, Users, MapPin } from 'lucide-react';
+import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2, RotateCcw, Users, MapPin, Plus } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
@@ -93,6 +93,20 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedAcompanhamento, setSelectedAcompanhamento] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Modal de novo registro state
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createSelectedPaciente, setCreateSelectedPaciente] = useState<any>(null);
+  const [createPacienteSearch, setCreatePacienteSearch] = useState('');
+  const [createPacienteResults, setCreatePacienteResults] = useState<any[]>([]);
+  const [isSearchingPaciente, setIsSearchingPaciente] = useState(false);
+  const [createDate, setCreateDate] = useState('');
+  const [createTipoBusca, setCreateTipoBusca] = useState('');
+  const [createTipoContato, setCreateTipoContato] = useState('');
+  const [createSituacao, setCreateSituacao] = useState('');
+  const [createEntraves, setCreateEntraves] = useState<string[]>([]);
+  const [createEntravesInformadoPor, setCreateEntravesInformadoPor] = useState('');
+  const [createObservacoes, setCreateObservacoes] = useState('');
 
   // Estados para Busca e Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -344,7 +358,8 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           acompFilters.push(buildSelectFilter('situacao_pos_busca', filterSituacao, SITUACAO_POS_BUSCA_OPTIONS));
         }
         if (filterEntraves.length > 0) {
-          acompFilters.push(`(${filterEntraves.map(v => `entraves_identificados ~ "${v}"`).join(' || ')})`);
+          const escapedEntraves = filterEntraves.map(v => v.replace(/[()]/g, '\\$&'));
+          acompFilters.push(`(${escapedEntraves.map(v => `entraves_identificados ~ "${v}"`).join(' || ')})`);
         }
 
         if (filterDataInicio) {
@@ -418,6 +433,104 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const handleCloseModal = () => {
     setIsEditModalOpen(false);
     setSelectedAcompanhamento(null);
+  };
+
+  // Search patients for create modal (server-side debounced)
+  useEffect(() => {
+    if (!createPacienteSearch || createPacienteSearch.length < 2) {
+      setCreatePacienteResults([]);
+      setIsSearchingPaciente(false);
+      return;
+    }
+    setIsSearchingPaciente(true);
+    const timer = setTimeout(async () => {
+      try {
+        const search = createPacienteSearch.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        const patients = await pb.collection('amarcap53_pacientes').getFullList({
+          filter: `nome ~ "${search}" || cns ~ "${search}"`,
+          fields: 'id,nome,cns,unidade,equipe,microarea',
+          sort: 'nome',
+          limit: 10,
+          requestKey: null,
+        });
+        setCreatePacienteResults(patients);
+      } catch (e) {
+        console.error('[FollowUpsScreen] Erro ao buscar pacientes:', e);
+        setCreatePacienteResults([]);
+      } finally {
+        setIsSearchingPaciente(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [createPacienteSearch]);
+
+  const resetCreateModal = () => {
+    setIsCreateModalOpen(false);
+    setCreateSelectedPaciente(null);
+    setCreatePacienteSearch('');
+    setCreatePacienteResults([]);
+    setCreateDate('');
+    setCreateTipoBusca('');
+    setCreateTipoContato('');
+    setCreateSituacao('');
+    setCreateEntraves([]);
+    setCreateEntravesInformadoPor('');
+    setCreateObservacoes('');
+  };
+
+  const handleSaveCreate = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!createSelectedPaciente || !user) return;
+
+    if (!createDate) {
+      alert('Preencha a Data da Busca.');
+      return;
+    }
+    if (!createTipoBusca || !createTipoContato || !createSituacao) {
+      alert('Preencha todos os campos obrigatórios: Tipo de Busca, Tipo de Contato e Situação Pós Busca.');
+      return;
+    }
+    if (createEntravesInformadoPor && createEntraves.length === 0) {
+      alert('Por favor, selecione ao menos um entrave identificado.');
+      return;
+    }
+
+    setIsSaving(true);
+
+    let dataBuscaIso = '';
+    if (createDate && createDate.includes('/')) {
+      const [d, m, y] = createDate.split('/');
+      dataBuscaIso = `${y}-${m}-${d}`;
+    }
+
+    const data = {
+      paciente: createSelectedPaciente.id,
+      profissional: user.id,
+      data_busca: dataBuscaIso || createDate,
+      tipo_busca: getSelectLabel(createTipoBusca, TIPO_BUSCA_OPTIONS),
+      tipo_contato: getSelectLabel(createTipoContato, TIPO_CONTATO_OPTIONS),
+      situacao_pos_busca: getSelectLabel(createSituacao, SITUACAO_POS_BUSCA_OPTIONS),
+      entraves_identificados: JSON.stringify(
+        Array.isArray(createEntraves) ? createEntraves.filter(v => v) : []
+      ),
+      entraves_informado_por: getSelectLabel(createEntravesInformadoPor, ENTRAVES_INFORMADO_POR_OPTIONS),
+      observacoes: createObservacoes,
+    };
+
+    try {
+      const result = await pb.collection('amarcap53_acompanhamentos').create(data);
+      setAcompanhamentos(prev => [result as any, ...prev]);
+      alert('Acompanhamento registrado com sucesso!');
+      resetCreateModal();
+    } catch (error: any) {
+      console.error('[SAVE CREATE] Erro:', error);
+      const msg = error?.data?.data
+        ? Object.entries(error.data.data).map(([k, v]: any) => `${k}: ${v?.message || v}`).join('\n')
+        : error?.message || 'Erro desconhecido';
+      alert(`Erro ao salvar o acompanhamento.\nCampos com problema:\n${msg}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveEdit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -559,6 +672,14 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                       {[filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal].filter(f => f.length > 0).length + (filterDataInicio || filterDataFim ? 1 : 0)}
                     </div>
                   )}
+                </button>
+
+                <button
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="flex items-center gap-3 px-8 h-16 rounded-[1.5rem] text-sm font-black uppercase tracking-widest transition-all duration-500 border bg-white/10 text-white border-white/20 hover:bg-white/20 hover:border-white/30 hover:shadow-[0_0_20px_rgba(255,255,255,0.15)]"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>Novo Registro</span>
                 </button>
               </div>
             </div>
@@ -1053,6 +1174,147 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                 {isSaving ? 'Salvando...' : 'Salvar Alterações'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Novo Registro de Acompanhamento */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 bg-primary/20 backdrop-blur-md z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+          <div data-dropdown-root="true" className="relative bg-surface-container-lowest w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl shadow-[0px_24px_48px_rgba(0,0,0,0.15)] overflow-visible border border-white/20 animate-in zoom-in-95 duration-300">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#1c2e4a] to-[#253c61] px-5 sm:px-8 md:px-10 py-5 sm:py-6 flex justify-between items-center relative shrink-0">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]">
+                  <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white text-base sm:text-lg md:text-xl font-black tracking-tight leading-tight">Novo Registro de Acompanhamento</h3>
+                  {createSelectedPaciente && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                      <p className="text-white/60 text-[10px] sm:text-xs font-medium uppercase tracking-widest truncate max-w-[200px] sm:max-w-[300px]">
+                        Paciente: {createSelectedPaciente.nome}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button onClick={resetCreateModal} className="p-2 -mr-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-all duration-300 hover:rotate-90">
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto custom-scrollbar-modal flex-1 p-5 sm:p-8 md:p-10">
+              <form id="create-acompanhamento-form" onSubmit={handleSaveCreate}>
+                {/* Patient Search */}
+                {!createSelectedPaciente ? (
+                  <div className="space-y-4 mb-6">
+                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
+                      <div className="p-1 rounded bg-primary/5"><Users className="w-3.5 h-3.5" /></div>
+                      Buscar Paciente por Nome ou CNS *
+                    </label>
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/30" />
+                      <input
+                        type="text"
+                        value={createPacienteSearch}
+                        onChange={(e) => setCreatePacienteSearch(e.target.value)}
+                        placeholder="Digite o nome ou CNS do paciente..."
+                        className="w-full pl-12 pr-4 py-4 bg-surface-container-low border-2 border-outline-variant/20 rounded-2xl text-base font-bold text-on-surface focus:border-primary/40 outline-none transition-all placeholder:text-on-surface-variant/30"
+                        autoFocus
+                      />
+                    </div>
+                    {createPacienteResults.length > 0 && (
+                      <div className="bg-white border border-outline-variant/20 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                        {createPacienteResults.map(p => (
+                          <button key={p.id} type="button"
+                            onClick={() => { setCreateSelectedPaciente(p); setCreatePacienteSearch(''); setCreatePacienteResults([]); }}
+                            className="w-full text-left px-4 py-3 hover:bg-primary/5 transition-colors border-b border-outline-variant/10 last:border-0"
+                          >
+                            <p className="text-sm font-black text-primary uppercase">{p.nome}</p>
+                            <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase">CNS: {p.cns || '--'} | {p.unidade || '--'} | {p.equipe || '--'}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {isSearchingPaciente && (
+                      <p className="text-xs font-bold text-on-surface-variant/40 uppercase text-center py-4">Buscando...</p>
+                    )}
+                    {!isSearchingPaciente && createPacienteSearch.length >= 2 && createPacienteResults.length === 0 && (
+                      <p className="text-xs font-bold text-on-surface-variant/40 uppercase text-center py-4">Nenhum paciente encontrado</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5 sm:gap-y-6">
+                    {/* Selected patient chip */}
+                    <div className="col-span-1 md:col-span-2 flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span className="text-sm font-black text-emerald-700 uppercase">{createSelectedPaciente.nome}</span>
+                      <span className="text-[10px] font-bold text-emerald-500">CNS: {createSelectedPaciente.cns}</span>
+                      <button type="button" onClick={() => setCreateSelectedPaciente(null)} className="ml-auto text-emerald-400 hover:text-emerald-700">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Date */}
+                    <div className="space-y-2 group/field">
+                      <DatePickerPTBR label="Data da Busca" value={createDate} isISO={false} onChange={setCreateDate} />
+                    </div>
+
+                    {/* Tipo de Busca */}
+                    <SingleSelect label="Tipo de Busca" placeholder="Selecione" options={TIPO_BUSCA_OPTIONS} value={createTipoBusca} onChange={setCreateTipoBusca} required icon={<Search className="w-3.5 h-3.5" />} showSearch={false} />
+
+                    {/* Tipo de Contato */}
+                    <SingleSelect label="Tipo de Contato" placeholder="Selecione uma modalidade" options={TIPO_CONTATO_OPTIONS} value={createTipoContato} onChange={setCreateTipoContato} required icon={<Phone className="w-3.5 h-3.5" />} showSearch={false} />
+
+                    {/* Entraves Informado Por */}
+                    <SingleSelect label="Entrave(s) Informado Por" placeholder="Selecione" options={ENTRAVES_INFORMADO_POR_OPTIONS} value={createEntravesInformadoPor} onChange={setCreateEntravesInformadoPor} icon={<Info className="w-3.5 h-3.5" />} showSearch={false} />
+
+                    {/* Situação Pós Busca */}
+                    <SingleSelect label="Situação Pós Busca Ativa" placeholder="Selecione o desfecho da busca" className="col-span-1 md:col-span-2" options={SITUACAO_POS_BUSCA_OPTIONS} value={createSituacao} onChange={setCreateSituacao} required icon={<Info className="w-3.5 h-3.5" />} showSearch={false} />
+
+                    {/* Entraves Identificados */}
+                    <MultiSelect label="Entraves Identificados" placeholder="Selecione" className="col-span-1 md:col-span-2" options={ENTRAVES_IDENTIFICADOS_OPTIONS} value={createEntraves} onChange={setCreateEntraves} showSearch={false} />
+
+                    {/* Observações */}
+                    <div className="col-span-1 md:col-span-2 space-y-2 group/field">
+                      <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
+                        <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
+                          <MessageSquare className="w-3.5 h-3.5" />
+                        </div>
+                        Observações Detalhadas
+                      </label>
+                      <textarea
+                        value={createObservacoes}
+                        onChange={(e) => setCreateObservacoes(e.target.value)}
+                        className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-4 resize-none transition-all outline-none placeholder:text-outline-variant/60 shadow-sm hover:border-primary/40 min-h-[120px]"
+                        rows={4}
+                        placeholder="Informações adicionais relevantes..."
+                      ></textarea>
+                    </div>
+                  </div>
+                )}
+              </form>
+            </div>
+
+            {/* Footer */}
+            {createSelectedPaciente && (
+              <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 p-5 sm:p-6 md:px-10 md:py-6 border-t border-outline-variant/10 bg-surface-container-lowest shrink-0 z-10">
+                <button type="button" onClick={resetCreateModal} disabled={isSaving} className="px-6 sm:px-8 py-3 rounded-xl text-sm font-bold text-primary hover:bg-primary/5 transition-all border border-transparent hover:border-primary/10 w-full sm:w-auto order-2 sm:order-1 disabled:opacity-50">
+                  Descartar
+                </button>
+                <button type="submit" form="create-acompanhamento-form" disabled={isSaving} className="px-8 sm:px-10 py-3.5 rounded-xl text-sm font-black uppercase tracking-widest text-white bg-gradient-to-r from-[#1c2e4a] to-[#253c61] hover:from-[#253c61] hover:to-[#1c2e4a] transition-all shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center gap-2 w-full sm:w-auto justify-center order-1 sm:order-2">
+                  {isSaving ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                  )}
+                  {isSaving ? 'Salvando...' : 'Salvar Registro'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
