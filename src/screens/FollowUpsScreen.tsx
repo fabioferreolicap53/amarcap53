@@ -623,7 +623,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       
       <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 no-scrollbar">
         <LoadingOverlay visible={isLoading} message="Sincronizando registros..." />
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-[1600px] mx-auto">
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
             <div className="bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-10 rounded-[2.5rem] shadow-2xl col-span-1 md:col-span-2 lg:col-span-4 flex flex-col md:flex-row items-center justify-between gap-10 relative overflow-hidden group">

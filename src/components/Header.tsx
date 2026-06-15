@@ -27,8 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'resumo', label: 'Resumo', icon: LayoutDashboard },
     { id: 'pacientes', label: 'Pacientes', icon: Users },
     { id: 'favoritos', label: 'Favoritos', icon: Star },
-    { id: 'acompanhamento', label: 'Acomp.', icon: ClipboardList },
-    { id: 'configuracoes', label: 'Config.', icon: Settings },
+    { id: 'acompanhamento', label: 'Acompanhamentos', icon: ClipboardList },
   ];
 
   return (
@@ -120,8 +119,6 @@ export const Header: React.FC<HeaderProps> = ({
           })}
         </nav>
 
-        <div className="w-px h-8 bg-white/10 mx-1 xl:mx-2 shrink-0"></div>
-
         {/* Informações do Usuário - Adaptável conforme Perfil */}
         <div className="hidden xl:flex items-center gap-6 border-l border-white/10 pl-6 ml-1 min-w-0">
           {user && (
@@ -186,12 +183,17 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="text-[8px] font-black text-blue-200/70 uppercase tracking-wider">{(user?.role === 'admin' || user?.role === 'cap') ? 'ADMIN' : user?.role?.toUpperCase()}</span>
             </div>
           </div>
-          <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-white/20 to-white/5 flex items-center justify-center text-white font-black text-sm ring-1 ring-white/20 shadow-lg shrink-0">
-            {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
-          </div>
         </div>
 
-        <button 
+        <button
+          onClick={() => setActiveTab?.('configuracoes')}
+          className="p-2 md:p-2.5 hover:bg-white/10 rounded-xl transition-all duration-300 text-white/60 hover:text-white group border border-transparent hover:border-white/20 shrink-0"
+          title="Configurações"
+        >
+          <Settings className="w-4 h-4 md:w-5 md:h-5 group-hover:scale-110 transition-transform" />
+        </button>
+
+        <button
           onClick={logout}
           className="p-2 md:p-2.5 hover:bg-red-500/20 rounded-xl transition-all duration-300 text-white/60 hover:text-red-400 group border border-transparent hover:border-red-500/30 shrink-0"
           title="Sair"
