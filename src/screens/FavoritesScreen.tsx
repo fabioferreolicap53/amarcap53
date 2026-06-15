@@ -656,9 +656,11 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       tipo_busca: getCanonicalSelectValue(modalTipoBusca, TIPO_BUSCA_OPTIONS),
       tipo_contato: getCanonicalSelectValue(modalTipoContato, TIPO_CONTATO_OPTIONS),
       situacao_pos_busca: getCanonicalSelectValue(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS),
-      entraves_identificados: Array.isArray(modalEntraves) 
-        ? modalEntraves.filter(v => v).join('; ') 
-        : modalEntraves || '',
+      entraves_identificados: JSON.stringify(
+        Array.isArray(modalEntraves)
+          ? modalEntraves.filter(v => v)
+          : modalEntraves ? [modalEntraves] : []
+      ),
       entraves_informado_por: getCanonicalSelectValue(modalEntravesInformadoPor, ENTRAVES_INFORMADO_POR_OPTIONS),
       observacoes: modalObservacoes,
     };

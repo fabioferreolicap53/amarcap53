@@ -451,9 +451,11 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       data_busca: dataBuscaIso || rawDate,
       tipo_contato: rawTipoContato.normalize('NFC'),
       situacao_pos_busca: getSelectLabel(selectedAcompanhamento.situacao_pos_busca, SITUACAO_POS_BUSCA_OPTIONS),
-      entraves_identificados: Array.isArray(selectedAcompanhamento.entraves_identificados) 
-        ? selectedAcompanhamento.entraves_identificados.filter(v => v)
-        : selectedAcompanhamento.entraves_identificados ? [selectedAcompanhamento.entraves_identificados] : [],
+      entraves_identificados: JSON.stringify(
+        Array.isArray(selectedAcompanhamento.entraves_identificados)
+          ? selectedAcompanhamento.entraves_identificados.filter(v => v)
+          : selectedAcompanhamento.entraves_identificados ? [selectedAcompanhamento.entraves_identificados] : []
+      ),
       entraves_informado_por: getSelectLabel(selectedAcompanhamento.entraves_informado_por, ENTRAVES_INFORMADO_POR_OPTIONS),
       observacoes: selectedAcompanhamento.observacoes || '',
     };
