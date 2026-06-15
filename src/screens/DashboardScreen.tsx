@@ -648,7 +648,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                   </div>
                   <h1 className="text-2xl md:text-[2.5rem] font-black tracking-tight uppercase leading-none">Resumo <span className="text-blue-300 opacity-50">Geral</span></h1>
                 </div>
-                <p className="text-base md:text-lg text-white/70 font-medium leading-relaxed max-w-xl mx-auto md:mx-0">
+                <p className="text-base md:text-lg text-white/70 font-medium leading-relaxed md:whitespace-nowrap mx-auto md:mx-0">
                   Olá, <span className="text-white font-black">{user?.name || 'Profissional'}</span>! Acompanhe o panorama atualizado do seu território.
                 </p>
               </div>
