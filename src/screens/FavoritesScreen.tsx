@@ -711,7 +711,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
         <div className="max-w-[1600px] mx-auto">
           
           <div className="grid grid-cols-1 gap-4 md:gap-6 mb-8 md:mb-10">
-            <div className="bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-4 md:p-10 rounded-2xl md:rounded-[2.5rem] shadow-2xl flex flex-col items-center justify-between gap-4 md:gap-10 relative overflow-hidden group">
+            <div className="bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-4 md:p-10 rounded-2xl md:rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row items-center justify-between gap-4 md:gap-10 relative overflow-hidden group">
               <div className="absolute -top-24 -right-24 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl group-hover:bg-amber-500/20 transition-all duration-700"></div>
 
               <div className="relative z-10 flex flex-col md:flex-row items-center gap-4 md:gap-8 w-full md:w-auto">

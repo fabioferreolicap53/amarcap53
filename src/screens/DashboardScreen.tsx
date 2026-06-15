@@ -638,15 +638,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           
           <div className="flex flex-col gap-6 mb-8 items-center lg:items-stretch justify-center">
             {/* Card Principal de Boas-vindas */}
-            <div className="w-full bg-gradient-to-br from-[#051934] via-[#0a2347] to-[#112d5a] p-6 md:p-10 rounded-[2.5rem] text-white relative overflow-hidden group shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
+            <div className="w-full bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-4 md:p-10 rounded-2xl md:rounded-[2.5rem] text-white relative overflow-hidden group shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 md:gap-10 text-center md:text-left">
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl group-hover:bg-white/10 transition-all duration-700"></div>
               
               <div className="relative z-10 flex-1">
                 <div className="flex items-center justify-center md:justify-start gap-3 mb-4">
-                  <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center ring-1 ring-white/20 shadow-inner">
-                    <LayoutDashboard className="w-6 h-6 text-blue-300" />
+                  <div className="w-16 h-16 md:w-20 md:h-20 bg-white/10 backdrop-blur-md rounded-2xl md:rounded-3xl flex items-center justify-center ring-1 ring-white/20 shadow-inner">
+                    <LayoutDashboard className="w-8 h-8 md:w-10 md:h-10 text-blue-300" />
                   </div>
-                  <h1 className="text-2xl md:text-3xl font-black tracking-tight uppercase">Resumo <span className="text-blue-300 opacity-50">Geral</span></h1>
+                  <h1 className="text-2xl md:text-[2.5rem] font-black tracking-tight uppercase leading-none">Resumo <span className="text-blue-300 opacity-50">Geral</span></h1>
                 </div>
                 <p className="text-base md:text-lg text-white/70 font-medium leading-relaxed max-w-xl mx-auto md:mx-0">
                   Olá, <span className="text-white font-black">{user?.name || 'Profissional'}</span>! Acompanhe o panorama atualizado do seu território.
@@ -655,18 +655,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
               {/* Botão de Filtro */}
               <div className="relative z-10">
-                <button 
+                <button
                   onClick={() => setIsFilterVisible(!isFilterVisible)}
-                  className={`flex items-center gap-3 px-6 h-14 rounded-[1.25rem] text-[11px] font-black uppercase tracking-widest transition-all duration-500 border ${
+                  className={`flex items-center gap-2 md:gap-3 px-4 md:px-8 h-12 md:h-14 rounded-2xl text-[10px] md:text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
                     isFilterVisible || filterUnidade.length > 0 || filterEquipe.length > 0 || filterMicroarea.length > 0 || filterDataInicio || filterDataFim
-                      ? 'bg-primary text-white border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)]' 
+                      ? 'bg-primary text-white border-primary shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]'
                       : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
                   }`}
                 >
-                  <Filter className="w-4 h-4" />
-                  <span>Filtros</span>
+                  <Filter className="w-4 h-4 md:w-5 md:h-5" />
+                  <span className="hidden sm:inline">Filtros</span>
                   {(filterUnidade.length > 0 || filterEquipe.length > 0 || filterMicroarea.length > 0 || filterDataInicio || filterDataFim) && (
-                    <div className="w-5 h-5 flex items-center justify-center bg-white text-primary text-[9px] rounded-full font-black animate-pulse">
+                    <div className="w-5 h-5 md:w-6 md:h-6 flex items-center justify-center bg-white text-primary text-[9px] md:text-[10px] rounded-full font-black animate-pulse">
                       {[filterUnidade, filterEquipe, filterMicroarea].filter(f => f.length > 0).length + (filterDataInicio || filterDataFim ? 1 : 0)}
                     </div>
                   )}
