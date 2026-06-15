@@ -711,47 +711,47 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
         <div className="max-w-[1600px] mx-auto">
           
           <div className="grid grid-cols-1 gap-4 md:gap-6 mb-8 md:mb-10">
-            <div className="bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-8 md:p-10 rounded-[2rem] shadow-2xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group">
+            <div className="bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-4 md:p-10 rounded-2xl md:rounded-[2.5rem] shadow-2xl flex flex-col items-center justify-between gap-4 md:gap-10 relative overflow-hidden group">
               <div className="absolute -top-24 -right-24 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl group-hover:bg-amber-500/20 transition-all duration-700"></div>
-              
-              <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 w-full md:w-auto">
-                <div className="w-20 h-20 rounded-3xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
-                  <Star className="w-10 h-10 text-amber-400 fill-amber-400" />
+
+              <div className="relative z-10 flex flex-col md:flex-row items-center gap-4 md:gap-8 w-full md:w-auto">
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl md:rounded-3xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
+                  <Star className="w-8 h-8 md:w-10 md:h-10 text-amber-400 fill-amber-400" />
                 </div>
                 <div className="text-center md:text-left">
-                  <p className="text-xs md:text-sm font-black text-white/40 uppercase tracking-[0.3em] mb-2">Monitoramento Prioritário</p>
-                  <p className="text-4xl md:text-[3.5rem] font-black text-white leading-none tracking-tighter">
-                    {filteredPacientes.length} <span className="text-lg font-bold text-white/60 ml-2 tracking-normal uppercase">Favoritos</span>
+                  <p className="text-[10px] md:text-sm font-black text-white/40 uppercase tracking-[0.3em] mb-2">Monitoramento Prioritário</p>
+                  <p className="text-2xl md:text-[3.5rem] font-black text-white leading-none tracking-tighter">
+                    {filteredPacientes.length} <span className="text-sm md:text-lg font-bold text-white/60 ml-2 tracking-normal uppercase">Favoritos</span>
                   </p>
                 </div>
               </div>
 
               {/* Botões de Busca e Filtro */}
-              <div className="relative z-10 flex items-center gap-4 w-full md:w-auto justify-center md:justify-end">
-                <button 
+              <div className="relative z-10 flex items-center gap-3 md:gap-4 w-full md:w-auto justify-center md:justify-end">
+                <button
                   onClick={() => setIsSearchVisible(!isSearchVisible)}
-                  className={`w-14 h-14 flex items-center justify-center rounded-2xl transition-all duration-500 border ${
-                    isSearchVisible 
-                      ? 'bg-white text-primary border-white shadow-[0_0_20px_rgba(255,255,255,0.3)]' 
+                  className={`w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-2xl transition-all duration-500 border ${
+                    isSearchVisible
+                      ? 'bg-white text-primary border-white shadow-[0_0_20px_rgba(255,255,255,0.3)]'
                       : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
                   }`}
                   title="Ativar Busca"
                 >
-                  <Search className={`w-6 h-6 transition-transform duration-500 ${isSearchVisible ? 'scale-110' : ''}`} />
+                  <Search className={`w-5 h-5 md:w-6 md:h-6 transition-transform duration-500 ${isSearchVisible ? 'scale-110' : ''}`} />
                 </button>
 
-                <button 
+                <button
                   onClick={() => setIsFilterVisible(!isFilterVisible)}
-                  className={`flex items-center gap-3 px-8 h-14 rounded-2xl text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
+                  className={`flex items-center gap-2 md:gap-3 px-4 md:px-8 h-12 md:h-14 rounded-2xl text-[10px] md:text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
                     isFilterVisible || filterStatus.length > 0 || filterGrupo.length > 0 || filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0
-                      ? 'bg-primary text-white border-primary shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]' 
+                      ? 'bg-primary text-white border-primary shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]'
                       : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
                   }`}
                 >
-                  <Filter className="w-5 h-5" />
-                  <span>Filtros</span>
+                  <Filter className="w-4 h-4 md:w-5 md:h-5" />
+                  <span className="hidden sm:inline">Filtros</span>
                   {(filterStatus.length > 0 || filterGrupo.length > 0 || filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0) && (
-                    <div className="w-6 h-6 flex items-center justify-center bg-white text-primary text-[10px] rounded-full font-black animate-pulse">
+                    <div className="w-5 h-5 md:w-6 md:h-6 flex items-center justify-center bg-white text-primary text-[9px] md:text-[10px] rounded-full font-black animate-pulse">
                       {[filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal].filter(f => f.length > 0).length}
                     </div>
                   )}

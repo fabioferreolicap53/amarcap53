@@ -376,6 +376,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         setAcompanhamentos(records);
         setFUCache(records);
       } catch (error) {
+        if (cancelled) return;
         console.error('Erro ao buscar acompanhamentos:', error);
       } finally {
         setIsLoading(false);
@@ -623,49 +624,49 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         <div className="max-w-[1600px] mx-auto">
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-            <div className="bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-10 rounded-[2.5rem] shadow-2xl col-span-1 md:col-span-2 lg:col-span-4 flex flex-col md:flex-row items-center justify-between gap-10 relative overflow-hidden group">
+            <div className="bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-4 md:p-10 rounded-2xl md:rounded-[2.5rem] shadow-2xl col-span-1 md:col-span-2 lg:col-span-4 flex flex-col items-center justify-between gap-4 md:gap-10 relative overflow-hidden group">
               {/* Efeitos de luz no fundo */}
               <div className="absolute -top-24 -right-24 w-80 h-80 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all duration-1000"></div>
               <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all duration-1000"></div>
 
-              <div className="relative z-10 flex flex-col md:flex-row items-center gap-10 w-full md:w-auto">
-                <div className="w-24 h-24 rounded-[2rem] bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
-                  <ClipboardList className="w-12 h-12 text-white" />
+              <div className="relative z-10 flex flex-col md:flex-row items-center gap-4 md:gap-10 w-full md:w-auto">
+                <div className="w-16 h-16 md:w-24 md:h-24 rounded-2xl md:rounded-[2rem] bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner group-hover:scale-105 transition-transform duration-500">
+                  <ClipboardList className="w-8 h-8 md:w-12 md:h-12 text-white" />
                 </div>
                 <div className="text-center md:text-left">
-                  <p className="text-xs md:text-sm font-black text-white/40 uppercase tracking-[0.4em] mb-3">Histórico de Ações</p>
-                  <p className="text-4xl md:text-[3.5rem] font-black text-white leading-none tracking-tighter">
-                    {stats.total} <span className="text-lg font-bold text-white/60 ml-2 tracking-normal uppercase">Registros</span>
+                  <p className="text-[10px] md:text-sm font-black text-white/40 uppercase tracking-[0.4em] mb-2 md:mb-3">Histórico de Ações</p>
+                  <p className="text-2xl md:text-[3.5rem] font-black text-white leading-none tracking-tighter">
+                    {stats.total} <span className="text-sm md:text-lg font-bold text-white/60 ml-2 tracking-normal uppercase">Registros</span>
                   </p>
                 </div>
               </div>
 
-              {/* Botões de Ação Criativos */}
-              <div className="relative z-10 flex items-center gap-4 w-full md:w-auto justify-center md:justify-end">
-                <button 
+              {/* Botões de Ação */}
+              <div className="relative z-10 flex items-center gap-3 md:gap-4 w-full md:w-auto justify-center md:justify-end">
+                <button
                   onClick={() => setIsSearchVisible(!isSearchVisible)}
-                  className={`w-16 h-16 flex items-center justify-center rounded-[1.5rem] transition-all duration-500 border ${
-                    isSearchVisible 
-                      ? 'bg-white text-primary border-white shadow-[0_0_25px_rgba(255,255,255,0.4)]' 
+                  className={`w-12 h-12 md:w-16 md:h-16 flex items-center justify-center rounded-2xl md:rounded-[1.5rem] transition-all duration-500 border ${
+                    isSearchVisible
+                      ? 'bg-white text-primary border-white shadow-[0_0_25px_rgba(255,255,255,0.4)]'
                       : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
                   }`}
                   title="Ativar Busca"
                 >
-                  <Search className={`w-7 h-7 transition-transform duration-500 ${isSearchVisible ? 'scale-110' : ''}`} />
+                  <Search className={`w-5 h-5 md:w-7 md:h-7 transition-transform duration-500 ${isSearchVisible ? 'scale-110' : ''}`} />
                 </button>
 
-                <button 
+                <button
                   onClick={() => setIsFilterVisible(!isFilterVisible)}
-                  className={`flex items-center gap-4 px-10 h-16 rounded-[1.5rem] text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
+                  className={`flex items-center gap-2 md:gap-4 px-4 md:px-10 h-12 md:h-16 rounded-2xl md:rounded-[1.5rem] text-[10px] md:text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
                     isFilterVisible || filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDataInicio || filterDataFim || filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0
-                      ? 'bg-primary text-white border-primary shadow-[0_0_25px_rgba(var(--primary-rgb),0.4)]' 
+                      ? 'bg-primary text-white border-primary shadow-[0_0_25px_rgba(var(--primary-rgb),0.4)]'
                       : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
                   }`}
                 >
-                  <Filter className="w-6 h-6" />
-                  <span>Filtros</span>
+                  <Filter className="w-4 h-4 md:w-6 md:h-6" />
+                  <span className="hidden sm:inline">Filtros</span>
                   {(filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDataInicio || filterDataFim || filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0) && (
-                    <div className="w-7 h-7 flex items-center justify-center bg-white text-primary text-[11px] rounded-full font-black animate-pulse">
+                    <div className="w-5 h-5 md:w-7 md:h-7 flex items-center justify-center bg-white text-primary text-[9px] md:text-[11px] rounded-full font-black animate-pulse">
                       {[filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal].filter(f => f.length > 0).length + (filterDataInicio || filterDataFim ? 1 : 0)}
                     </div>
                   )}
@@ -673,10 +674,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
                 <button
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="flex items-center gap-3 px-8 h-16 rounded-[1.5rem] text-sm font-black uppercase tracking-widest transition-all duration-500 border bg-white/10 text-white border-white/20 hover:bg-white/20 hover:border-white/30 hover:shadow-[0_0_20px_rgba(255,255,255,0.15)]"
+                  className="flex items-center gap-2 md:gap-3 px-4 md:px-8 h-12 md:h-16 rounded-2xl md:rounded-[1.5rem] text-[10px] md:text-sm font-black uppercase tracking-widest transition-all duration-500 border bg-white/10 text-white border-white/20 hover:bg-white/20 hover:border-white/30 hover:shadow-[0_0_20px_rgba(255,255,255,0.15)]"
                 >
-                  <Plus className="w-5 h-5" />
-                  <span>Novo Registro</span>
+                  <Plus className="w-4 h-4 md:w-5 md:h-5" />
+                  <span className="hidden sm:inline">Novo Registro</span>
                 </button>
               </div>
             </div>

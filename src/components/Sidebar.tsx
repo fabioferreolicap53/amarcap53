@@ -17,7 +17,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     { id: 'pacientes', label: 'Meus Pacientes', icon: Users },
     { id: 'favoritos', label: 'Favoritos', icon: Star },
     { id: 'acompanhamento', label: 'Acompanhamentos', icon: ClipboardList },
-    { id: 'configuracoes', label: 'Configurações', icon: Settings },
   ];
 
   const handleNavClick = (id: string) => {
@@ -74,14 +73,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           <div className="px-2">
             <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#051934] to-[#1c2e4a] flex items-center justify-center text-white font-black text-sm shadow-md ring-1 ring-white/20">
-                  {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
-                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-black text-[#051934] dark:text-white leading-none truncate">
                     {user.name || user.email}
                   </p>
                 </div>
+                <button
+                  onClick={() => handleNavClick('configuracoes')}
+                  className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all"
+                  title="Configurações"
+                >
+                  <Settings className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                </button>
               </div>
               
               <button 
