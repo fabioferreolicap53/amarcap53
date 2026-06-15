@@ -25,7 +25,7 @@ import {
 
 // Remove acentos via Unicode NFD decomposition (ex: "ESPERANÇA" → "ESPERANCA")
 const normalizeText = (str: string) =>
-  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim().replace(/\s+/g, ' ');
 
 interface Acompanhamento {
   id: string;
@@ -58,7 +58,8 @@ const matchesMultiValueField = (rawValue: string | string[] | undefined, selecte
   if (!rawValue || (Array.isArray(rawValue) && rawValue.length === 0)) return false;
 
   const values = Array.isArray(rawValue) ? rawValue : rawValue.split('; ');
-  return values.some(v => selectedValues.includes(v));
+  const normSelected = new Set(selectedValues.map(normalizeText));
+  return values.some(v => normSelected.has(normalizeText(v)));
 };
 
 const SIM_NAO_OPTIONS = [
@@ -141,28 +142,64 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     return acomp.tipo_contato || '';
   };
 
-  // Estatísticas Calculadas com useMemo para persistência e performance
+  // Registros filtrados pelo cliente (busca + filtros UI) — usado por stats E tabela
+  const filteredRecords = useMemo(() => {
+    return acompanhamentos.filter(acomp => {
+      const search = searchTerm.toLowerCase();
+      const patientName = (acomp.expand?.paciente?.nome || '').toLowerCase();
+      const cns = (acomp.expand?.paciente?.cns || '').toLowerCase();
+      const date = acomp.data_busca ? new Date(acomp.data_busca).toLocaleDateString('pt-BR').toLowerCase() : '';
+
+      const matchesSearch = !searchTerm || patientName.includes(search) || cns.includes(search) || date.includes(search);
+      const matchesTipoBusca = matchesSelectFilter(acomp.tipo_busca, filterTipoBusca, TIPO_BUSCA_OPTIONS);
+      const matchesTipoContato = matchesSelectFilter(acomp.tipo_contato, filterTipoContato, TIPO_CONTATO_OPTIONS);
+      const matchesSituacao = matchesSelectFilter(acomp.situacao_pos_busca, filterSituacao, SITUACAO_POS_BUSCA_OPTIONS);
+      const matchesEntraves = matchesMultiValueField(acomp.entraves_identificados, filterEntraves);
+
+      let matchesData = true;
+      if (acomp.data_busca) {
+        const dataAcomp = new Date(acomp.data_busca);
+        dataAcomp.setHours(0, 0, 0, 0);
+        if (filterDataInicio) {
+          const dInicio = new Date(filterDataInicio);
+          dInicio.setHours(0, 0, 0, 0);
+          if (dataAcomp < dInicio) matchesData = false;
+        }
+        if (filterDataFim) {
+          const dFim = new Date(filterDataFim);
+          dFim.setHours(0, 0, 0, 0);
+          if (dataAcomp > dFim) matchesData = false;
+        }
+      } else if (filterDataInicio || filterDataFim) {
+        matchesData = false;
+      }
+
+      return matchesSearch && matchesTipoBusca && matchesTipoContato && matchesSituacao && matchesEntraves && matchesData;
+    });
+  }, [acompanhamentos, searchTerm, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim]);
+
+  // Estatísticas Calculadas a partir dos registros filtrados
   const stats = useMemo(() => {
-    const total = acompanhamentos.length;
-    const contatos = acompanhamentos.filter(a => {
+    const total = filteredRecords.length;
+    const contatos = filteredRecords.filter(a => {
       const val = String(a.tipo_contato || '').toLowerCase();
       return val && !val.includes('não houve contato');
     }).length;
-    
-    const falhas = acompanhamentos.filter(a => {
+
+    const falhas = filteredRecords.filter(a => {
       const val = String(a.tipo_contato || '').toLowerCase();
       return val && val.includes('não houve contato');
     }).length;
-    
-    const agendamentos = acompanhamentos.filter(a => {
+
+    const agendamentos = filteredRecords.filter(a => {
       const val = String(a.situacao_pos_busca || '').toLowerCase();
       return val && val.includes('agendamento');
     }).length;
-    
+
     const counts: Record<string, number> = {};
     const totalCounts: Record<string, number> = {};
 
-    const validAcomps = acompanhamentos
+    const validAcomps = filteredRecords
       .map(a => ({ ...a, canal_label: getCanalLabel(a) }))
       .filter(a => a.canal_label);
 
@@ -173,10 +210,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         counts[a.canal_label] = (counts[a.canal_label] || 0) + 1;
       }
     });
-    
+
     const sorted = Object.entries(counts).sort(([,a], [,b]) => b - a);
     let canalEfetivo = { label: '--', count: 0 };
-    
+
     if (sorted.length > 0) {
       const topLabel = sorted[0][0];
       canalEfetivo = {
@@ -184,7 +221,6 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         count: sorted[0][1]
       };
     } else if (validAcomps.length > 0) {
-      // Fallback para o canal mais usado geral, mesmo sem agendamento
       const sortedTotal = Object.entries(totalCounts).sort(([,a], [,b]) => b - a);
       if (sortedTotal.length > 0) {
         const topLabel = sortedTotal[0][0];
@@ -196,7 +232,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     }
 
     return { total, contatos, falhas, agendamentos, canalEfetivo };
-  }, [acompanhamentos]);
+  }, [filteredRecords]);
 
   useEffect(() => {
     const fetchAcompanhamentos = async () => {
@@ -234,29 +270,67 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           patientRegionFilterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
         }
 
-        // Fetch patient IDs for region/role scoping (replaces unreliable paciente.unidade filter syntax)
-        let scopedAcompPatientIds: string[] = [];
-        if (patientRegionFilterParts.length > 0) {
-          const regionFilter = patientRegionFilterParts.join(' && ');
-          const regionPatients = await pb.collection('amarcap53_pacientes').getFullList({
-            filter: regionFilter,
+        const buildIdFilter = (ids: string[], chunkSize = 200) => {
+          if (ids.length === 0) return null;
+          const chunks: string[][] = [];
+          for (let i = 0; i < ids.length; i += chunkSize) {
+            chunks.push(ids.slice(i, i + chunkSize));
+          }
+          return `(${chunks.map(chunk => `(${chunk.map(id => `paciente = "${id}"`).join(' || ')})`).join(' || ')})`;
+        };
+
+        // Parallel: fetch region patient IDs + SIM/NÃO patient IDs (2x faster)
+        const regionPromise = (patientRegionFilterParts.length > 0)
+          ? pb.collection('amarcap53_pacientes').getFullList({
+              filter: patientRegionFilterParts.join(' && '),
+              batch: 500,
+              requestKey: null,
+              fields: 'id'
+            }).then(r => r.map(p => p.id).filter(Boolean))
+          : Promise.resolve([]);
+
+        const simNaoFilter = (field: string, vals: string[]) => {
+          if (vals.length === 0) return null;
+          const wantSim = vals.includes('SIM');
+          const wantNao = vals.includes('NÃO');
+          if (wantSim && wantNao) return null;
+          if (wantSim) return `${field} != ""`;
+          if (wantNao) return `${field} = ""`;
+          return null;
+        };
+        const hasSimNaoFilter = filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0;
+        const simNaoPromise = hasSimNaoFilter ? (() => {
+          const patFilters: string[] = [];
+          const f1 = simNaoFilter('dna_hpv_pep', filterDnaHpvPep);
+          if (f1) patFilters.push(f1);
+          const f2 = simNaoFilter('cito_lab', filterCitoLab);
+          if (f2) patFilters.push(f2);
+          const f3 = simNaoFilter('cito_pep', filterCitoPep);
+          if (f3) patFilters.push(f3);
+          const f4 = simNaoFilter('dna_hpv_gal', filterDnaHpvGal);
+          if (f4) patFilters.push(f4);
+          if (patFilters.length === 0) return Promise.resolve([]);
+          return pb.collection('amarcap53_pacientes').getFullList({
+            filter: patFilters.join(' && '),
+            fields: 'id',
             batch: 500,
-            requestKey: null,
-            fields: 'id'
-          });
-          scopedAcompPatientIds = regionPatients.map(p => p.id).filter(Boolean);
-        }
+            requestKey: null
+          }).then(r => r.map(p => p.id).filter(Boolean));
+        })() : Promise.resolve([]);
+
+        const [regionPatientIds, simNaoPatientIds] = await Promise.all([regionPromise, simNaoPromise]);
 
         const acompFilters = [];
-        // Add patient ID filter for role/region scoping
-        if (scopedAcompPatientIds.length > 0) {
-          const chunkSize = 200;
-          const idChunks: string[][] = [];
-          for (let i = 0; i < scopedAcompPatientIds.length; i += chunkSize) {
-            idChunks.push(scopedAcompPatientIds.slice(i, i + chunkSize));
+        const regionIdFilter = buildIdFilter(regionPatientIds);
+        if (regionIdFilter) acompFilters.push(regionIdFilter);
+
+        if (hasSimNaoFilter) {
+          const simNaoIdFilter = buildIdFilter(simNaoPatientIds);
+          if (simNaoIdFilter) {
+            acompFilters.push(simNaoIdFilter);
+          } else {
+            acompFilters.push('id = "none"');
           }
-          const idFilterStr = idChunks.map(chunk => `(${chunk.map(id => `paciente = "${id}"`).join(' || ')})`).join(' || ');
-          acompFilters.push(`(${idFilterStr})`);
         }
 
         // Outros Filtros UI
@@ -280,54 +354,11 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           acompFilters.push(`data_busca <= "${filterDataFim} 23:59:59"`);
         }
 
-        // If SIM/NÃO filters active, pre-filter patient IDs server-side
-        const hasSimNaoFilter = filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0;
-        if (hasSimNaoFilter) {
-          const simNaoFilter = (field: string, vals: string[]) => {
-            if (vals.length === 0) return null;
-            const wantSim = vals.includes('SIM');
-            const wantNao = vals.includes('NÃO');
-            if (wantSim && wantNao) return null;
-            if (wantSim) return `${field} != ""`;
-            if (wantNao) return `${field} = ""`;
-            return null;
-          };
-          const patFilters: string[] = [];
-          const f1 = simNaoFilter('dna_hpv_pep', filterDnaHpvPep);
-          if (f1) patFilters.push(f1);
-          const f2 = simNaoFilter('cito_lab', filterCitoLab);
-          if (f2) patFilters.push(f2);
-          const f3 = simNaoFilter('cito_pep', filterCitoPep);
-          if (f3) patFilters.push(f3);
-          const f4 = simNaoFilter('dna_hpv_gal', filterDnaHpvGal);
-          if (f4) patFilters.push(f4);
-
-          if (patFilters.length > 0) {
-            const matchingPatients = await pb.collection('amarcap53_pacientes').getFullList({
-              filter: patFilters.join(' && '),
-              fields: 'id',
-              batch: 500,
-              requestKey: null
-            });
-            const matchingIds = matchingPatients.map(p => p.id).filter(Boolean);
-            if (matchingIds.length > 0) {
-              const chunkSize = 200;
-              const idChunks: string[][] = [];
-              for (let i = 0; i < matchingIds.length; i += chunkSize) {
-                idChunks.push(matchingIds.slice(i, i + chunkSize));
-              }
-              const idFilterStr = idChunks.map(chunk => `(${chunk.map(id => `paciente = "${id}"`).join(' || ')})`).join(' || ');
-              acompFilters.push(`(${idFilterStr})`);
-            } else {
-              acompFilters.push('id = "none"');
-            }
-          }
-        }
-
         const records = await pb.collection('amarcap53_acompanhamentos').getFullList({
           sort: '-created',
           expand: 'paciente',
           filter: acompFilters.join(' && '),
+          fields: 'id,created,updated,paciente,data_busca,tipo_busca,tipo_contato,situacao_pos_busca,entraves_identificados,entraves_informado_por,observacoes,profissional,expand',
           requestKey: null
         });
         setAcompanhamentos(records);
@@ -787,7 +818,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/5">
-                  {acompanhamentos.length === 0 ? (
+                  {filteredRecords.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-6 py-20 text-center">
                         <div className="flex flex-col items-center opacity-30">
@@ -797,42 +828,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                       </td>
                     </tr>
                   ) : (
-                    acompanhamentos
-                      .filter(acomp => {
-                        const search = searchTerm.toLowerCase();
-                        const patientName = (acomp.expand?.paciente?.nome || '').toLowerCase();
-                        const cns = (acomp.expand?.paciente?.cns || '').toLowerCase();
-                        const date = acomp.data_busca ? new Date(acomp.data_busca).toLocaleDateString('pt-BR').toLowerCase() : '';
-                        
-                        const matchesSearch = patientName.includes(search) || cns.includes(search) || date.includes(search);
-                        const matchesTipoBusca = matchesSelectFilter(acomp.tipo_busca, filterTipoBusca, TIPO_BUSCA_OPTIONS);
-                        const matchesTipoContato = matchesSelectFilter(acomp.tipo_contato, filterTipoContato, TIPO_CONTATO_OPTIONS);
-                        const matchesSituacao = matchesSelectFilter(acomp.situacao_pos_busca, filterSituacao, SITUACAO_POS_BUSCA_OPTIONS);
-                        const matchesEntraves = matchesMultiValueField(acomp.entraves_identificados, filterEntraves);
-                        
-                        // Filtro de Data
-                        let matchesData = true;
-                        if (acomp.data_busca) {
-                          const dataAcomp = new Date(acomp.data_busca);
-                          dataAcomp.setHours(0, 0, 0, 0);
-
-                          if (filterDataInicio) {
-                            const dInicio = new Date(filterDataInicio);
-                            dInicio.setHours(0, 0, 0, 0);
-                            if (dataAcomp < dInicio) matchesData = false;
-                          }
-                          if (filterDataFim) {
-                            const dFim = new Date(filterDataFim);
-                            dFim.setHours(0, 0, 0, 0);
-                            if (dataAcomp > dFim) matchesData = false;
-                          }
-                        } else if (filterDataInicio || filterDataFim) {
-                          matchesData = false;
-                        }
-
-                        return matchesSearch && matchesTipoBusca && matchesTipoContato && matchesSituacao && matchesEntraves && matchesData;
-                      })
-                      .map((acomp) => {
+                    filteredRecords.map((acomp) => {
                         const p = acomp.expand?.paciente as any || {};
                         const pacienteNome = p.nome || 'Paciente Desconhecido';
                         const cns = p.cns || '--';

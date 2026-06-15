@@ -22,7 +22,7 @@ import {
 
 // Remove acentos via Unicode NFD decomposition (ex: "ESPERANÇA" → "ESPERANCA")
 const normalizeText = (str: string) =>
-  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim().replace(/\s+/g, ' ');
 
 interface Paciente {
   id: string;

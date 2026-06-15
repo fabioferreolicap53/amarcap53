@@ -168,9 +168,13 @@ export const ENTRAVES_INFORMADO_POR_OPTIONS: SelectOption[] = [
   }
 ];
 
+// Remove acentos via Unicode NFD decomposition + trim whitespace duplo
+const normalizeAccents = (str: string) =>
+  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ');
+
 const normalizeOptionText = (value: string) => {
   if (typeof value !== 'string') return '';
-  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+  return normalizeAccents(value).toLowerCase();
 };
 
 export const escapeFilterValue = (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -239,7 +243,15 @@ export const buildSelectFilter = (
   operator: '=' | '~' = '='
 ) => {
   const clauses = selectedValues.flatMap(value =>
-    getSelectAliases(value, options).map(alias => `${fieldName} ${operator} "${escapeFilterValue(alias)}"`)
+    getSelectAliases(value, options).flatMap(alias => {
+      const escaped = `${fieldName} ${operator} "${escapeFilterValue(alias)}"`;
+      const stripped = normalizeAccents(alias);
+      // Also match unaccented variant (DB may store without accents)
+      if (stripped !== alias) {
+        return [escaped, `${fieldName} ${operator} "${escapeFilterValue(stripped)}"`];
+      }
+      return [escaped];
+    })
   );
 
   return clauses.length > 0 ? `(${Array.from(new Set(clauses)).join(' || ')})` : '';
