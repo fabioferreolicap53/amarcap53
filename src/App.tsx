@@ -50,7 +50,12 @@ function AppContent() {
   }
 
   if (!user) {
-    return <AuthScreen />;
+    return (
+      <>
+        <AuthScreen />
+        <InstallBanner />
+      </>
+    );
   }
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Share, HeartPulse } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -6,67 +6,74 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+// Checa síncrono — roda na inicialização do state, antes do primeiro render
+function calcInitState(): { show: boolean; isIOS: boolean; standalone: boolean } {
+  const standalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    !!(navigator as any).standalone;
+  const isIOS =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+
+  if (standalone) return { show: false, isIOS, standalone: true };
+
+  const lastDismissed = localStorage.getItem('pwa-banner-dismissed');
+  if (lastDismissed && Date.now() - parseInt(lastDismissed) < 259200000) {
+    return { show: false, isIOS, standalone: false };
+  }
+
+  // iOS: mostra sempre (não tem beforeinstallprompt)
+  if (isIOS) return { show: true, isIOS, standalone: false };
+
+  // Já tem evento capturado pelo inline script do index.html?
+  if ((window as any).__deferredPrompt) {
+    return { show: true, isIOS, standalone: false };
+  }
+
+  return { show: false, isIOS, standalone: false };
+}
+
 export const InstallBanner: React.FC = () => {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showBanner, setShowBanner] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false);
+  const [state, setState] = useState(calcInitState);
+  const deferredRef = useRef<BeforeInstallPromptEvent | null>(
+    (window as any).__deferredPrompt || null,
+  );
+
+  const { show: showBanner, isIOS, standalone: isStandalone } = state;
 
   useEffect(() => {
-    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    const standalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+    // Se standalone, não faz nada
+    if (isStandalone) return;
 
-    setIsIOS(isIOSDevice);
-    setIsStandalone(standalone);
+    // Se já temos o evento guardado e banner já mostrando, só atualiza o ref
+    if (deferredRef.current && showBanner) return;
 
-    // Se já está rodando como standalone, nunca mostra banner
-    if (standalone) return;
-
-    // Verificar localStorage (3 dias)
-    const lastDismissed = localStorage.getItem('pwa-banner-dismissed');
-    const now = Date.now();
-    const threeDays = 3 * 24 * 60 * 60 * 1000;
-    if (lastDismissed && (now - parseInt(lastDismissed) < threeDays)) return;
-
-    // iOS: mostra banner com instruções (sem beforeinstallprompt no iOS)
-    if (isIOSDevice) {
-      setShowBanner(true);
-      return;
-    }
-
-    // Pega evento capturado pelo script inline no index.html
-    const stored = (window as any).__deferredPrompt as BeforeInstallPromptEvent | undefined;
-    if (stored) {
-      setDeferredPrompt(stored);
-      setShowBanner(true);
-      return;
-    }
-
-    // Fallback: escuta o evento caso ainda não tenha disparado
+    // Fallback: beforeinstallprompt ainda não disparou — escuta
     const handler = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setShowBanner(true);
+      deferredRef.current = e as BeforeInstallPromptEvent;
+      setState((prev) => ({ ...prev, show: true }));
     };
     window.addEventListener('beforeinstallprompt', handler);
 
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
-    };
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
+    const promptEvent = deferredRef.current;
+    if (!promptEvent) return;
+
+    await promptEvent.prompt();
+    const { outcome } = await promptEvent.userChoice;
     if (outcome === 'accepted') {
-      setShowBanner(false);
+      setState((prev) => ({ ...prev, show: false }));
     }
-    setDeferredPrompt(null);
+    deferredRef.current = null;
+    (window as any).__deferredPrompt = null;
   };
 
   const handleClose = () => {
-    setShowBanner(false);
+    setState((prev) => ({ ...prev, show: false }));
     localStorage.setItem('pwa-banner-dismissed', Date.now().toString());
   };
 
