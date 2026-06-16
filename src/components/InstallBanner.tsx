@@ -19,50 +19,57 @@ export const InstallBanner: React.FC = () => {
     setIsIOS(isIOSDevice);
     setIsStandalone(standalone);
 
-    // Se já está rodando como standalone, não mostra banner nunca
+    // Se já está rodando como standalone, nunca mostra banner
     if (standalone) return;
 
-    // Verificar se usuário fechou recentemente (3 dias)
+    // Verificar localStorage (3 dias)
     const lastDismissed = localStorage.getItem('pwa-banner-dismissed');
     const now = Date.now();
     const threeDays = 3 * 24 * 60 * 60 * 1000;
-    const shouldShow = !lastDismissed || (now - parseInt(lastDismissed) > threeDays);
+    if (lastDismissed && (now - parseInt(lastDismissed) < threeDays)) return;
 
-    if (!shouldShow) return;
-
-    // iOS: mostra banner com instruções alternativas (sem beforeinstallprompt)
+    // iOS: mostra banner com instruções (sem beforeinstallprompt no iOS)
     if (isIOSDevice) {
       setShowBanner(true);
       return;
     }
 
-    // Android/Desktop: intercepta beforeinstallprompt
+    // Pega evento que já foi capturado em main.tsx (antes do React montar)
+    const stored = (window as any).__deferredPrompt as BeforeInstallPromptEvent | undefined;
+    if (stored) {
+      setDeferredPrompt(stored);
+      setShowBanner(true);
+      return;
+    }
+
+    // Fallback: escuta o evento caso ainda não tenha disparado
     const handler = (e: Event) => {
-      e.preventDefault(); // Impede mini-infobar padrão do Chrome
+      e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setShowBanner(true);
     };
-
     window.addEventListener('beforeinstallprompt', handler);
 
-    // Se o evento não disparar em 30s, não mostra banner (app já instalado ou não suporta)
-    const timeout = setTimeout(() => {
-      if (!deferredPrompt) setShowBanner(false);
-    }, 30000);
+    // Escuta custom event disparado por main.tsx
+    const customHandler = () => {
+      const stored = (window as any).__deferredPrompt as BeforeInstallPromptEvent | undefined;
+      if (stored) {
+        setDeferredPrompt(stored);
+        setShowBanner(true);
+      }
+    };
+    window.addEventListener('pwa-install-ready', customHandler);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
-      clearTimeout(timeout);
+      window.removeEventListener('pwa-install-ready', customHandler);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
-
     await deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-
     if (outcome === 'accepted') {
       setShowBanner(false);
     }
