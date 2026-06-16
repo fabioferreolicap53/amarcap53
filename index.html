@@ -11,6 +11,14 @@
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2245%22 fill=%22%231c2e4a%22/><path d=%22M30 50 L45 50 L50 35 L60 65 L65 50 L80 50%22 stroke=%22%23ffffff%22 stroke-width=%226%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 fill=%22none%22/></svg>">
     <script>
+// Captura beforeinstallprompt ANTES de qualquer script carregar
+window.__deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', function (e) {
+  e.preventDefault();
+  window.__deferredPrompt = e;
+});
+</script>
+    <script>
       (function () {
         var path = window.location.pathname.toLowerCase();
         var search = window.location.search;

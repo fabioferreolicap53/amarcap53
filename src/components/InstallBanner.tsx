@@ -34,7 +34,7 @@ export const InstallBanner: React.FC = () => {
       return;
     }
 
-    // Pega evento que já foi capturado em main.tsx (antes do React montar)
+    // Pega evento capturado pelo script inline no index.html
     const stored = (window as any).__deferredPrompt as BeforeInstallPromptEvent | undefined;
     if (stored) {
       setDeferredPrompt(stored);
@@ -50,19 +50,8 @@ export const InstallBanner: React.FC = () => {
     };
     window.addEventListener('beforeinstallprompt', handler);
 
-    // Escuta custom event disparado por main.tsx
-    const customHandler = () => {
-      const stored = (window as any).__deferredPrompt as BeforeInstallPromptEvent | undefined;
-      if (stored) {
-        setDeferredPrompt(stored);
-        setShowBanner(true);
-      }
-    };
-    window.addEventListener('pwa-install-ready', customHandler);
-
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
-      window.removeEventListener('pwa-install-ready', customHandler);
     };
   }, []);
 
