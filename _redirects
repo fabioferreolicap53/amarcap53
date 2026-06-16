@@ -1,1 +1,7 @@
+# PWA files MUST bypass SPA redirect
+/manifest.json  /manifest.json 200
+/sw.js  /sw.js 200
+/service-worker.js  /service-worker.js 200
+
+# SPA catch-all
 /* /index.html 200
