@@ -93,8 +93,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         sort: '-created',
       });
       setImportHistory(records.items as unknown as ImportLog[]);
-    } catch (err) {
-      console.error('Erro ao buscar histórico:', err);
+    } catch (err: any) {
+      if (err?.status !== 404) {
+        console.error('Erro ao buscar histórico:', err);
+      }
     } finally {
       setIsLoadingHistory(false);
     }
@@ -129,9 +131,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       const resultList = await pb.collection('amarcap53_pacientes').getList(1, 1);
       setTotalPatients(resultList.totalItems);
       
-      const lastImport = await pb.collection('amarcap53_importacoes').getFirstListItem('', { sort: '-created' });
-      if (lastImport) {
-        setLastSync(new Date(lastImport.created).toLocaleString('pt-BR'));
+      try {
+        const lastImport = await pb.collection('amarcap53_importacoes').getFirstListItem('', { sort: '-created' });
+        if (lastImport) {
+          setLastSync(new Date(lastImport.created).toLocaleString('pt-BR'));
+        }
+      } catch (e: any) {
+        if (e?.status !== 404) throw e;
       }
     } catch (err) {
       console.error('Erro ao buscar estatísticas:', err);
@@ -195,43 +201,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     }
   };
 
-  const [isCleaning, setIsCleaning] = useState(false);
-
-  // Normaliza whitespace de todos os pacientes na base (corrige espaços duplicados)
-  const handleNormalizeData = async () => {
-    if (!window.confirm('Isso vai normalizar os campos de texto (unidade, equipe, nome) de todos os pacientes. Deseja continuar?')) return;
-    setIsCleaning(true);
-    try {
-      const records = await pb.collection('amarcap53_pacientes').getFullList({
-        fields: 'id,unidade,equipe,nome',
-        requestKey: null,
-      });
-      const batchSize = 100;
-      let updated = 0;
-      for (let i = 0; i < records.length; i += batchSize) {
-        const chunk = records.slice(i, i + batchSize);
-        await Promise.all(chunk.map(async (r) => {
-          const upd: Record<string, any> = {};
-          const nu = normalizeWhitespace(r.unidade || '');
-          const ne = normalizeWhitespace(r.equipe || '');
-          const nn = normalizeWhitespace(r.nome || '');
-          if (nu !== r.unidade) upd.unidade = nu;
-          if (ne !== r.equipe) upd.equipe = ne;
-          if (nn !== r.nome) upd.nome = nn;
-          if (Object.keys(upd).length > 0) {
-            await pb.collection('amarcap53_pacientes').update(r.id, upd, { $autoCancel: false });
-          }
-        }));
-        updated += chunk.length;
-      }
-      alert(`Normalização concluída! ${updated} registros processados.`);
-    } catch (err) {
-      console.error('Erro ao normalizar dados:', err);
-      alert('Erro ao normalizar dados. Verifique o console.');
-    } finally {
-      setIsCleaning(false);
-    }
-  };
+  // REMOVED: isCleaning state
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -270,134 +240,104 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
-        const data = results.data as any[];
-        const totalRecords = data.length;
-        let successCount = 0;
-        let errorCount = 0;
-        const errorDetails: string[] = [];
+        const rawData = results.data as any[];
+        const totalRecords = rawData.length;
 
         try {
-          // Estágio 2: Limpeza Ultra-Rápida
-          setUploadStatus({ stage: 'cleaning', message: 'Limpando base de dados antiga...', current: 0, total: 0, fileName: file.name });
-          const recordsToDelete = await pb.collection('amarcap53_pacientes').getFullList({ fields: 'id' });
-          
-          if (recordsToDelete.length > 0) {
-            const deleteBatchSize = 100;
-            for (let i = 0; i < recordsToDelete.length; i += deleteBatchSize) {
-              const chunk = recordsToDelete.slice(i, i + deleteBatchSize);
-              await Promise.all(chunk.map(async (record) => {
-                try {
-                  await pb.collection('amarcap53_pacientes').delete(record.id, { $autoCancel: false });
-                } catch (err: any) {
-                  if (err?.status !== 404 && !err?.isAbort) throw err;
-                }
-              }));
-              setUploadStatus(prev => ({ ...prev, current: Math.min(i + deleteBatchSize, recordsToDelete.length), total: recordsToDelete.length }));
+          setUploadStatus({ stage: 'importing', message: 'Enviando para servidor...', current: 0, total: totalRecords, fileName: file.name });
+
+          // Processa linhas → JSON (mesma lógica de field mapping)
+          const parseCSVDate = (dateStr: string | undefined): string | null => {
+            if (!dateStr || dateStr === '--' || dateStr.trim() === '') return null;
+            const trimmed = dateStr.trim();
+            if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed;
+            const parts = trimmed.split('/');
+            if (parts.length === 3) {
+              const [d, m, y] = parts;
+              const year = y.length === 2 ? `20${y}` : y;
+              return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
             }
-          }
+            return null;
+          };
 
-          // Estágio 3: Importação Ultra-Rápida via Paralelismo Massivo
-          setUploadStatus({ stage: 'importing', message: 'Importando novos registros...', current: 0, total: totalRecords, fileName: file.name });
+          const normalize = normalizeWhitespace;
 
-          const createBatchSize = 100;
-          for (let i = 0; i < data.length; i += createBatchSize) {
-            const chunk = data.slice(i, i + createBatchSize);
-            
-            const processedRows = chunk.map(rawRow => {
-              const row: any = {};
-              Object.keys(rawRow).forEach(key => {
-                const normalizedKey = key.trim().toUpperCase();
-                row[normalizedKey] = rawRow[key];
-              });
-
-              // normalizeWhitespace: trim + colapsa espaços internos (evita mismatch em filtros)
-              const normalize = normalizeWhitespace;
-              const unidade = normalize(row['UNIDADE'] || '');
-              const equipe = normalize(row['EQUIPE'] || '');
-              const microarea = normalize(row['MICROÁREA'] || '') || normalize(row['MICROAREA'] || '') || normalize(row['MICRO'] || '');
-              const cns = (row['CNS'] || '').trim();
-              const nome = normalize(row['NOME'] || '');
-              const dataNascimento = (row['NASC.'] || '').trim() || (row['DATA DE NASCIMENTO'] || '').trim() || (row['DATA NASCIMENTO'] || '').trim() || (row['NASCIMENTO'] || '').trim();
-              const idade = (row['IDADE'] || '').trim();
-              const grupo = normalize(row['GRUPO'] || '') || normalize(row['FAIXA ETÁRIA'] || '') || normalize(row['FAIXA ETARIA'] || '') || '';
-
-              if (unidade && equipe && cns && nome && dataNascimento) {
-                const parsedDate = parseCSVDate(dataNascimento);
-                if (!parsedDate) return null;
-
-                const record: Record<string, any> = {
-                  unidade, 
-                  equipe, 
-                  microarea: parseInt(microarea) || 0,
-                  cns: cns.replace(/\D/g, '').padStart(15, '0').slice(-15),
-                  nome, 
-                  data_nascimento: parsedDate,
-                  idade: parseInt(idade) || 0,
-                  grupo: grupo || '--',
-                };
-
-                const citoLab = parseCSVDate(row['CITO LAB'] || row['RESULTADO DE CITO LABORATÓRIO']);
-                if (citoLab) record.cito_lab = citoLab;
-
-                const citoPep = parseCSVDate(row['CITO PEP'] || row['RESULTADO DE CITO REGISTRADO NO PEP']);
-                if (citoPep) record.cito_pep = citoPep;
-
-                const dnaHpv = parseCSVDate(row['DNA-HPV'] || row['TESTE MOLECULAR DNA-HPV']);
-                if (dnaHpv) record.dna_hpv_gal = dnaHpv;
-
-                const alertas = row['ALERTAS RASTREAMENTO']?.trim();
-                if (alertas) record.alertas_rastreamento = alertas;
-
-                return record;
-              }
-              return null;
-            }).filter(Boolean);
-
-            const promises = processedRows.map(async (pacienteData, idx) => {
-              try {
-                await pb.collection('amarcap53_pacientes').create(pacienteData!, { $autoCancel: false });
-                if (i === 0 && idx === 0) {
-                  console.log('[IMPORT] Primeiro registro criado com sucesso:', pacienteData);
-                }
-                return true;
-              } catch (e: any) {
-                if (i === 0 && idx < 3) {
-                  console.error(`[IMPORT] Erro detalhado no registro ${idx}:`, {
-                    status: e?.status,
-                    message: e?.message,
-                    data: e?.data,
-                    record: pacienteData
-                  });
-                }
-                const errMsg = e?.message || JSON.stringify(e?.data) || 'Erro desconhecido';
-                errorDetails.push(`${pacienteData?.cns || '?'}: ${errMsg}`);
-                return false;
-              }
+          const records = rawData.map(rawRow => {
+            const row: any = {};
+            Object.keys(rawRow).forEach(key => {
+              const normalizedKey = key.trim().toUpperCase();
+              row[normalizedKey] = rawRow[key];
             });
 
-            const results_chunk = await Promise.all(promises);
-            successCount += results_chunk.filter(r => r).length;
-            errorCount += (chunk.length - results_chunk.filter(r => r).length);
-            
-            setUploadStatus(prev => ({ ...prev, current: Math.min(i + createBatchSize, totalRecords) }));
-          }
+            const unidade = normalize(row['UNIDADE'] || '');
+            const equipe = normalize(row['EQUIPE'] || '');
+            const microarea = normalize(row['MICROÁREA'] || '') || normalize(row['MICROAREA'] || '') || normalize(row['MICRO'] || '');
+            const cns = (row['CNS'] || '').trim();
+            const nome = normalize(row['NOME'] || '');
+            const dataNascimento = (row['NASC.'] || '').trim() || (row['DATA DE NASCIMENTO'] || '').trim() || (row['DATA NASCIMENTO'] || '').trim() || (row['NASCIMENTO'] || '').trim();
+            const idade = (row['IDADE'] || '').trim();
+            const grupo = normalize(row['GRUPO'] || '') || normalize(row['FAIXA ETÁRIA'] || '') || normalize(row['FAIXA ETARIA'] || '') || '';
 
-          // Finalização
-          await pb.collection('amarcap53_importacoes').create({
-            filename: file.name,
-            total_records: totalRecords,
-            success_count: successCount,
-            error_count: errorCount,
-            user_id: user?.id,
-            details: errorDetails.slice(0, 50).join('\n')
+            if (!(unidade && equipe && cns && nome && dataNascimento)) return null;
+
+            const parsedDate = parseCSVDate(dataNascimento);
+            if (!parsedDate) return null;
+
+            const record: Record<string, any> = {
+              unidade,
+              equipe,
+              microarea: parseInt(microarea) || 0,
+              cns: cns.replace(/\D/g, '').padStart(15, '0').slice(-15),
+              nome,
+              data_nascimento: parsedDate,
+              idade: parseInt(idade) || 0,
+              grupo: grupo || '--',
+            };
+
+            const citoLab = parseCSVDate(row['CITO LAB'] || row['RESULTADO DE CITO LABORATÓRIO']);
+            if (citoLab) record.cito_lab = citoLab;
+
+            const citoPep = parseCSVDate(row['CITO PEP'] || row['RESULTADO DE CITO REGISTRADO NO PEP']);
+            if (citoPep) record.cito_pep = citoPep;
+
+            const dnaHpv = parseCSVDate(row['DNA-HPV'] || row['TESTE MOLECULAR DNA-HPV']);
+            if (dnaHpv) record.dna_hpv_gal = dnaHpv;
+
+            const alertas = row['ALERTAS RASTREAMENTO']?.trim();
+            if (alertas) record.alertas_rastreamento = alertas;
+
+            return record;
+          }).filter(Boolean);
+
+          // POST para endpoint customizado (transacional)
+          const response = await fetch(`${pb.baseUrl}/api/custom/import-pacientes`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': pb.authStore.token ? `Bearer ${pb.authStore.token}` : '',
+            },
+            body: JSON.stringify({ records, fileName: file.name }),
           });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            throw new Error(result.message || `Erro HTTP ${response.status}`);
+          }
 
           fetchImportHistory();
           fetchStats();
-          setUploadStatus({ stage: 'completed', message: `Sucesso! ${successCount} registros importados.`, current: totalRecords, total: totalRecords, fileName: file.name });
-        } catch (err) {
-          console.error('Erro no processamento:', err);
-          setUploadStatus({ stage: 'error', message: 'Erro crítico durante a importação.', current: 0, total: 0 });
+          setUploadStatus({
+            stage: 'completed',
+            message: `Sucesso! ${result.imported} de ${result.total} registros importados.${result.errors > 0 ? ` (${result.errors} falhas)` : ''}`,
+            current: result.total,
+            total: result.total,
+            fileName: file.name,
+          });
+        } catch (err: any) {
+          console.error('Erro na importação:', err);
+          const rollbackMsg = err.message?.includes('revertida') ? ' Dados antigos preservados.' : '';
+          setUploadStatus({ stage: 'error', message: `Erro: ${err.message || 'Falha na comunicação'}.${rollbackMsg}`, current: 0, total: 0 });
         } finally {
           setIsUploading(false);
           if (fileInputRef.current) fileInputRef.current.value = '';
@@ -422,9 +362,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 no-scrollbar">
         <div className="max-w-7xl mx-auto">
           
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Lado Esquerdo: Dashboard de Gestão */}
-            <div className="flex-1 space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Lado Esquerdo: Dashboard de Gestão — 2/3 largura */}
+            <div className="lg:col-span-2 space-y-8">
 
               {/* Perfil do Usuário */}
               <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-slate-200/60 relative overflow-hidden">
@@ -562,36 +502,41 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-7 border border-white/10 hover:bg-white/10 transition-colors group/card">
-                      <div className="flex items-center gap-3 mb-4">
-                        <Users className="w-4 h-4 text-blue-400" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Base Ativa</p>
+                    <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-7 border border-white/10 hover:bg-white/10 transition-colors group/card flex flex-col">
+                      <div className="flex items-center gap-3 mb-6">
+                        <Users className="w-4 h-4 text-blue-400 shrink-0" />
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 truncate">Base Ativa</p>
                       </div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-black text-white">{totalPatients.toLocaleString('pt-BR')}</span>
-                        <span className="text-xs font-bold text-white/30 uppercase">Registros</span>
+                      <div className="flex flex-col items-start mt-auto">
+                        <span className="text-3xl lg:text-4xl font-black text-white tracking-tight leading-none">{totalPatients.toLocaleString('pt-BR')}</span>
+                        <span className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1.5">Registros</span>
                       </div>
                     </div>
                     
-                    <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-7 border border-white/10 hover:bg-white/10 transition-colors">
-                      <div className="flex items-center gap-3 mb-4">
-                        <Activity className="w-4 h-4 text-emerald-400" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Status Sincro</p>
+                    <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-7 border border-white/10 hover:bg-white/10 transition-colors flex flex-col">
+                      <div className="flex items-center gap-3 mb-6">
+                        <Activity className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 truncate">Status Sincro</p>
                       </div>
-                      <div className="flex items-center gap-3 text-white">
-                        <span className="text-lg font-black tracking-tight">{lastSync !== '--' ? 'ATUALIZADO' : 'PENDENTE'}</span>
-                        <CheckCircle className="w-4 h-4 text-emerald-500" />
+                      <div className="flex flex-col items-start mt-auto">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-lg lg:text-xl font-black text-white tracking-tight">{lastSync !== '--' ? 'ATUALIZADO' : 'PENDENTE'}</span>
+                          <CheckCircle className={`w-4 h-4 ${lastSync !== '--' ? 'text-emerald-500' : 'text-white/20'}`} />
+                        </div>
+                        {lastSync !== '--' && (
+                          <span className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1.5">Base sincronizada</span>
+                        )}
                       </div>
                     </div>
 
-                    <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-7 border border-white/10 hover:bg-white/10 transition-colors">
-                      <div className="flex items-center gap-3 mb-4">
-                        <History className="w-4 h-4 text-indigo-400" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Última Carga</p>
+                    <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-7 border border-white/10 hover:bg-white/10 transition-colors flex flex-col">
+                      <div className="flex items-center gap-3 mb-6">
+                        <History className="w-4 h-4 text-indigo-400 shrink-0" />
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 truncate">Última Carga</p>
                       </div>
-                      <div className="text-white/90">
-                        <span className="text-lg font-bold">{lastSync.split(',')[0]}</span>
-                        <p className="text-[10px] font-medium text-white/30 mt-1 uppercase">{lastSync.split(',')[1] || ''}</p>
+                      <div className="flex flex-col items-start mt-auto">
+                        <span className="text-lg lg:text-xl font-black text-white tracking-tight leading-none">{lastSync.split(',')[0]}</span>
+                        <span className="text-[9px] font-medium text-white/30 uppercase tracking-wider mt-1.5">{lastSync.split(',')[1] || '—'}</span>
                       </div>
                     </div>
                   </div>
@@ -665,18 +610,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
             )}
           </div>
 
-          {/* Lado Direito: Upload e Histórico */}
-          <div className="w-full lg:w-96 space-y-8">
+          {/* Lado Direito: Upload e Histórico — 1/3 largura */}
+          <div className="lg:col-span-1 flex flex-col gap-8">
             {isCap ? (
               <>
                   {/* Card de Ação: Upload */}
-                  <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60">
-                    <div className="mb-8">
+                  <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60 flex-1 flex flex-col">
+                    <div className="mb-8 shrink-0">
                       <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Novo Upload</h3>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Atualize a base de pacientes</p>
                     </div>
 
-                    <div className="relative">
+                    <div className="relative flex-1 flex flex-col justify-center">
                       <AnimatePresence mode="wait">
                         {isUploading ? (
                           <motion.div 
@@ -763,29 +708,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                     )}
                   </div>
 
-                  {/* Card: Normalizar Dados */}
-                  <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60">
-                    <div className="mb-6">
-                      <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Normalizar Dados</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Corrige espaços duplicados em registros existentes</p>
-                    </div>
-                    <button
-                      onClick={handleNormalizeData}
-                      disabled={isCleaning}
-                      className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:from-amber-600 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-200"
-                    >
-                      {isCleaning ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Database className="w-4 h-4" />
-                      )}
-                      {isCleaning ? 'Normalizando...' : 'Normalizar Agora'}
-                    </button>
-                  </div>
-
                   {/* Histórico de Operações */}
-                  <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60">
-                    <div className="flex items-center justify-between mb-8">
+                  <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60 flex-1 flex flex-col">
+                    <div className="flex items-center justify-between mb-8 shrink-0">
                       <div>
                         <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Histórico</h3>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Últimos sincronismos</p>
@@ -795,8 +720,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                       </button>
                     </div>
 
-                    <div className="space-y-4">
-                      {importHistory.length > 0 ? importHistory.map((log) => (
+                    <div className="flex-1 flex flex-col justify-center">
+                      <div className="space-y-4">
+                        {importHistory.length > 0 ? importHistory.map((log) => (
                         <div key={log.id} className="p-5 bg-slate-50/50 border border-slate-100 rounded-3xl relative group hover:border-blue-200 transition-colors">
                           <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-3">
@@ -833,9 +759,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                       )}
                     </div>
                   </div>
+                </div>
                 </>
               ) : (
-                <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60 flex flex-col items-center justify-center text-center opacity-60 aspect-square">
+                <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60 flex flex-col items-center justify-center text-center opacity-60 flex-1">
                   <Shield className="w-12 h-12 text-slate-200 mb-4" />
                   <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter mb-2">Área Administrativa</h3>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest max-w-[200px]">

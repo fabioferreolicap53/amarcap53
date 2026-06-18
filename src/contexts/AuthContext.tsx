@@ -74,9 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         userUnsubscribe = unsub;
       })
-      .catch((error) => {
-        console.error('Erro ao inscrever sincronizacao do usuario:', error);
-      });
+      .catch(() => {});
 
     return () => {
       disposed = true;
