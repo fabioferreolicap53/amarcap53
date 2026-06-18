@@ -258,7 +258,7 @@ routerAdd('POST', '/api/custom/import-pacientes', (c) => {
 
     return c.json(200, {
       success: true,
-      mode: 'replace',
+      mode,
       total: rows.length,
       imported: newCount,
       errors: totalErrors,

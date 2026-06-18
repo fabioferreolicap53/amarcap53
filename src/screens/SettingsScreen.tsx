@@ -197,59 +197,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     }
   };
 
-  // Parseia uma linha CSV respeitando aspas duplas
-  const parseCSVLine = (line: string): string[] => {
-    const fields: string[] = [];
-    let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') { inQ = !inQ; continue; }
-      if (ch === ',' && !inQ) { fields.push(cur.trim()); cur = ''; continue; }
-      cur += ch;
-    }
-    fields.push(cur.trim());
-    return fields;
-  };
-
-  // Normaliza CSV: linhas com múltiplos registros são desdobradas em 1 registro por linha
-  // O CSV original tem registros concatenados sem newline, e APENAS 10 campos entre registros
-  // (dna_hpv_gal só aparece no final de cada linha, quando presente)
-  const normalizeCSV = (text: string): string => {
-    // Remove BOM e normaliza line endings
-    const cleanText = text.replace(/^\ufeff/, '').replace(/\r/g, '');
-    const lines = cleanText.split('\n').filter(l => l.trim());
-    if (lines.length === 0) return text;
-
-    const header = lines[0];
-    const dataLines = lines.slice(1);
-
-    const normalizedLines: string[] = [];
-
-    for (const line of dataLines) {
-      const values = parseCSVLine(line);
-      let i = 0;
-
-      // Divide em grupos de 10 campos (registro sem dna_hpv_gal)
-      while (i + 9 < values.length) {
-        const chunk = values.slice(i, i + 10);
-        // Adiciona vírgula vazia para dna_hpv_gal (11º campo)
-        normalizedLines.push(chunk.join(',') + ',');
-        i += 10;
-      }
-
-      // Valor extra no final = dna_hpv_gal do último registro
-      if (i < values.length) {
-        const extra = values.slice(i).join(',');
-        // Substitui a vírgula vazia do último registro pelo valor real
-        if (normalizedLines.length > 0) {
-          normalizedLines[normalizedLines.length - 1] =
-            normalizedLines[normalizedLines.length - 1].replace(/,$/, ',' + extra);
-        }
-      }
-    }
-
-    return [header, ...normalizedLines].join('\n');
-  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -274,10 +221,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     reader.onload = async (e) => {
       try {
         const csvText = e.target?.result as string;
-        const normalizedText = normalizeCSV(csvText);
 
-        // Divide em linhas e separa header dos dados
-        const lines = normalizedText.split('\n').filter(l => l.trim());
+        // Divide em linhas (raw CSV, backend parseCSV cuida do parsing)
+        const lines = csvText.replace(/\r/g, '').split('\n').filter(l => l.trim());
         if (lines.length < 2) throw new Error('CSV vazio ou sem dados');
 
         const header = lines[0];
