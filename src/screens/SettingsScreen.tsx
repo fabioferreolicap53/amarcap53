@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Header } from '../components/Header';
 import { Edit2, User, Check, ShieldCheck, MapPin, Moon, AlignJustify, Mail, AlertOctagon, Shield, Terminal, UploadCloud, CheckCircle, AlertTriangle, FileText, History, BarChart3, ChevronRight, Info, Trash2, Database, Activity, Loader2, Search, Users, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import Papa from 'papaparse';
 import { pb } from '../lib/pocketbase';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -47,9 +46,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
   };
 
   const isCap = user?.role === 'cap';
-
-  // Normaliza whitespace: trim + colapsa múltiplos espaços internos
-  const normalizeWhitespace = (s: string) => s.trim().replace(/\s+/g, ' ');
 
   const [isUploading, setIsUploading] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -241,8 +237,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     return [header, ...normalizedLines].join('\n');
   };
 
-  // REMOVED: isCleaning state
-
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -252,200 +246,66 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       return;
     }
 
+    // Limite de 100MB p/ 1GB RAM da VM
+    const MAX_FILE_SIZE = 100 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      setUploadStatus({ stage: 'error', message: 'Arquivo muito grande (máx. 100MB). Divida em partes menores.', current: 0, total: 0 });
+      return;
+    }
+
     setIsUploading(true);
     setUploadStatus({ stage: 'reading', message: 'Lendo arquivo...', current: 0, total: 0, fileName: file.name });
 
-    // Função auxiliar para converter DD/MM/YYYY para ISO YYYY-MM-DD
-    const parseCSVDate = (dateStr: string | undefined): string | null => {
-      if (!dateStr || dateStr === '--' || dateStr.trim() === '') return null;
-      
-      const trimmed = dateStr.trim();
-      
-      // Se já for ISO
-      if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed;
-      
-      // Se for DD/MM/YYYY
-      const parts = trimmed.split('/');
-      if (parts.length === 3) {
-        const [d, m, y] = parts;
-        // Garante que o ano tenha 4 dígitos (ex: 24 -> 2024)
-        const year = y.length === 2 ? `20${y}` : y;
-        return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-      }
-      
-      return null;
-    };
-
-    // Lê o arquivo como texto para normalizar antes do parse
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const csvText = e.target?.result as string;
-      // Normaliza: desdobra registros que estão na mesma linha
       const normalizedText = normalizeCSV(csvText);
 
-      Papa.parse(normalizedText, {
-        header: true,
-        skipEmptyLines: true,
-        complete: async (results) => {
-          const rawData = results.data as any[];
-          const totalRecords = rawData.length;
+      try {
+        setUploadStatus({ stage: 'importing', message: 'Enviando p/ servidor...', current: 0, total: 0, fileName: file.name });
 
-          try {
-            setUploadStatus({ stage: 'importing', message: 'Enviando para servidor...', current: 0, total: totalRecords, fileName: file.name });
-
-            // Processa linhas → JSON (mesma lógica de field mapping)
-            const parseCSVDate = (dateStr: string | undefined): string | null => {
-              if (!dateStr || dateStr === '--' || dateStr.trim() === '') return null;
-              const trimmed = dateStr.trim();
-              if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed;
-              const parts = trimmed.split('/');
-              if (parts.length === 3) {
-                const [d, m, y] = parts;
-                const year = y.length === 2 ? `20${y}` : y;
-                return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-              }
-              return null;
-            };
-
-            const normalize = normalizeWhitespace;
-
-          const records = rawData.map(rawRow => {
-            const row: any = {};
-            Object.keys(rawRow).forEach(key => {
-              const normalizedKey = key.trim().toUpperCase();
-              row[normalizedKey] = rawRow[key];
-            });
-
-            const unidade = normalize(row['UNIDADE'] || '');
-            const equipe = normalize(row['EQUIPE'] || '');
-            const microarea = normalize(row['MICROÁREA'] || '') || normalize(row['MICROAREA'] || '') || normalize(row['MICRO'] || '');
-            const cns = (row['CNS'] || '').trim();
-            const nome = normalize(row['NOME'] || '');
-            const dataNascimento = (row['NASC.'] || '').trim() || (row['DATA DE NASCIMENTO'] || '').trim() || (row['DATA NASCIMENTO'] || '').trim() || (row['NASCIMENTO'] || '').trim() || (row['DATA_NASCIMENTO'] || '').trim();
-            const idade = (row['IDADE'] || '').trim();
-            const grupo = normalize(row['GRUPO'] || '') || normalize(row['FAIXA ETÁRIA'] || '') || normalize(row['FAIXA ETARIA'] || '') || '';
-
-            if (!(unidade && equipe && cns && nome && dataNascimento)) return null;
-
-            const parsedDate = parseCSVDate(dataNascimento);
-            if (!parsedDate) return null;
-
-            const record: Record<string, any> = {
-              unidade,
-              equipe,
-              microarea: parseInt(microarea) || 0,
-              cns: cns.replace(/\D/g, '').padStart(15, '0').slice(-15),
-              nome,
-              data_nascimento: parsedDate,
-              idade: parseInt(idade) || 0,
-              grupo: grupo || '--',
-            };
-
-            const citoLab = parseCSVDate(row['CITO LAB'] || row['RESULTADO DE CITO LABORATÓRIO'] || row['CITO_LAB']);
-            if (citoLab) record.cito_lab = citoLab;
-
-            const citoPep = parseCSVDate(row['CITO PEP'] || row['RESULTADO DE CITO REGISTRADO NO PEP'] || row['CITO_PEP']);
-            if (citoPep) record.cito_pep = citoPep;
-
-            const dnaHpv = parseCSVDate(row['DNA-HPV'] || row['TESTE MOLECULAR DNA-HPV'] || row['DNA_HPV_GAL']);
-            if (dnaHpv) record.dna_hpv_gal = dnaHpv;
-
-            const alertas = row['ALERTAS RASTREAMENTO']?.trim();
-            if (alertas) record.alertas_rastreamento = alertas;
-
-            return record;
-          }).filter(Boolean);
-
-          console.log(`[CSV] ${rawData.length} linhas lidas, ${records.length} registros válidos para envio`);
-
-          if (records.length === 0) {
-            throw new Error('Nenhum registro válido encontrado no CSV. Verifique cabeçalhos e dados.');
-          }
-
-          // ─── POST para endpoint customizado (transacional) ───
-          // Envia em lotes de até 500 registros para evitar limite de body
-          const BATCH_SIZE = 500;
-          const totalBatches = Math.ceil(records.length / BATCH_SIZE);
-          let totalImported = 0;
-          let totalErrors = 0;
-          let batchErrors: string[] = [];
-
-          for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-            const start = batchIndex * BATCH_SIZE;
-            const batch = records.slice(start, start + BATCH_SIZE);
-            const batchNum = batchIndex + 1;
-            const isFirst = batchIndex === 0;
-
-            setUploadStatus({
-              stage: 'importing',
-              message: `Enviando lote ${batchNum}/${totalBatches} (${batch.length} registros)...`,
-              current: start + batch.length,
-              total: records.length,
-              fileName: file.name,
-            });
-
-            const response = await fetch(`${pb.baseUrl}/api/custom/import-pacientes`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': pb.authStore.token ? `Bearer ${pb.authStore.token}` : '',
-              },
-              body: JSON.stringify({
-                records: batch,
-                fileName: file.name,
-                mode: isFirst ? 'replace' : 'append',
-              }),
-            });
-
-            let result;
-            try {
-              result = await response.json();
-            } catch (_) {
-              throw new Error(`Lote ${batchNum}: servidor retornou ${response.status} sem resposta JSON`);
-            }
-
-            if (!response.ok) {
-              console.error(`[CSV] Server error details (lote ${batchNum}):`, result);
-              // Se o primeiro lote falhar, erro fatal
-              if (isFirst) {
-                throw new Error(result.message || `Erro HTTP ${response.status}`);
-              }
-              // Se um lote subsequente falhar, registra e continua
-              batchErrors.push(`Lote ${batchNum}: ${result.message || `Erro HTTP ${response.status}`}`);
-              continue;
-            }
-
-            totalImported += result.imported || 0;
-            totalErrors += result.errors || 0;
-            if (result.errorDetails?.length) {
-              result.errorDetails.forEach((e: string) => batchErrors.push(e));
-            }
-          }
-
-          fetchImportHistory();
-          fetchStats();
-          setUploadStatus({
-            stage: 'completed',
-            message: `Sucesso! ${totalImported} de ${records.length} registros importados${batchErrors.length > 0 ? ` (${batchErrors.length} falhas)` : ''}.`,
-            current: records.length,
-            total: records.length,
+        const response = await fetch(`${pb.baseUrl}/api/custom/import-pacientes`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': pb.authStore.token ? `Bearer ${pb.authStore.token}` : '',
+          },
+          body: JSON.stringify({
+            csvText: normalizedText,
             fileName: file.name,
-          });
-        } catch (err: any) {
-          console.error('Erro na importação:', err);
-          const rollbackMsg = err.message?.includes('revertida') ? ' Dados antigos preservados.' : '';
-          setUploadStatus({ stage: 'error', message: `Erro: ${err.message || 'Falha na comunicação'}.${rollbackMsg}`, current: 0, total: 0 });
-        } finally {
-          setIsUploading(false);
-          if (fileInputRef.current) fileInputRef.current.value = '';
+          }),
+        });
+
+        let result;
+        try {
+          result = await response.json();
+        } catch (_) {
+          throw new Error(`Servidor retornou ${response.status} sem resposta JSON`);
         }
-      },
-      error: (error) => {
+
+        if (!response.ok) {
+          throw new Error(result.message || `Erro HTTP ${response.status}`);
+        }
+
+        fetchImportHistory();
+        fetchStats();
+        setUploadStatus({
+          stage: 'completed',
+          message: `Sucesso! ${result.imported} registros importados${result.errors > 0 ? `, ${result.errors} falhas` : ''}.`,
+          current: result.total,
+          total: result.total,
+          fileName: file.name,
+        });
+      } catch (err: any) {
+        console.error('Erro na importação:', err);
+        const rollbackMsg = err.message?.includes('revertida') ? ' Dados antigos preservados.' : '';
+        setUploadStatus({ stage: 'error', message: `Erro: ${err.message || 'Falha na comunicação'}.${rollbackMsg}`, current: 0, total: 0 });
+      } finally {
         setIsUploading(false);
-        setUploadStatus({ stage: 'error', message: `Erro ao ler arquivo: ${error.message}`, current: 0, total: 0 });
+        if (fileInputRef.current) fileInputRef.current.value = '';
       }
-    });
     };
+
     reader.onerror = () => {
       setIsUploading(false);
       setUploadStatus({ stage: 'error', message: 'Erro ao ler arquivo', current: 0, total: 0 });
