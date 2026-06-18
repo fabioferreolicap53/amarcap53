@@ -274,7 +274,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
             const microarea = normalize(row['MICROÁREA'] || '') || normalize(row['MICROAREA'] || '') || normalize(row['MICRO'] || '');
             const cns = (row['CNS'] || '').trim();
             const nome = normalize(row['NOME'] || '');
-            const dataNascimento = (row['NASC.'] || '').trim() || (row['DATA DE NASCIMENTO'] || '').trim() || (row['DATA NASCIMENTO'] || '').trim() || (row['NASCIMENTO'] || '').trim();
+            const dataNascimento = (row['NASC.'] || '').trim() || (row['DATA DE NASCIMENTO'] || '').trim() || (row['DATA NASCIMENTO'] || '').trim() || (row['NASCIMENTO'] || '').trim() || (row['DATA_NASCIMENTO'] || '').trim();
             const idade = (row['IDADE'] || '').trim();
             const grupo = normalize(row['GRUPO'] || '') || normalize(row['FAIXA ETÁRIA'] || '') || normalize(row['FAIXA ETARIA'] || '') || '';
 
@@ -294,13 +294,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
               grupo: grupo || '--',
             };
 
-            const citoLab = parseCSVDate(row['CITO LAB'] || row['RESULTADO DE CITO LABORATÓRIO']);
+            const citoLab = parseCSVDate(row['CITO LAB'] || row['RESULTADO DE CITO LABORATÓRIO'] || row['CITO_LAB']);
             if (citoLab) record.cito_lab = citoLab;
 
-            const citoPep = parseCSVDate(row['CITO PEP'] || row['RESULTADO DE CITO REGISTRADO NO PEP']);
+            const citoPep = parseCSVDate(row['CITO PEP'] || row['RESULTADO DE CITO REGISTRADO NO PEP'] || row['CITO_PEP']);
             if (citoPep) record.cito_pep = citoPep;
 
-            const dnaHpv = parseCSVDate(row['DNA-HPV'] || row['TESTE MOLECULAR DNA-HPV']);
+            const dnaHpv = parseCSVDate(row['DNA-HPV'] || row['TESTE MOLECULAR DNA-HPV'] || row['DNA_HPV_GAL']);
             if (dnaHpv) record.dna_hpv_gal = dnaHpv;
 
             const alertas = row['ALERTAS RASTREAMENTO']?.trim();
