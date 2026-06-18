@@ -319,7 +319,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
             body: JSON.stringify({ records, fileName: file.name }),
           });
 
-          const result = await response.json();
+          let result;
+          try {
+            result = await response.json();
+          } catch (_) {
+            throw new Error(`Servidor retornou ${response.status} sem resposta JSON`);
+          }
 
           if (!response.ok) {
             throw new Error(result.message || `Erro HTTP ${response.status}`);
