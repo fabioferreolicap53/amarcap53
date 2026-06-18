@@ -309,6 +309,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
             return record;
           }).filter(Boolean);
 
+          console.log(`[CSV] ${rawData.length} linhas lidas, ${records.length} registros válidos para envio`);
+
+          if (records.length === 0) {
+            throw new Error('Nenhum registro válido encontrado no CSV. Verifique cabeçalhos e dados.');
+          }
+
           // POST para endpoint customizado (transacional)
           const response = await fetch(`${pb.baseUrl}/api/custom/import-pacientes`, {
             method: 'POST',
@@ -327,6 +333,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
           }
 
           if (!response.ok) {
+            // Log server-side error details
+            console.error('[CSV] Server error details:', result);
             throw new Error(result.message || `Erro HTTP ${response.status}`);
           }
 
