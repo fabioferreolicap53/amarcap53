@@ -21,16 +21,41 @@ routerAdd('POST', '/api/custom/import-pacientes', (c) => {
   }
 
   // ─── 2. Parse JSON body ───
-  // c.parseBody() é método oficial do PocketBase para application/json
+  // Tenta múltiplas estratégias de parsing para suportar diferentes
+  // versões do PocketBase e payloads grandes (+500 registros).
   let body;
   try {
-    body = c.parseBody();
+    // Estratégia 1: c.requestInfo() (PocketBase v0.23+ — mais robusto)
+    const info = c.requestInfo();
+    body = (info && typeof info.body === 'object' && info.body !== null) ? info.body : {};
   } catch (_) {
-    body = {};
+    try {
+      // Estratégia 2: c.parseBody() (PocketBase v0.22.x — fallback)
+      body = c.parseBody();
+    } catch (_) {
+      body = {};
+    }
   }
 
-  const records = body.records;
-  const fileName = body.fileName || 'import.csv';
+  // Se as estratégias acima falharam (body vazio), tenta ler o body cru
+  // diretamente do *http.Request — útil quando há proxy limitando tamanho.
+  if (!body || Object.keys(body).length === 0) {
+    try {
+      const req = c.request();
+      // PocketBase expõe $httpApi.readBody() em versões recentes
+      if (typeof $httpApi !== 'undefined' && $httpApi.readBody) {
+        const raw = $httpApi.readBody(req);
+        if (raw) body = JSON.parse(raw);
+      }
+    } catch (_) {
+      // silent — mantém body vazio
+    }
+  }
+
+  const records = body ? body.records : undefined;
+  const fileName = (body && body.fileName) || 'import.csv';
+  // mode: 'replace' (padrão) = DELETE + INSERT; 'append' = só INSERT
+  const mode = (body && body.mode === 'append') ? 'append' : 'replace';
 
   if (!Array.isArray(records) || records.length === 0) {
     return c.json(400, {
@@ -59,16 +84,19 @@ routerAdd('POST', '/api/custom/import-pacientes', (c) => {
 
   try {
     dao.runInTransaction((txDao) => {
-      // 3a. Conta registros antigos
-      try {
-        const row = txDao.db().newQuery(`SELECT COUNT(*) as total FROM ${COLLECTION}`).one();
-        oldCount = row?.get('total') || 0;
-      } catch (_) {
-        oldCount = 0;
-      }
+      // Só conta antigos + faz DELETE no mode 'replace' (primeiro lote)
+      if (mode === 'replace') {
+        // 3a. Conta registros antigos
+        try {
+          const row = txDao.db().newQuery(`SELECT COUNT(*) as total FROM ${COLLECTION}`).one();
+          oldCount = row?.get('total') || 0;
+        } catch (_) {
+          oldCount = 0;
+        }
 
-      // 3b. DELETE instantâneo (SQL direto)
-      txDao.db().newQuery(`DELETE FROM ${COLLECTION}`).execute();
+        // 3b. DELETE instantâneo (SQL direto) — só no primeiro lote
+        txDao.db().newQuery(`DELETE FROM ${COLLECTION}`).execute();
+      }
 
       // 3c. INSERT em loop (seguro, sem estourar RAM)
       for (let i = 0; i < records.length; i++) {
@@ -135,6 +163,7 @@ routerAdd('POST', '/api/custom/import-pacientes', (c) => {
 
   return c.json(200, {
     success: true,
+    mode,
     total: records.length,
     imported: newCount,
     errors: records.length - newCount,

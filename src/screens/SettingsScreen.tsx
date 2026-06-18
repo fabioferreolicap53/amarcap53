@@ -201,6 +201,33 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     }
   };
 
+  // Número de colunas esperado no CSV
+  const CSV_COLUMNS = 11;
+
+  // Normaliza CSV: linhas com múltiplos registros são desdobradas em 1 registro por linha
+  const normalizeCSV = (text: string): string => {
+    // Remove \r para normalizar line endings (Windows → Unix)
+    const cleanText = text.replace(/\r/g, '');
+    const lines = cleanText.split('\n').filter(l => l.trim());
+    if (lines.length === 0) return text;
+
+    const header = lines[0];
+    const dataLines = lines.slice(1);
+
+    const normalizedLines: string[] = [];
+
+    for (const line of dataLines) {
+      const values = line.split(',');
+      // Divide os valores em grupos de CSV_COLUMNS (11 campos por registro)
+      for (let i = 0; i + CSV_COLUMNS - 1 < values.length; i += CSV_COLUMNS) {
+        const chunk = values.slice(i, i + CSV_COLUMNS);
+        normalizedLines.push(chunk.join(','));
+      }
+    }
+
+    return [header, ...normalizedLines].join('\n');
+  };
+
   // REMOVED: isCleaning state
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -236,31 +263,38 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       return null;
     };
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const rawData = results.data as any[];
-        const totalRecords = rawData.length;
+    // Lê o arquivo como texto para normalizar antes do parse
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const csvText = e.target?.result as string;
+      // Normaliza: desdobra registros que estão na mesma linha
+      const normalizedText = normalizeCSV(csvText);
 
-        try {
-          setUploadStatus({ stage: 'importing', message: 'Enviando para servidor...', current: 0, total: totalRecords, fileName: file.name });
+      Papa.parse(normalizedText, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async (results) => {
+          const rawData = results.data as any[];
+          const totalRecords = rawData.length;
 
-          // Processa linhas → JSON (mesma lógica de field mapping)
-          const parseCSVDate = (dateStr: string | undefined): string | null => {
-            if (!dateStr || dateStr === '--' || dateStr.trim() === '') return null;
-            const trimmed = dateStr.trim();
-            if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed;
-            const parts = trimmed.split('/');
-            if (parts.length === 3) {
-              const [d, m, y] = parts;
-              const year = y.length === 2 ? `20${y}` : y;
-              return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-            }
-            return null;
-          };
+          try {
+            setUploadStatus({ stage: 'importing', message: 'Enviando para servidor...', current: 0, total: totalRecords, fileName: file.name });
 
-          const normalize = normalizeWhitespace;
+            // Processa linhas → JSON (mesma lógica de field mapping)
+            const parseCSVDate = (dateStr: string | undefined): string | null => {
+              if (!dateStr || dateStr === '--' || dateStr.trim() === '') return null;
+              const trimmed = dateStr.trim();
+              if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed;
+              const parts = trimmed.split('/');
+              if (parts.length === 3) {
+                const [d, m, y] = parts;
+                const year = y.length === 2 ? `20${y}` : y;
+                return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+              }
+              return null;
+            };
+
+            const normalize = normalizeWhitespace;
 
           const records = rawData.map(rawRow => {
             const row: any = {};
@@ -315,36 +349,73 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
             throw new Error('Nenhum registro válido encontrado no CSV. Verifique cabeçalhos e dados.');
           }
 
-          // POST para endpoint customizado (transacional)
-          const response = await fetch(`${pb.baseUrl}/api/custom/import-pacientes`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': pb.authStore.token ? `Bearer ${pb.authStore.token}` : '',
-            },
-            body: JSON.stringify({ records, fileName: file.name }),
-          });
+          // ─── POST para endpoint customizado (transacional) ───
+          // Envia em lotes de até 500 registros para evitar limite de body
+          const BATCH_SIZE = 500;
+          const totalBatches = Math.ceil(records.length / BATCH_SIZE);
+          let totalImported = 0;
+          let totalErrors = 0;
+          let batchErrors: string[] = [];
 
-          let result;
-          try {
-            result = await response.json();
-          } catch (_) {
-            throw new Error(`Servidor retornou ${response.status} sem resposta JSON`);
-          }
+          for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+            const start = batchIndex * BATCH_SIZE;
+            const batch = records.slice(start, start + BATCH_SIZE);
+            const batchNum = batchIndex + 1;
+            const isFirst = batchIndex === 0;
 
-          if (!response.ok) {
-            // Log server-side error details
-            console.error('[CSV] Server error details:', result);
-            throw new Error(result.message || `Erro HTTP ${response.status}`);
+            setUploadStatus({
+              stage: 'importing',
+              message: `Enviando lote ${batchNum}/${totalBatches} (${batch.length} registros)...`,
+              current: start + batch.length,
+              total: records.length,
+              fileName: file.name,
+            });
+
+            const response = await fetch(`${pb.baseUrl}/api/custom/import-pacientes`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': pb.authStore.token ? `Bearer ${pb.authStore.token}` : '',
+              },
+              body: JSON.stringify({
+                records: batch,
+                fileName: file.name,
+                mode: isFirst ? 'replace' : 'append',
+              }),
+            });
+
+            let result;
+            try {
+              result = await response.json();
+            } catch (_) {
+              throw new Error(`Lote ${batchNum}: servidor retornou ${response.status} sem resposta JSON`);
+            }
+
+            if (!response.ok) {
+              console.error(`[CSV] Server error details (lote ${batchNum}):`, result);
+              // Se o primeiro lote falhar, erro fatal
+              if (isFirst) {
+                throw new Error(result.message || `Erro HTTP ${response.status}`);
+              }
+              // Se um lote subsequente falhar, registra e continua
+              batchErrors.push(`Lote ${batchNum}: ${result.message || `Erro HTTP ${response.status}`}`);
+              continue;
+            }
+
+            totalImported += result.imported || 0;
+            totalErrors += result.errors || 0;
+            if (result.errorDetails?.length) {
+              result.errorDetails.forEach((e: string) => batchErrors.push(e));
+            }
           }
 
           fetchImportHistory();
           fetchStats();
           setUploadStatus({
             stage: 'completed',
-            message: `Sucesso! ${result.imported} de ${result.total} registros importados.${result.errors > 0 ? ` (${result.errors} falhas)` : ''}`,
-            current: result.total,
-            total: result.total,
+            message: `Sucesso! ${totalImported} de ${records.length} registros importados${batchErrors.length > 0 ? ` (${batchErrors.length} falhas)` : ''}.`,
+            current: records.length,
+            total: records.length,
             fileName: file.name,
           });
         } catch (err: any) {
@@ -361,6 +432,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         setUploadStatus({ stage: 'error', message: `Erro ao ler arquivo: ${error.message}`, current: 0, total: 0 });
       }
     });
+    };
+    reader.onerror = () => {
+      setIsUploading(false);
+      setUploadStatus({ stage: 'error', message: 'Erro ao ler arquivo', current: 0, total: 0 });
+    };
+    reader.readAsText(file);
   };
 
   return (
