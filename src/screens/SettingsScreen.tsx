@@ -201,13 +201,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     }
   };
 
-  // Número de colunas esperado no CSV
-  const CSV_COLUMNS = 11;
-
   // Normaliza CSV: linhas com múltiplos registros são desdobradas em 1 registro por linha
+  // O CSV original tem registros concatenados sem newline, e APENAS 10 campos entre registros
+  // (dna_hpv_gal só aparece no final de cada linha, quando presente)
   const normalizeCSV = (text: string): string => {
-    // Remove \r para normalizar line endings (Windows → Unix)
-    const cleanText = text.replace(/\r/g, '');
+    // Remove BOM e normaliza line endings
+    const cleanText = text.replace(/^\ufeff/, '').replace(/\r/g, '');
     const lines = cleanText.split('\n').filter(l => l.trim());
     if (lines.length === 0) return text;
 
@@ -218,10 +217,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
     for (const line of dataLines) {
       const values = line.split(',');
-      // Divide os valores em grupos de CSV_COLUMNS (11 campos por registro)
-      for (let i = 0; i + CSV_COLUMNS - 1 < values.length; i += CSV_COLUMNS) {
-        const chunk = values.slice(i, i + CSV_COLUMNS);
-        normalizedLines.push(chunk.join(','));
+      let i = 0;
+
+      // Divide em grupos de 10 campos (registro sem dna_hpv_gal)
+      while (i + 9 < values.length) {
+        const chunk = values.slice(i, i + 10);
+        // Adiciona vírgula vazia para dna_hpv_gal (11º campo)
+        normalizedLines.push(chunk.join(',') + ',');
+        i += 10;
+      }
+
+      // Valor extra no final = dna_hpv_gal do último registro
+      if (i < values.length) {
+        const extra = values.slice(i).join(',');
+        // Substitui a vírgula vazia do último registro pelo valor real
+        if (normalizedLines.length > 0) {
+          normalizedLines[normalizedLines.length - 1] =
+            normalizedLines[normalizedLines.length - 1].replace(/,$/, ',' + extra);
+        }
       }
     }
 
