@@ -197,6 +197,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     }
   };
 
+  // Parseia uma linha CSV respeitando aspas duplas
+  const parseCSVLine = (line: string): string[] => {
+    const fields: string[] = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; continue; }
+      if (ch === ',' && !inQ) { fields.push(cur.trim()); cur = ''; continue; }
+      cur += ch;
+    }
+    fields.push(cur.trim());
+    return fields;
+  };
+
   // Normaliza CSV: linhas com múltiplos registros são desdobradas em 1 registro por linha
   // O CSV original tem registros concatenados sem newline, e APENAS 10 campos entre registros
   // (dna_hpv_gal só aparece no final de cada linha, quando presente)
@@ -212,7 +226,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     const normalizedLines: string[] = [];
 
     for (const line of dataLines) {
-      const values = line.split(',');
+      const values = parseCSVLine(line);
       let i = 0;
 
       // Divide em grupos de 10 campos (registro sem dna_hpv_gal)
@@ -246,10 +260,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       return;
     }
 
-    // Limite de 100MB p/ 1GB RAM da VM
-    const MAX_FILE_SIZE = 100 * 1024 * 1024;
+    // Limite de 50MB
+    const MAX_FILE_SIZE = 50 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
-      setUploadStatus({ stage: 'error', message: 'Arquivo muito grande (máx. 100MB). Divida em partes menores.', current: 0, total: 0 });
+      setUploadStatus({ stage: 'error', message: 'Arquivo muito grande (máx. 50MB). Divida em partes menores.', current: 0, total: 0 });
       return;
     }
 
@@ -258,42 +272,73 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
     const reader = new FileReader();
     reader.onload = async (e) => {
-      const csvText = e.target?.result as string;
-      const normalizedText = normalizeCSV(csvText);
-
       try {
-        setUploadStatus({ stage: 'importing', message: 'Enviando p/ servidor...', current: 0, total: 0, fileName: file.name });
+        const csvText = e.target?.result as string;
+        const normalizedText = normalizeCSV(csvText);
 
-        const response = await fetch(`${pb.baseUrl}/api/custom/import-pacientes`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': pb.authStore.token ? `Bearer ${pb.authStore.token}` : '',
-          },
-          body: JSON.stringify({
-            csvText: normalizedText,
+        // Divide em linhas e separa header dos dados
+        const lines = normalizedText.split('\n').filter(l => l.trim());
+        if (lines.length < 2) throw new Error('CSV vazio ou sem dados');
+
+        const header = lines[0];
+        const dataLines = lines.slice(1);
+
+        // Chunk size: ~4000 linhas por request (~6-7MB de JSON, seguros p/ 8MB)
+        const CHUNK_SIZE = 4000;
+        const totalChunks = Math.ceil(dataLines.length / CHUNK_SIZE);
+
+        let importedTotal = 0;
+        let errorsTotal = 0;
+
+        for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+          const start = chunkIdx * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, dataLines.length);
+          const chunkLines = dataLines.slice(start, end);
+          const chunkCsv = [header, ...chunkLines].join('\n');
+
+          setUploadStatus({
+            stage: 'importing',
+            message: `Enviando parte ${chunkIdx + 1} de ${totalChunks}...`,
+            current: chunkIdx + 1,
+            total: totalChunks,
             fileName: file.name,
-          }),
-        });
+          });
 
-        let result;
-        try {
-          result = await response.json();
-        } catch (_) {
-          throw new Error(`Servidor retornou ${response.status} sem resposta JSON`);
-        }
+          const response = await fetch(`${pb.baseUrl}/api/custom/import-pacientes`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': pb.authStore.token ? `Bearer ${pb.authStore.token}` : '',
+            },
+            body: JSON.stringify({
+              csvText: chunkCsv,
+              fileName: file.name,
+              mode: chunkIdx === 0 ? 'replace' : 'append',
+            }),
+          });
 
-        if (!response.ok) {
-          throw new Error(result.message || `Erro HTTP ${response.status}`);
+          let result;
+          try {
+            result = await response.json();
+          } catch (_) {
+            throw new Error(`Servidor retornou ${response.status} na parte ${chunkIdx + 1}`);
+          }
+
+          if (!response.ok) {
+            throw new Error(result.message || `Erro HTTP ${response.status} na parte ${chunkIdx + 1}`);
+          }
+
+          importedTotal += result.imported || 0;
+          errorsTotal += result.errors || 0;
         }
 
         fetchImportHistory();
         fetchStats();
         setUploadStatus({
           stage: 'completed',
-          message: `Sucesso! ${result.imported} registros importados${result.errors > 0 ? `, ${result.errors} falhas` : ''}.`,
-          current: result.total,
-          total: result.total,
+          message: `Sucesso! ${importedTotal} registros importados${errorsTotal > 0 ? `, ${errorsTotal} falhas` : ''}.`,
+          current: importedTotal,
+          total: importedTotal,
           fileName: file.name,
         });
       } catch (err: any) {

@@ -122,127 +122,156 @@ function sanitizeValue(field, val) {
 // ─── Router ────────────────────────────────────────────────
 
 routerAdd('POST', '/api/custom/import-pacientes', (c) => {
-  // 1. Auth
-  const auth = c.auth;
-  if (!auth) return c.json(401, { code: 401, message: 'Não autenticado' });
-  const role = auth.get('role');
-  if (role !== 'cap' && role !== 'admin')
-    return c.json(403, { code: 403, message: 'Apenas usuários CAP ou admin' });
-
-  // 2. Parse body
-  let body;
   try {
-    const info = c.requestInfo();
-    body = (info && typeof info.body === 'object' && info.body !== null) ? info.body : {};
-  } catch (_) {
-    try { body = c.parseBody(); } catch (_) { body = {}; }
-  }
+    // 1. Auth
+    const auth = c.auth;
+    if (!auth) return c.json(401, { code: 401, message: 'Não autenticado' });
+    const role = auth.get('role');
+    if (role !== 'cap' && role !== 'admin')
+      return c.json(403, { code: 403, message: 'Apenas usuários CAP ou admin' });
 
-  // ─── Modo LEGADO: { records } ──────────────────────────────
-  if (body.records && Array.isArray(body.records)) {
-    return handleLegacyBody(c, body, auth);
-  }
-
-  // ─── Modo NOVO: { csvText } ────────────────────────────────
-  const csvText = body.csvText;
-  if (!csvText || typeof csvText !== 'string' || csvText.trim().length === 0) {
-    return c.json(400, { code: 400, message: 'Envie csvText com o conteúdo do CSV' });
-  }
-
-  const fileName = body.fileName || 'import.csv';
-
-  // 3. Parse CSV
-  const { headers, rows } = parseCSV(csvText);
-  if (rows.length === 0) {
-    return c.json(400, { code: 400, message: 'CSV vazio ou sem dados válidos após o cabeçalho' });
-  }
-
-  // 4. Valida campos mapeados
-  const mappedFields = headers.filter(Boolean);
-  if (!mappedFields.includes('nome') || !mappedFields.includes('cns')) {
-    return c.json(400, {
-      code: 400,
-      message: 'CSV precisa ter colunas mapeáveis para "nome" e "cns". Colunas encontradas: ' +
-        JSON.stringify(headers.map((h, i) => ({ csv: parseCSVLine(csvText.split('\n')[0])[i], mapped: h })))
-    });
-  }
-
-  // 5. Transação — processa em lotes para memória (1GB VM)
-  const dao = $app.dao();
-  const collection = dao.findCollectionByNameOrId(COLLECTION);
-  if (!collection) return c.json(500, { code: 500, message: `Collection "${COLLECTION}" não encontrada` });
-
-  let oldCount = 0, newCount = 0, totalErrors = 0;
-  const errorDetails = [];
-
-  try {
-    dao.runInTransaction((txDao) => {
-      // Conta + remove dados antigos
+    // 2. Parse body - suporta diferentes versões do PocketBase
+    let body;
+    try {
+      const info = c.requestInfo();
+      if (info && info.body) {
+        body = (typeof info.body === 'object') ? info.body : {};
+        // Se for DynamicModel (tem .get()), converte p/ plain object
+        if (body && typeof body.get === 'function') {
+          body = {
+            csvText: body.get('csvText'),
+            fileName: body.get('fileName'),
+            records: body.get('records'),
+          };
+        }
+      } else {
+        body = {};
+      }
+    } catch (_) {
       try {
-        const row = txDao.db().newQuery(`SELECT COUNT(*) as total FROM ${COLLECTION}`).one();
-        oldCount = row?.get('total') || 0;
-      } catch (_) { oldCount = 0; }
-      txDao.db().newQuery(`DELETE FROM ${COLLECTION}`).execute();
+        const raw = c.parseBody();
+        body = (typeof raw === 'object' && raw !== null) ? raw : {};
+      } catch (_2) {
+        body = {};
+      }
+    }
 
-      // Processa em lotes
-      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-        const batch = rows.slice(i, i + BATCH_SIZE);
-        for (let j = 0; j < batch.length; j++) {
-          const r = batch[j];
-          try {
-            const rec = txDao.createRecord(collection);
-            for (const field of mappedFields) {
-              const val = sanitizeValue(field, r[field]);
-              if (val !== null) rec.set(field, val);
+    // ─── Modo LEGADO: { records } ──────────────────────────────
+    if (body.records && Array.isArray(body.records)) {
+      return handleLegacyBody(c, body, auth);
+    }
+
+    // ─── Modo NOVO: { csvText } ────────────────────────────────
+    const csvText = body.csvText;
+    if (!csvText || typeof csvText !== 'string' || csvText.trim().length === 0) {
+      return c.json(400, { code: 400, message: 'Envie csvText com o conteúdo do CSV' });
+    }
+
+    const fileName = body.fileName || 'import.csv';
+    const mode = body.mode === 'append' ? 'append' : 'replace'; // append = nao deleta dados antigos
+
+    // 3. Parse CSV
+    const { headers, rows } = parseCSV(csvText);
+    if (rows.length === 0) {
+      return c.json(400, { code: 400, message: 'CSV vazio ou sem dados válidos após o cabeçalho' });
+    }
+
+    // 4. Valida campos mapeados
+    const mappedFields = headers.filter(Boolean);
+    if (!mappedFields.includes('nome') || !mappedFields.includes('cns')) {
+      return c.json(400, {
+        code: 400,
+        message: 'CSV precisa ter colunas mapeáveis para "nome" e "cns". Colunas encontradas: ' +
+          JSON.stringify(headers.map((h, i) => ({ csv: parseCSVLine(csvText.split('\n')[0])[i], mapped: h })))
+      });
+    }
+
+    // 5. Transação — processa em lotes para memória (1GB VM)
+    const dao = $app.dao();
+    const collection = dao.findCollectionByNameOrId(COLLECTION);
+    if (!collection) return c.json(500, { code: 500, message: `Collection "${COLLECTION}" não encontrada` });
+
+    let oldCount = 0, newCount = 0, totalErrors = 0;
+    const errorDetails = [];
+
+    try {
+      dao.runInTransaction((txDao) => {
+        // Conta dados existentes
+        try {
+          const row = txDao.db().newQuery(`SELECT COUNT(*) as total FROM ${COLLECTION}`).one();
+          oldCount = row?.get('total') || 0;
+        } catch (_) { oldCount = 0; }
+
+        // Modo replace: deleta antigos. Modo append: mantem.
+        if (mode === 'replace') {
+          txDao.db().newQuery(`DELETE FROM ${COLLECTION}`).execute();
+        }
+
+        // Processa em lotes
+        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+          const batch = rows.slice(i, i + BATCH_SIZE);
+          for (let j = 0; j < batch.length; j++) {
+            const r = batch[j];
+            try {
+              const rec = txDao.createRecord(collection);
+              for (const field of mappedFields) {
+                const val = sanitizeValue(field, r[field]);
+                if (val !== null) rec.set(field, val);
+              }
+              txDao.saveRecord(rec);
+              newCount++;
+            } catch (e) {
+              totalErrors++;
+              const errMsg = (e && e.message) || 'Erro desconhecido';
+              errorDetails.push(`#${i + j + 1} ${r.cns || r.nome || '?'}: ${errMsg}`);
             }
-            txDao.saveRecord(rec);
-            newCount++;
-          } catch (e) {
-            totalErrors++;
-            const errMsg = (e && e.message) || 'Erro desconhecido';
-            errorDetails.push(`#${i + j + 1} ${r.cns || r.nome || '?'}: ${errMsg}`);
           }
         }
-      }
 
-      if (newCount === 0 && rows.length > 0)
-        throw new Error('Nenhum registro inserido. Transação revertida.');
-    });
-  } catch (e) {
-    return c.json(500, {
-      code: 500,
-      message: (e && e.message) || 'Erro na importação',
-      oldCount,
-      rollback: true,
-    });
-  }
-
-  // 6. Log
-  try {
-    const logColl = dao.findCollectionByNameOrId(LOG_COLLECTION);
-    if (logColl) {
-      const log = dao.createRecord(logColl);
-      log.set('filename', fileName);
-      log.set('total_records', rows.length);
-      log.set('success_count', newCount);
-      log.set('error_count', totalErrors);
-      log.set('user_id', auth.getId());
-      if (errorDetails.length > 0)
-        log.set('details', errorDetails.slice(0, 100).join('\n'));
-      dao.saveRecord(log);
+        if (newCount === 0 && rows.length > 0 && mode === 'replace')
+          throw new Error('Nenhum registro inserido. Transação revertida.');
+      });
+    } catch (e) {
+      return c.json(500, {
+        code: 500,
+        message: (e && e.message) || 'Erro na importação',
+        oldCount,
+        rollback: true,
+      });
     }
-  } catch (_) {}
 
-  return c.json(200, {
-    success: true,
-    mode: 'replace',
-    total: rows.length,
-    imported: newCount,
-    errors: totalErrors,
-    oldCount,
-    mappedFields: mappedFields,
-    errorDetails: errorDetails.slice(0, 10),
-  });
+    // 6. Log
+    try {
+      const logColl = dao.findCollectionByNameOrId(LOG_COLLECTION);
+      if (logColl) {
+        const log = dao.createRecord(logColl);
+        log.set('filename', fileName);
+        log.set('total_records', rows.length);
+        log.set('success_count', newCount);
+        log.set('error_count', totalErrors);
+        log.set('user_id', auth.getId());
+        if (errorDetails.length > 0)
+          log.set('details', errorDetails.slice(0, 100).join('\n'));
+        dao.saveRecord(log);
+      }
+    } catch (_) {}
+
+    return c.json(200, {
+      success: true,
+      mode: 'replace',
+      total: rows.length,
+      imported: newCount,
+      errors: totalErrors,
+      oldCount,
+      mappedFields: mappedFields,
+      errorDetails: errorDetails.slice(0, 10),
+    });
+  } catch (unexpectedErr) {
+    // Garante que erros inesperados nao caiam no generic "Something went wrong" do PB
+    const msg = (unexpectedErr && unexpectedErr.message) || 'Erro inesperado no servidor';
+    console.error('import-pacientes CRASH:', msg);
+    return c.json(500, { code: 500, message: msg });
+  }
 });
 
 // ─── Handler legado (mesma lógica de antes) ────────────────
