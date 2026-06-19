@@ -283,19 +283,44 @@ routerAdd('POST', '/api/custom/import-pacientes', (c) => {
     let oldCount = 0, newCount = 0, totalErrors = 0;
     const errorDetails = [];
 
-    // ─── FASE 1: DELETE FORA da transação (garantido) ───
+    // ─── FASE 1: DROP TABLE (impossível ficar parcial) ───
     if (mode === 'replace') {
+      // Conta antes
       try {
         const row = dao.db().newQuery(`SELECT COUNT(*) as total FROM ${COLLECTION}`).one();
         oldCount = row?.get('total') || 0;
       } catch (_) { oldCount = 0; }
 
-      dao.db().newQuery(`DELETE FROM ${COLLECTION}`).execute();
-      console.log(`[import-pacientes] DELETE realizado: ${oldCount} registros removidos`);
+      // Salva schema da coleção
+      const colJSON = collection.export();
+      const colFields = JSON.parse(colJSON).fields;
+      const colIndexes = collection.indexes ? collection.indexes() : [];
+
+      // DROP TABLE
+      dao.db().newQuery(`DROP TABLE IF EXISTS ${COLLECTION}`).execute();
+      console.log(`[import-pacientes] DROP TABLE ${COLLECTION}: ${oldCount} registros destruídos`);
+
+      // Recria tabela com mesma estrutura
+      const fieldDefs = colFields.map(f => {
+        let colType = 'TEXT';
+        if (f.type === 'number') colType = 'REAL DEFAULT 0';
+        else if (f.type === 'bool') colType = 'INTEGER DEFAULT 0';
+        else if (f.type === 'file') colType = 'TEXT DEFAULT \'\'';
+        return `"${f.name}" ${colType}`;
+      }).join(', ');
+      dao.db().newQuery(`CREATE TABLE IF NOT EXISTS "${COLLECTION}" (id TEXT PRIMARY KEY, created TEXT DEFAULT (datetime(\'now\')), updated TEXT DEFAULT (datetime(\'now\')), ${fieldDefs})`).execute();
+
+      // Recria collection no PocketBase (metadados)
+      dao.saveCollection(collection);
+
+      console.log(`[import-pacientes] Tabela recriada com ${colFields.length} campos`);
     }
 
     // ─── FASE 2: INSERT dentro da transação ───
     if (rows.length > 0) {
+      // Rebusca collection (pode ter sido recriada)
+      const freshCollection = dao.findCollectionByNameOrId(COLLECTION);
+
       try {
         dao.runInTransaction((txDao) => {
           for (let i = 0; i < rows.length; i += BATCH_SIZE) {
@@ -303,7 +328,7 @@ routerAdd('POST', '/api/custom/import-pacientes', (c) => {
             for (let j = 0; j < batch.length; j++) {
               const r = batch[j];
               try {
-                const rec = txDao.createRecord(collection);
+                const rec = txDao.createRecord(freshCollection);
                 for (const field of mappedFields) {
                   const val = sanitizeValue(field, r[field]);
                   if (val !== null) rec.set(field, val);
@@ -322,12 +347,11 @@ routerAdd('POST', '/api/custom/import-pacientes', (c) => {
             throw new Error('Nenhum registro inserido. Transação revertida.');
         });
       } catch (e) {
-        // INSERT falhou, mas DELETE já foi feito — dados antigos foram removidos
         const msg = (e && e.message) || 'Erro na importação';
-        console.error('[import-pacientes] INSERT falhou após DELETE:', msg);
+        console.error('[import-pacientes] INSERT falhou:', msg);
         return c.json(500, {
           code: 500,
-          message: 'DELETE realizado mas INSERT falhou: ' + msg,
+          message: 'Tabela recriada mas INSERT falhou: ' + msg,
           oldCount,
           imported: 0,
           errors: totalErrors || rows.length,
@@ -428,5 +452,64 @@ routerAdd('POST', '/api/custom/delete-all', (c) => {
     return c.json(500, { code: 500, message: msg });
   }
 });
+
+// ─── HOOK: auto-delete antigos quando frontend cria registros 1 por 1 ───
+// Quando "Substituir existentes" está marcado, frontend antigo faz:
+//   delete sequencial (Promise.allSettled) + create 1 por 1.
+// Este hook intercepta o PRIMEIRO create e deleta TODOS os antigos de uma vez.
+// Funciona com qualquer build do frontend.
+
+var _autoDeleteDone = false;
+
+onRecordBeforeCreateRequest((e) => {
+  if (!e.record || e.record.collection().name !== COLLECTION) {
+    return e.next();
+  }
+  if (_autoDeleteDone) {
+    return e.next();
+  }
+
+  console.log('[auto-delete] Primeiro create detectado — limpando ' + COLLECTION + '...');
+
+  try {
+    var dao = $app.dao();
+    var total = 0;
+    try {
+      var row = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
+      total = (row && row.get) ? (row.get('total') || 0) : 0;
+    } catch (_) {}
+
+    if (total === 0) {
+      _autoDeleteDone = true;
+      return e.next();
+    }
+
+    // DELETE em batch até vazio
+    var maxIter = 200;
+    var iter = 0;
+    while (iter < maxIter) {
+      var check = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
+      var rem = (check && check.get) ? (check.get('total') || 0) : 0;
+      if (rem === 0) break;
+      dao.db().newQuery('DELETE FROM ' + COLLECTION + ' WHERE id IN (SELECT id FROM ' + COLLECTION + ' LIMIT 10000)').execute();
+      iter++;
+    }
+
+    var finalCheck = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
+    var leftover = (finalCheck && finalCheck.get) ? (finalCheck.get('total') || 0) : 0;
+
+    _autoDeleteDone = true;
+
+    if (leftover > 0) {
+      console.error('[auto-delete] ERRO: ' + leftover + ' registros restaram');
+    } else {
+      console.log('[auto-delete] OK: ' + total + ' registros destruidos. Colecao vazia.');
+    }
+  } catch (err) {
+    console.error('[auto-delete] Erro:', (err && err.message) || err);
+  }
+
+  return e.next();
+}, COLLECTION);
 
 
