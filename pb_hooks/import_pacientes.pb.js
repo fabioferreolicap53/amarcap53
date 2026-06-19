@@ -1,17 +1,13 @@
-// Custom endpoint: Import CSV directly to amarcap53_pacientes
-// Uso: POST /api/custom/import-pacientes
-// Body (novo): { csvText: "raw csv...", fileName: "exemplo.csv" }
-// Body (legado): { records: [...], fileName: "...", mode: "replace"|"append" }
-// Apenas cap/admin. Transação all-or-nothing.
-// Otimizado para 1GB RAM VM: processa em lotes de 500
-
-console.log('[pb_hooks] import_pacientes.pb.js CARREGADO com sucesso!');
+// Import CSV → amarcap53_pacientes
+// POST /api/custom/import-pacientes
+// Body: { csvText, fileName, mode }
+// Apenas cap/admin. ES5 puro (Goja engine).
 
 var COLLECTION = 'amarcap53_pacientes';
 var LOG_COLLECTION = 'amarcap53_importacoes';
 var BATCH_SIZE = 500;
+var DATE_FIELDS = ['data_nascimento', 'cito_lab', 'cito_pep', 'dna_hpv_gal', 'dna_hpv_pep'];
 
-// Goja ES5 helper — substitui padStart nativo
 function padLeft(str, len, ch) {
   var s = String(str);
   ch = ch || ' ';
@@ -19,55 +15,45 @@ function padLeft(str, len, ch) {
   return s;
 }
 
-// Mapa: nome do campo no PocketBase → aliases do CSV (normalizados)
-var FIELD_ALIASES = {
-  'unidade':               ['UNIDADE', 'UNIDADE DE SAUDE', 'UNIDADE SAÚDE', 'UNIDADE SAUDE', 'ESTABELECIMENTO', 'UBS'],
-  'equipe':                ['EQUIPE', 'EQUIPE DE SAUDE', 'EQUIPE SAÚDE', 'EQUIPE SAUDE', 'EQ'],
-  'microarea':             ['MICROAREA', 'MICRO ÁREA', 'MICRO AREA', 'MICRO', 'MICROÁREA', 'MICRO_AREA'],
-  'cns':                   ['CNS', 'CARTAO SUS', 'CARTÃO SUS', 'NUMERO CNS', 'Nº CNS', 'N° CNS', 'CNS/CPF'],
-  'nome':                  ['NOME', 'NOME PACIENTE', 'NOME DO PACIENTE', 'PACIENTE', 'NOME COMPLETO'],
-  'data_nascimento':       ['NASC', 'DATA DE NASCIMENTO', 'DATA NASCIMENTO', 'NASCIMENTO', 'DATA_NASCIMENTO', 'DT NASCIMENTO', 'DT NASC', 'DATA NASC'],
-  'idade':                 ['IDADE', 'ANOS'],
-  'grupo':                 ['GRUPO', 'FAIXA ETÁRIA', 'FAIXA ETARIA', 'FAIXA ETARIA', 'CATEGORIA'],
-  'cito_lab':              ['CITO LAB', 'RESULTADO DE CITO LABORATÓRIO', 'CITO LABORATORIO', 'CITO LABORATÓRIO', 'CITO_LAB', 'CITO LAB', 'CITOLAB'],
-  'cito_pep':              ['CITO PEP', 'RESULTADO DE CITO REGISTRADO NO PEP', 'CITO_PEP', 'CITO PEP', 'CITOPEP'],
-  'dna_hpv_gal':           ['DNA-HPV', 'TESTE MOLECULAR DNA-HPV', 'DNA_HPV_GAL', 'DNA HPV', 'DNA HPV GAL', 'DNA-HPV GAL'],
-  'alertas_rastreamento':  ['ALERTAS RASTREAMENTO', 'ALERTAS', 'ALERTA', 'ALERTAS DE RASTREAMENTO', 'OBSERVACOES'],
-};
-
-// Campos do tipo date — precisam conversão DD/MM/YYYY → YYYY-MM-DD
-// Goja (PB JS engine) is ES5 — no Set/Map/Promise/etc.
-var DATE_FIELDS = ['data_nascimento', 'cito_lab', 'cito_pep', 'dna_hpv_gal', 'dna_hpv_pep'];
-
 function isDateField(f) {
-  return DATE_FIELDS.indexOf(f) !== -1;
+  for (var i = 0; i < DATE_FIELDS.length; i++) {
+    if (DATE_FIELDS[i] === f) return true;
+  }
+  return false;
 }
 
-// ─── Helpers (var p/ compat Goja PB v0.39.x) ──────────────
-
 function normalizeHeader(h) {
-  return h.trim()
-    .toUpperCase()
-    .replace(/[^\w\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-};
+  return h.trim().toUpperCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
 
 function findField(csvHeader) {
   var n = normalizeHeader(csvHeader);
-  if (FIELD_ALIASES[n]) return n;
-  var fieldName, aliases, ai;
-  for (fieldName in FIELD_ALIASES) {
-    aliases = FIELD_ALIASES[fieldName];
-    for (ai = 0; ai < aliases.length; ai++) {
-      if (normalizeHeader(aliases[ai]) === n) return fieldName;
+  var ALIASES = {
+    'unidade': ['UNIDADE', 'UNIDADE DE SAUDE', 'ESTABELECIMENTO', 'UBS'],
+    'equipe': ['EQUIPE', 'EQUIPE DE SAUDE', 'EQ'],
+    'microarea': ['MICROAREA', 'MICRO AREA', 'MICRO', 'MICROAREA'],
+    'cns': ['CNS', 'CARTAO SUS', 'NUMERO CNS'],
+    'nome': ['NOME', 'NOME PACIENTE', 'NOME DO PACIENTE', 'PACIENTE', 'NOME COMPLETO'],
+    'data_nascimento': ['NASC', 'DATA DE NASCIMENTO', 'DATA NASCIMENTO', 'NASCIMENTO', 'DATA_NASCIMENTO'],
+    'idade': ['IDADE', 'ANOS'],
+    'grupo': ['GRUPO', 'FAIXA ETARIA', 'CATEGORIA'],
+    'cito_lab': ['CITO LAB', 'CITO LABORATORIO', 'CITO_LAB', 'CITOLAB'],
+    'cito_pep': ['CITO PEP', 'CITO_PEP', 'CITOPEP'],
+    'dna_hpv_gal': ['DNA-HPV', 'DNA_HPV_GAL', 'DNA HPV', 'DNA HPV GAL'],
+    'alertas_rastreamento': ['ALERTAS RASTREAMENTO', 'ALERTAS', 'OBSERVACOES']
+  };
+  var key, aliases, i;
+  for (key in ALIASES) {
+    aliases = ALIASES[key];
+    for (i = 0; i < aliases.length; i++) {
+      if (normalizeHeader(aliases[i]) === n) return key;
     }
   }
-  for (fieldName in FIELD_ALIASES) {
-    aliases = FIELD_ALIASES[fieldName];
-    for (ai = 0; ai < aliases.length; ai++) {
-      var na = normalizeHeader(aliases[ai]);
-      if (n.indexOf(na) !== -1 || na.indexOf(n) !== -1) return fieldName;
+  for (key in ALIASES) {
+    aliases = ALIASES[key];
+    for (i = 0; i < aliases.length; i++) {
+      var na = normalizeHeader(aliases[i]);
+      if (n.indexOf(na) !== -1 || na.indexOf(n) !== -1) return key;
     }
   }
   return null;
@@ -75,7 +61,8 @@ function findField(csvHeader) {
 
 function parseCSVLine(line) {
   var fields = [];
-  var cur = '', inQ = false;
+  var cur = '';
+  var inQ = false;
   for (var i = 0; i < line.length; i++) {
     var ch = line[i];
     if (ch === '"') { inQ = !inQ; continue; }
@@ -84,21 +71,23 @@ function parseCSVLine(line) {
   }
   fields.push(cur.trim());
   return fields;
-};
+}
 
 function parseCSV(text) {
-  var lines = text.replace(/^\ufeff/, '').replace(/\r/g, '').split('\n').filter(function(l) { return l.trim(); });
+  var raw = text.replace(/^\ufeff/, '').replace(/\r/g, '').split('\n');
+  var lines = [];
+  for (var i = 0; i < raw.length; i++) {
+    if (raw[i].trim()) lines.push(raw[i]);
+  }
   if (lines.length < 2) return { headers: [], rows: [] };
-
   var rawHeaders = parseCSVLine(lines[0]);
   var headers = [];
-  for (var hi = 0; hi < rawHeaders.length; hi++) {
-    headers.push(findField(rawHeaders[hi]));
+  for (var h = 0; h < rawHeaders.length; h++) {
+    headers.push(findField(rawHeaders[h]));
   }
   var rows = [];
-
-  for (var ri = 1; ri < lines.length; ri++) {
-    var vals = parseCSVLine(lines[ri]);
+  for (var r = 1; r < lines.length; r++) {
+    var vals = parseCSVLine(lines[r]);
     var row = {};
     var hasData = false;
     for (var j = 0; j < headers.length && j < vals.length; j++) {
@@ -108,24 +97,25 @@ function parseCSV(text) {
     }
     if (hasData) rows.push(row);
   }
-
   return { headers: headers, rows: rows };
-};
+}
 
-var parseDate = function(str) {
+function parseDate(str) {
   if (!str || str === '--' || str.trim() === '') return null;
   var s = str.trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s;
   var parts = s.split('/');
   if (parts.length === 3) {
-    var d = parts[0], m = parts[1], y = parts[2];
+    var d = parts[0];
+    var m = parts[1];
+    var y = parts[2];
     if (y.length === 2) y = '20' + y;
     return y + '-' + padLeft(m, 2, '0') + '-' + padLeft(d, 2, '0');
   }
   return null;
-};
+}
 
-var sanitizeValue = function(field, val) {
+function sanitizeValue(field, val) {
   if (val === undefined || val === null) return null;
   var s = String(val).trim();
   if (s === '' || s === '--') return null;
@@ -133,48 +123,63 @@ var sanitizeValue = function(field, val) {
   if (field === 'microarea' || field === 'idade') return parseInt(s, 10) || 0;
   if (field === 'cns') return padLeft(s.replace(/\D/g, ''), 15, '0').slice(-15);
   return s;
-};
+}
 
-// ─── Handler legado (var p/ compat Goja PB v0.39.x) ───────
+function doInsert(dao, collection, rows, mappedFields) {
+  var newCount = 0;
+  var totalErrors = 0;
+  var errorDetails = [];
+  dao.runInTransaction(function(txDao) {
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      try {
+        var rec = txDao.createRecord(collection);
+        for (var fi = 0; fi < mappedFields.length; fi++) {
+          var val = sanitizeValue(mappedFields[fi], r[mappedFields[fi]]);
+          if (val !== null) rec.set(mappedFields[fi], val);
+        }
+        txDao.saveRecord(rec);
+        newCount++;
+      } catch (e) {
+        totalErrors++;
+        var errMsg = (e && e.message) ? e.message : 'Erro';
+        errorDetails.push('#' + (i + 1) + ' ' + (r.cns || r.nome || '?') + ': ' + errMsg);
+      }
+    }
+    if (newCount === 0 && rows.length > 0) throw new Error('Nenhum registro inserido');
+  });
+  return { newCount: newCount, totalErrors: totalErrors, errorDetails: errorDetails };
+}
 
-var handleLegacyBody = function(c, body, auth) {
+// ─── Handler legado ─────────────────────────────────────
+function handleLegacyBody(c, body, auth) {
   var records = body.records;
   var fileName = body.fileName || 'import.csv';
   var mode = body.mode === 'append' ? 'append' : 'replace';
-
-  if (records.length > 30000)
-    return c.json(413, { code: 413, message: 'Max 30000 registros por lote no modo legado' });
-
+  if (records.length > 30000) return c.json(413, { code: 413, message: 'Max 30000 registros por lote' });
   var dao = $app.dao();
-  var collection = dao.findCollectionByNameOrId(COLLECTION);
-  if (!collection) return c.json(500, { code: 500, message: 'Collection "' + COLLECTION + '" nao encontrada' });
-
-  var oldCount = 0, newCount = 0;
+  var coll = dao.findCollectionByNameOrId(COLLECTION);
+  if (!coll) return c.json(500, { code: 500, message: 'Collection nao encontrada' });
+  var oldCount = 0;
+  var newCount = 0;
   var errors = [];
-
   try {
     dao.runInTransaction(function(txDao) {
       if (mode === 'replace') {
-        try {
-          var row = txDao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
-          oldCount = row && row.get ? (row.get('total') || 0) : 0;
-        } catch (_) { oldCount = 0; }
+        try { var row = txDao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one(); oldCount = (row && row.get) ? (row.get('total') || 0) : 0; } catch (_) { oldCount = 0; }
         txDao.db().newQuery('DELETE FROM ' + COLLECTION).execute();
       }
-
       for (var i = 0; i < records.length; i++) {
         var r = records[i];
         try {
-          var rec = txDao.createRecord(collection);
+          var rec = txDao.createRecord(coll);
           if (r.unidade) rec.set('unidade', String(r.unidade).trim());
           if (r.equipe) rec.set('equipe', String(r.equipe).trim());
-          if (r.microarea !== undefined && r.microarea !== null && r.microarea !== '')
-            rec.set('microarea', parseInt(r.microarea, 10) || 0);
+          if (r.microarea !== undefined && r.microarea !== null && r.microarea !== '') rec.set('microarea', parseInt(r.microarea, 10) || 0);
           if (r.cns) rec.set('cns', padLeft(String(r.cns).replace(/\D/g, ''), 15, '0').slice(-15));
           if (r.nome) rec.set('nome', String(r.nome).trim());
           if (r.data_nascimento) rec.set('data_nascimento', r.data_nascimento);
-          if (r.idade !== undefined && r.idade !== null && r.idade !== '')
-            rec.set('idade', parseInt(r.idade, 10) || 0);
+          if (r.idade !== undefined && r.idade !== null && r.idade !== '') rec.set('idade', parseInt(r.idade, 10) || 0);
           if (r.grupo !== undefined && r.grupo !== null) rec.set('grupo', String(r.grupo).trim());
           if (r.cito_lab) rec.set('cito_lab', r.cito_lab);
           if (r.cito_pep) rec.set('cito_pep', r.cito_pep);
@@ -186,138 +191,57 @@ var handleLegacyBody = function(c, body, auth) {
           errors.push('#' + (i + 1) + ' CNS=' + (r.cns || '?') + ': ' + ((e && e.message) || 'Erro'));
         }
       }
-
-      if (newCount === 0 && records.length > 0)
-        throw new Error('Nenhum registro inserido. Transacao revertida.');
+      if (newCount === 0 && records.length > 0) throw new Error('Nenhum registro inserido');
     });
   } catch (e) {
-    return c.json(500, {
-      code: 500,
-      message: (e && e.message) || 'Erro na importacao',
-      oldCount: oldCount,
-      rollback: true,
-    });
+    return c.json(500, { code: 500, message: (e && e.message) || 'Erro', oldCount: oldCount, rollback: true });
   }
+  try { var logColl = dao.findCollectionByNameOrId(LOG_COLLECTION); if (logColl) { var log = dao.createRecord(logColl); log.set('filename', fileName); log.set('total_records', records.length); log.set('success_count', newCount); log.set('error_count', records.length - newCount); log.set('user_id', auth.getId()); if (errors.length > 0) log.set('details', errors.slice(0, 100).join('\n')); dao.saveRecord(log); } } catch (_) {}
+  return c.json(200, { success: true, mode: mode, total: records.length, imported: newCount, errors: records.length - newCount, oldCount: oldCount, errorDetails: errors.slice(0, 10) });
+}
 
-  try {
-    var logColl = dao.findCollectionByNameOrId(LOG_COLLECTION);
-    if (logColl) {
-      var log = dao.createRecord(logColl);
-      log.set('filename', fileName);
-      log.set('total_records', records.length);
-      log.set('success_count', newCount);
-      log.set('error_count', records.length - newCount);
-      log.set('user_id', auth.getId());
-      if (errors.length > 0) log.set('details', errors.slice(0, 100).join('\n'));
-      dao.saveRecord(log);
-    }
-  } catch (_) {}
-
-  return c.json(200, {
-    success: true,
-    mode: mode,
-    total: records.length,
-    imported: newCount,
-    errors: records.length - newCount,
-    oldCount: oldCount,
-    errorDetails: errors.slice(0, 10),
-  });
-};
-
-// ─── Router ────────────────────────────────────────────────
-
+// ─── Router: POST /api/custom/import-pacientes ──────────
 routerAdd('POST', '/api/custom/import-pacientes', function(c) {
   try {
-    // 1. Auth
     var auth = c.auth;
     if (!auth) return c.json(401, { code: 401, message: 'Nao autenticado' });
     var role = auth.get('role');
-    if (role !== 'cap' && role !== 'admin')
-      return c.json(403, { code: 403, message: 'Apenas usuarios CAP ou admin' });
-
-    // 2. Parse body
+    if (role !== 'cap' && role !== 'admin') return c.json(403, { code: 403, message: 'Apenas CAP ou admin' });
     var body;
     try {
       var info = c.requestInfo();
       if (info && info.body) {
         body = (typeof info.body === 'object') ? info.body : {};
         if (body && typeof body.get === 'function') {
-          body = {
-            csvText: body.get('csvText'),
-            fileName: body.get('fileName'),
-            records: body.get('records'),
-            mode: body.get('mode'),
-          };
+          body = { csvText: body.get('csvText'), fileName: body.get('fileName'), records: body.get('records'), mode: body.get('mode') };
         }
-      } else {
-        body = {};
-      }
-    } catch (_) {
-      try {
-        body = c.parseBody() || {};
-      } catch (_2) {
-        body = {};
-      }
-    }
-
+      } else { body = {}; }
+    } catch (_) { try { body = c.parseBody() || {}; } catch (_2) { body = {}; } }
     var bodyMode = body.mode || 'replace';
-
-    // ─── Modo LEGADO: { records } ──────────────────────────────
-    if (body.records && Array.isArray(body.records)) {
-      return handleLegacyBody(c, body, auth);
-    }
-
-    // ─── Modo NOVO: { csvText } ────────────────────────────────
+    if (body.records && Array.isArray(body.records)) return handleLegacyBody(c, body, auth);
     var csvText = body.csvText;
-    if (!csvText || typeof csvText !== 'string' || csvText.trim().length === 0) {
-      return c.json(400, { code: 400, message: 'Envie csvText com o conteudo do CSV' });
-    }
-
+    if (!csvText || typeof csvText !== 'string' || csvText.trim().length === 0) return c.json(400, { code: 400, message: 'Envie csvText' });
     var fileName = body.fileName || 'import.csv';
     var mode = (bodyMode === 'append') ? 'append' : 'replace';
-
-    // 3. Parse CSV
     var parsed = parseCSV(csvText);
     var csvHeaders = parsed.headers;
     var rows = parsed.rows;
-    if (rows.length === 0) {
-      return c.json(400, { code: 400, message: 'CSV vazio ou sem dados validos' });
-    }
-
-    // 4. Valida campos mapeados
+    if (rows.length === 0) return c.json(400, { code: 400, message: 'CSV vazio' });
     var mappedFields = [];
-    for (var mi = 0; mi < csvHeaders.length; mi++) {
-      if (csvHeaders[mi]) mappedFields.push(csvHeaders[mi]);
-    }
-    var hasNome = false, hasCns = false;
+    for (var mi = 0; mi < csvHeaders.length; mi++) { if (csvHeaders[mi]) mappedFields.push(csvHeaders[mi]); }
+    var hasNome = false;
+    var hasCns = false;
     for (var vi = 0; vi < mappedFields.length; vi++) {
       if (mappedFields[vi] === 'nome') hasNome = true;
       if (mappedFields[vi] === 'cns') hasCns = true;
     }
-    if (!hasNome || !hasCns) {
-      return c.json(400, {
-        code: 400,
-        message: 'CSV precisa de colunas "nome" e "cns". Encontradas: ' + mappedFields.join(', '),
-      });
-    }
-
-    // 5. DELETE + INSERT
+    if (!hasNome || !hasCns) return c.json(400, { code: 400, message: 'CSV precisa de "nome" e "cns". Encontradas: ' + mappedFields.join(', ') });
     var dao = $app.dao();
     var collection = dao.findCollectionByNameOrId(COLLECTION);
     if (!collection) return c.json(500, { code: 500, message: 'Collection nao encontrada' });
-
     var oldCount = 0;
-    var newCount = 0;
-    var totalErrors = 0;
-    var errorDetails = [];
-
-    // ─── FASE 1: DELETE — garante coleção vazia ──────────────
     if (mode === 'replace') {
-      try {
-        var cntRow = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
-        oldCount = (cntRow && cntRow.get) ? (cntRow.get('total') || 0) : 0;
-      } catch (_) { oldCount = 0; }
-
+      try { var cntRow = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one(); oldCount = (cntRow && cntRow.get) ? (cntRow.get('total') || 0) : 0; } catch (_) { oldCount = 0; }
       if (oldCount > 0) {
         var delIter = 0;
         while (delIter < 500) {
@@ -327,201 +251,69 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
           dao.db().newQuery('DELETE FROM ' + COLLECTION + ' WHERE id IN (SELECT id FROM ' + COLLECTION + ' LIMIT 10000)').execute();
           delIter++;
         }
-
         var finalRow = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
         var leftover = (finalRow && finalRow.get) ? (finalRow.get('total') || 0) : 0;
-        if (leftover > 0) {
-          console.error('[import-pacientes] AVISO: ' + leftover + ' registros restaram apos DELETE');
-          return c.json(500, { code: 500, message: leftover + ' registros antigos nao puderam ser removidos' });
-        }
-        console.log('[import-pacientes] DELETE OK: ' + oldCount + ' registros removidos');
+        if (leftover > 0) return c.json(500, { code: 500, message: leftover + ' registros nao removidos' });
       }
     }
-
-    // ─── FASE 2: INSERT ──────────────────────────────────────
+    var insertResult = { newCount: 0, totalErrors: 0, errorDetails: [] };
     if (rows.length > 0) {
       try {
-        dao.runInTransaction(function(txDao) {
-          for (var i = 0; i < rows.length; i++) {
-            var r = rows[i];
-            try {
-              var rec = txDao.createRecord(collection);
-              for (var fi = 0; fi < mappedFields.length; fi++) {
-                var val = sanitizeValue(mappedFields[fi], r[mappedFields[fi]]);
-                if (val !== null) rec.set(mappedFields[fi], val);
-              }
-              txDao.saveRecord(rec);
-              newCount++;
-            } catch (e) {
-              totalErrors++;
-              var errMsg = (e && e.message) ? e.message : 'Erro';
-              errorDetails.push('#' + (i + 1) + ' ' + (r.cns || r.nome || '?') + ': ' + errMsg);
-            }
-          }
-          if (newCount === 0 && rows.length > 0)
-            throw new Error('Nenhum registro inserido. Transacao revertida.');
-        });
+        insertResult = doInsert(dao, collection, rows, mappedFields);
       } catch (e) {
-        var insMsg = (e && e.message) ? e.message : 'Erro na importacao';
-        console.error('[import-pacientes] INSERT falhou:', insMsg);
-        return c.json(500, {
-          code: 500,
-          message: 'DELETE ok mas INSERT falhou: ' + insMsg,
-          oldCount: oldCount,
-          imported: 0,
-          errors: totalErrors || rows.length,
-        });
+        return c.json(500, { code: 500, message: 'DELETE ok mas INSERT falhou: ' + ((e && e.message) || '?'), oldCount: oldCount, imported: 0, errors: rows.length });
       }
     }
-
-    // 6. Log
-    try {
-      var logColl = dao.findCollectionByNameOrId(LOG_COLLECTION);
-      if (logColl) {
-        var log = dao.createRecord(logColl);
-        log.set('filename', fileName);
-        log.set('total_records', rows.length);
-        log.set('success_count', newCount);
-        log.set('error_count', totalErrors);
-        log.set('user_id', auth.getId());
-        if (errorDetails.length > 0)
-          log.set('details', errorDetails.slice(0, 100).join('\n'));
-        dao.saveRecord(log);
-      }
-    } catch (_) {}
-
-    console.log('[import-pacientes] OK: ' + oldCount + ' antigos removidos, ' + newCount + ' novos inseridos, ' + totalErrors + ' erros');
-
-    return c.json(200, {
-      success: true,
-      mode: mode,
-      total: rows.length,
-      imported: newCount,
-      errors: totalErrors,
-      oldCount: oldCount,
-      mappedFields: mappedFields,
-      errorDetails: errorDetails.slice(0, 10),
-    });
-  } catch (unexpectedErr) {
-    var crashMsg = (unexpectedErr && unexpectedErr.message) ? unexpectedErr.message : 'Erro inesperado';
-    console.error('import-pacientes CRASH:', crashMsg);
-    return c.json(500, { code: 500, message: crashMsg });
+    try { var logColl = dao.findCollectionByNameOrId(LOG_COLLECTION); if (logColl) { var log = dao.createRecord(logColl); log.set('filename', fileName); log.set('total_records', rows.length); log.set('success_count', insertResult.newCount); log.set('error_count', insertResult.totalErrors); log.set('user_id', auth.getId()); if (insertResult.errorDetails.length > 0) log.set('details', insertResult.errorDetails.slice(0, 100).join('\n')); dao.saveRecord(log); } } catch (_) {}
+    return c.json(200, { success: true, mode: mode, total: rows.length, imported: insertResult.newCount, errors: insertResult.totalErrors, oldCount: oldCount, mappedFields: mappedFields, errorDetails: insertResult.errorDetails.slice(0, 10) });
+  } catch (err) {
+    var msg = (err && err.message) ? err.message : 'Erro inesperado';
+    console.error('import-pacientes CRASH:', msg);
+    return c.json(500, { code: 500, message: msg });
   }
 });
 
-// ─── DELETE em massa: remove TODOS os registros de uma coleção ───
-// POST /api/custom/delete-all  { collection: "amarcap53_pacientes" }
-// Apenas cap/admin. SQL direto = instantâneo.
+// ─── DELETE em massa ────────────────────────────────────
 routerAdd('POST', '/api/custom/delete-all', function(c) {
   try {
     var auth = c.auth;
     if (!auth) return c.json(401, { code: 401, message: 'Nao autenticado' });
     var role = auth.get('role');
-    if (role !== 'cap' && role !== 'admin')
-      return c.json(403, { code: 403, message: 'Apenas usuarios CAP ou admin' });
-
+    if (role !== 'cap' && role !== 'admin') return c.json(403, { code: 403, message: 'Apenas CAP ou admin' });
     var body;
-    try {
-      var info = c.requestInfo();
-      if (info && info.body) {
-        body = (typeof info.body === 'object') ? info.body : {};
-        if (body && typeof body.get === 'function') {
-          body = { collection: body.get('collection') };
-        }
-      } else {
-        body = {};
-      }
-    } catch (_) {
-      try {
-        body = c.parseBody() || {};
-      } catch (_2) {
-        body = {};
-      }
-    }
-
+    try { var info = c.requestInfo(); if (info && info.body) { body = (typeof info.body === 'object') ? info.body : {}; if (body && typeof body.get === 'function') { body = { collection: body.get('collection') }; } } else { body = {}; } } catch (_) { try { body = c.parseBody() || {}; } catch (_2) { body = {}; } }
     var collName = body.collection;
-    if (!collName || typeof collName !== 'string')
-      return c.json(400, { code: 400, message: 'Envie collection nome' });
-
+    if (!collName || typeof collName !== 'string') return c.json(400, { code: 400, message: 'Envie collection' });
     var dao = $app.dao();
     var col = dao.findCollectionByNameOrId(collName);
     if (!col) return c.json(404, { code: 404, message: 'Colecao nao encontrada' });
-
     var beforeCount = 0;
-    try {
-      var row = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + collName).one();
-      beforeCount = (row && row.get) ? (row.get('total') || 0) : 0;
-    } catch (_) {}
-
+    try { var row = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + collName).one(); beforeCount = (row && row.get) ? (row.get('total') || 0) : 0; } catch (_) {}
     dao.db().newQuery('DELETE FROM ' + collName).execute();
-
-    console.log('[delete-all] ' + collName + ': ' + beforeCount + ' registros removidos');
     return c.json(200, { success: true, deleted: beforeCount });
   } catch (err) {
-    var delMsg = (err && err.message) ? err.message : 'Erro ao deletar';
-    console.error('[delete-all] CRASH:', delMsg);
-    return c.json(500, { code: 500, message: delMsg });
+    return c.json(500, { code: 500, message: (err && err.message) || 'Erro' });
   }
 });
 
-// ─── HOOK: auto-delete antigos quando frontend cria registros 1 por 1 ───
-// Intercepta PRIMEIRO create na coleção alvo, deleta TODOS antigos, depois libera.
-// Usa onRecordCreate (API consistente em todas versões PB) com tag filter.
-// Flag setada ANTES do delete loop — impossível race condition.
-
+// ─── Hook: auto-delete no primeiro create ───────────────
 var _autoDeleteDone = false;
-
 onRecordCreate(function(e) {
-  // Já limpou? Skip rápido.
   if (_autoDeleteDone) return e.next();
-
-  // BLOQUEIA flag AGORA — antes de qualquer operação.
   _autoDeleteDone = true;
-
-  console.log('[auto-delete] INICIO: deletando registros antigos em ' + COLLECTION + '...');
-
   try {
     var dao = $app.dao();
     var total = 0;
-    try {
-      var row = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
-      total = (row && row.get) ? (row.get('total') || 0) : 0;
-    } catch (_) {}
-
-    if (total === 0) {
-      console.log('[auto-delete] Colecao ja vazia. Nada a deletar.');
-      return e.next();
-    }
-
-    // DELETE em batch ate vazio
-    var maxIter = 500;
+    try { var row = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one(); total = (row && row.get) ? (row.get('total') || 0) : 0; } catch (_) {}
+    if (total === 0) return e.next();
     var iter = 0;
-    while (iter < maxIter) {
-      try {
-        var check = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
-        var rem = (check && check.get) ? (check.get('total') || 0) : 0;
-        if (rem === 0) break;
-        dao.db().newQuery('DELETE FROM ' + COLLECTION + ' WHERE id IN (SELECT id FROM ' + COLLECTION + ' LIMIT 10000)').execute();
-        iter++;
-      } catch (dbErr) {
-        console.error('[auto-delete] Erro DB na iteracao ' + iter + ':', (dbErr && dbErr.message) || dbErr);
-        break;
-      }
+    while (iter < 500) {
+      var chk = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
+      var rem = (chk && chk.get) ? (chk.get('total') || 0) : 0;
+      if (rem === 0) break;
+      dao.db().newQuery('DELETE FROM ' + COLLECTION + ' WHERE id IN (SELECT id FROM ' + COLLECTION + ' LIMIT 10000)').execute();
+      iter++;
     }
-
-    var finalCheck = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
-    var leftover = (finalCheck && finalCheck.get) ? (finalCheck.get('total') || 0) : 0;
-
-    if (leftover > 0) {
-      console.error('[auto-delete] AVISO: ' + leftover + ' registros ainda restam apos ' + iter + ' iteracoes');
-    } else {
-      console.log('[auto-delete] OK: ' + total + ' registros deletados em ' + iter + ' iteracoes. Colecao vazia.');
-    }
-  } catch (err) {
-    console.error('[auto-delete] ERRO GERAL:', (err && err.message) || err);
-  }
-
+  } catch (err) {}
   return e.next();
 }, COLLECTION);
-
-
