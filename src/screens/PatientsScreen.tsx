@@ -934,46 +934,36 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     setIsCsvUploading(true);
     const totalRecords = csvRecords.length;
 
-    // Se "Substituir existentes" marcado, deleta todos os registros antigos
+    // Se "Substituir existentes" marcado, deleta TODOS os registros antigos ANTES de importar
     if (csvReplaceExisting) {
-      try {
-        setCsvProgress({ current: 0, total: 1 });
+      setCsvProgress({ current: 0, total: 1 });
 
-        // Fase 1: Coleta TODOS os IDs antes de deletar (evita paginação deslizante)
-        const allIds: string[] = [];
-        let fetchPage = 1;
-        while (true) {
-          const page = await pb.collection('amarcap53_pacientes').getList(fetchPage, 200, {
-            requestKey: null,
-          });
-          allIds.push(...page.items.map(r => r.id));
-          if (allIds.length >= page.totalItems || page.items.length < 200) break;
-          fetchPage++;
-        }
-
-        console.log(`[CSV] ${allIds.length} registros encontrados para deletar`);
-
-        // Fase 2: Deleta sequencialmente 1 por 1 (estável, sem silenciar erros)
-        let totalDeleted = 0;
-        let totalFailed = 0;
-        for (const id of allIds) {
-          try {
-            await pb.collection('amarcap53_pacientes').delete(id);
-            totalDeleted++;
-          } catch (err: any) {
-            totalFailed++;
-            console.warn(`[CSV] Falha delete ${id}:`, err?.message || err);
-          }
-          if (totalDeleted % 100 === 0 && totalDeleted > 0) {
-            setCsvProgress({ current: totalDeleted, total: allIds.length });
-          }
-        }
-
-        console.log(`[CSV] Deletados ${totalDeleted} registros antigos (${totalFailed} falhas)`);
-        if (totalDeleted > 0) await new Promise(r => setTimeout(r, 300));
-      } catch (error) {
-        console.error('[CSV] Erro ao deletar registros antigos:', error);
+      // Fase 1: Coleta TODOS os IDs antes de deletar
+      const allIds: string[] = [];
+      let fetchPage = 1;
+      while (true) {
+        const page = await pb.collection('amarcap53_pacientes').getList(fetchPage, 200, {
+          requestKey: null,
+        });
+        allIds.push(...page.items.map(r => r.id));
+        if (allIds.length >= page.totalItems || page.items.length < 200) break;
+        fetchPage++;
       }
+
+      console.log(`[CSV] ${allIds.length} registros encontrados para deletar`);
+
+      // Fase 2: Deleta sequencialmente 1 por 1
+      let totalDeleted = 0;
+      for (const id of allIds) {
+        await pb.collection('amarcap53_pacientes').delete(id);
+        totalDeleted++;
+        if (totalDeleted % 100 === 0) {
+          setCsvProgress({ current: totalDeleted, total: allIds.length });
+        }
+      }
+
+      console.log(`[CSV] ${totalDeleted} registros antigos deletados`);
+      await new Promise(r => setTimeout(r, 300));
     }
 
     const BATCH_SIZE = 500;
