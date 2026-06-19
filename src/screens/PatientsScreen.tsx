@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck } from 'lucide-react';
+import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck, Upload } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
+import Papa from 'papaparse';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { MultiSelect } from '../components/MultiSelect';
 import { SingleSelect } from '../components/SingleSelect';
@@ -283,6 +284,17 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [filterCitoLab, setFilterCitoLab] = useState('');
   const [filterCitoPep, setFilterCitoPep] = useState('');
   const [filterDnaHpvGal, setFilterDnaHpvGal] = useState('');
+
+  // CSV Import state
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvRecords, setCsvRecords] = useState<any[]>([]);
+  const [csvFileName, setCsvFileName] = useState('');
+  const [isCsvUploading, setIsCsvUploading] = useState(false);
+  const [csvProgress, setCsvProgress] = useState({ current: 0, total: 0 });
+  const [csvResult, setCsvResult] = useState<{ success: number; errors: number; total: number } | null>(null);
+  const [csvPreview, setCsvPreview] = useState<any[]>([]);
+  const [csvReplaceExisting, setCsvReplaceExisting] = useState(false);
 
   const [availableGroups, setAvailableGroups] = useState<string[]>(() => {
     // Carrega cache instantaneamente (evita flash de loading)
@@ -880,6 +892,154 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     return () => { cancelled = true; };
   }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, searchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal]);
 
+  // CSV Import handlers
+  const convertDateToISO = (value: string): string => {
+    if (!value || value === '--' || value.trim() === '') return '';
+    if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value;
+    const parts = value.split('/');
+    if (parts.length === 3) {
+      let [d, m, y] = parts;
+      if (y.length === 2) y = '20' + y;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    return value;
+  };
+
+  const handleCsvFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCsvFile(file);
+    setCsvFileName(file.name);
+    setCsvResult(null);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const result = Papa.parse(text, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (h: string) => h.replace(/,+$/, '').trim(),
+      });
+      const records = (result.data as any[]).filter(r => r.nome && r.nome.trim());
+      setCsvRecords(records);
+      setCsvPreview(records.slice(0, 5));
+    };
+    reader.readAsText(file);
+  };
+
+  const handleCsvImport = async () => {
+    if (!csvRecords.length || !csvFileName) return;
+
+    setIsCsvUploading(true);
+    const totalRecords = csvRecords.length;
+
+    // Se "Substituir existentes" marcado, deleta todos os registros antigos
+    if (csvReplaceExisting) {
+      try {
+        setCsvProgress({ current: 0, total: 1 });
+        let delPage = 1;
+        let totalDeleted = 0;
+        let totalFailed = 0;
+        while (true) {
+          const page = await pb.collection('amarcap53_pacientes').getList(delPage, 200);
+          if (page.items.length === 0) break;
+
+          // Deleta em paralelo, lotes de 50
+          const ids = page.items.map(r => r.id);
+          for (let di = 0; di < ids.length; di += 50) {
+            const chunk = ids.slice(di, di + 50);
+            const results = await Promise.allSettled(
+              chunk.map(id => pb.collection('amarcap53_pacientes').delete(id))
+            );
+            results.forEach((r, idx) => {
+              if (r.status === 'fulfilled') totalDeleted++;
+              else {
+                totalFailed++;
+                console.warn(`[CSV] Falha delete ${chunk[idx]}:`, r.reason?.message || r.reason);
+              }
+            });
+          }
+
+          if (page.items.length < 200) break;
+          delPage++;
+        }
+        console.log(`[CSV] Deletados ${totalDeleted} registros antigos (${totalFailed} falhas)`);
+        if (totalDeleted > 0) await new Promise(r => setTimeout(r, 300));
+      } catch (error) {
+        console.error('[CSV] Erro ao deletar registros antigos:', error);
+      }
+    }
+
+    const BATCH_SIZE = 500;
+    const chunks: any[][] = [];
+
+    for (let i = 0; i < totalRecords; i += BATCH_SIZE) {
+      chunks.push(csvRecords.slice(i, i + BATCH_SIZE));
+    }
+
+    setCsvProgress({ current: 0, total: chunks.length });
+
+    let totalSuccess = 0;
+    let totalErrors = 0;
+    const DATE_FIELDS = new Set(['data_nascimento', 'cito_lab', 'cito_pep', 'dna_hpv_gal', 'dna_hpv_pep']);
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i].map((r: any) => {
+        const record: Record<string, any> = {};
+        for (const key in r) {
+          if (r.hasOwnProperty(key) && key) record[key] = r[key];
+        }
+        for (const field of DATE_FIELDS) {
+          if (record[field]) record[field] = convertDateToISO(record[field]);
+        }
+        if (record.cns) record.cns = String(record.cns).replace(/\D/g, '').padStart(15, '0').slice(-15);
+        if (record.idade) record.idade = parseInt(record.idade, 10) || 0;
+        if (record.microarea !== undefined && record.microarea !== '') record.microarea = parseInt(record.microarea, 10) || 0;
+        return record;
+      });
+
+      try {
+        const batchSize = chunk.length;
+        const batch: any[] = [];
+        for (const rec of chunk) {
+          batch.push(pb.collection('amarcap53_pacientes').create(rec, { requestKey: null }));
+        }
+        const results = await Promise.allSettled(batch);
+        let chunkOk = 0;
+        let chunkFail = 0;
+        results.forEach((r, idx) => {
+          if (r.status === 'fulfilled') {
+            chunkOk++;
+          } else {
+            chunkFail++;
+            if (chunkFail <= 3) console.warn(`Lote ${i + 1} #${idx + 1}:`, r.reason?.message || r.reason);
+          }
+        });
+        totalSuccess += chunkOk;
+        totalErrors += chunkFail;
+      } catch (error: any) {
+        console.error(`Erro no lote ${i + 1}:`, error);
+        totalErrors += chunk.length;
+      }
+
+      setCsvProgress({ current: i + 1, total: chunks.length });
+    }
+
+    setIsCsvUploading(false);
+    setCsvResult({ success: totalSuccess, errors: totalErrors, total: totalRecords });
+  };
+
+  const resetCsvState = () => {
+    setIsCsvModalOpen(false);
+    setCsvFile(null);
+    setCsvRecords([]);
+    setCsvFileName('');
+    setCsvResult(null);
+    setCsvPreview([]);
+    setCsvProgress({ current: 0, total: 0 });
+  };
+
   const resetFilters = () => {
     setSearchTerm('');
     setFilterStatus([]);
@@ -1002,6 +1162,16 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     </div>
                   )}
                 </button>
+
+                {(isAdmin || user?.role === 'cap') && (
+                  <button
+                    onClick={() => setIsCsvModalOpen(true)}
+                    className="flex items-center gap-2 md:gap-3 px-4 md:px-8 h-12 md:h-14 rounded-2xl text-[10px] md:text-sm font-black uppercase tracking-widest transition-all duration-500 border bg-emerald-600/20 text-emerald-300 border-emerald-500/30 hover:bg-emerald-600/30 hover:border-emerald-500/50 shadow-sm"
+                  >
+                    <Upload className="w-4 h-4 md:w-5 md:h-5" />
+                    <span className="hidden sm:inline">Importar CSV</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1779,6 +1949,155 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
               <button onClick={handleCloseDetails} className="px-8 py-2.5 rounded-xl text-sm font-black text-white bg-[#001b3d] shadow-lg hover:shadow-xl transition-all active:scale-95 w-full sm:w-auto">
                 Fechar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Importação CSV */}
+      {isCsvModalOpen && (
+        <div className="fixed inset-0 bg-primary/20 backdrop-blur-md z-[120] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+          <div className="bg-surface-container-lowest w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-[0px_24px_48px_rgba(0,0,0,0.15)] flex flex-col border border-white/20 animate-in zoom-in-95 duration-300">
+            <div className="bg-gradient-to-r from-emerald-800 to-emerald-700 px-6 py-5 flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                  <Upload className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white text-lg font-black tracking-tight leading-tight">Importar Pacientes (CSV)</h3>
+                  <p className="text-white/60 text-[10px] uppercase tracking-widest mt-1">Upload por lotes de 500 registros</p>
+                </div>
+              </div>
+              <button onClick={resetCsvState} disabled={isCsvUploading} className="p-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-all">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 sm:p-8 overflow-y-auto no-scrollbar">
+              {!csvFile ? (
+                <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-emerald-300/40 rounded-2xl cursor-pointer hover:border-emerald-400/60 hover:bg-emerald-50/50 transition-all bg-emerald-50/20 group">
+                  <Upload className="w-10 h-10 text-emerald-400 group-hover:text-emerald-500 transition-colors mb-3" />
+                  <p className="text-sm font-bold text-emerald-700 group-hover:text-emerald-800">Clique para selecionar arquivo CSV</p>
+                  <p className="text-[10px] font-medium text-emerald-500 mt-1">Cabeçalhos: unidade, equipe, microarea, cns, nome, data_nascimento, idade, grupo, cito_lab, cito_pep, dna_hpv_gal</p>
+                  <input type="file" accept=".csv" onChange={handleCsvFileSelect} className="hidden" />
+                </label>
+              ) : (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-5 h-5 text-emerald-600" />
+                      <div>
+                        <p className="text-sm font-bold text-emerald-800">{csvFileName}</p>
+                        <p className="text-[10px] font-medium text-emerald-600">{csvRecords.length} registros encontrados</p>
+                      </div>
+                    </div>
+                    {!isCsvUploading && !csvResult && (
+                      <button onClick={resetCsvState} className="text-[10px] font-black text-emerald-600 uppercase tracking-wider hover:text-emerald-800 transition-colors">
+                        Trocar arquivo
+                      </button>
+                    )}
+                  </div>
+
+                  {csvPreview.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-2">Pré-visualização (primeiros {csvPreview.length})</p>
+                      <div className="overflow-x-auto rounded-xl border border-outline-variant/20">
+                        <table className="w-full text-[10px]">
+                          <thead>
+                            <tr className="bg-slate-50">
+                              {Object.keys(csvPreview[0]).map(key => (
+                                <th key={key} className="px-2 py-2 font-bold text-slate-500 uppercase tracking-wider text-left whitespace-nowrap">{key}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {csvPreview.map((row, i) => (
+                              <tr key={i} className="border-t border-outline-variant/10">
+                                {Object.values(row).map((val: any, j) => (
+                                  <td key={j} className="px-2 py-1.5 font-medium text-slate-700 truncate max-w-[120px]">{val || '--'}</td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {isCsvUploading && (
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-[10px] font-bold text-primary uppercase tracking-wider">
+                        <span>Processando lote {csvProgress.current} de {csvProgress.total}</span>
+                        <span>{Math.round((csvProgress.current / csvProgress.total) * 100)}%</span>
+                      </div>
+                      <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-500"
+                          style={{ width: `${(csvProgress.current / csvProgress.total) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {csvResult && (
+                    <div className={`p-4 rounded-xl border ${csvResult.errors > 0 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                      <p className="text-sm font-black text-slate-800 mb-1">
+                        {csvResult.errors > 0 ? 'Importação concluída com avisos' : 'Importação concluída com sucesso!'}
+                      </p>
+                      <p className="text-[11px] font-medium text-slate-600">
+                        {csvResult.success} de {csvResult.total} registros importados
+                        {csvResult.errors > 0 && ` · ${csvResult.errors} erros`}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-outline-variant/10 bg-surface-container-lowest flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              <label className="flex items-center gap-3 cursor-pointer select-none group/toggle">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={csvReplaceExisting}
+                    onChange={(e) => setCsvReplaceExisting(e.target.checked)}
+                    disabled={isCsvUploading}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-6 bg-slate-200 rounded-full peer-checked:bg-red-500 transition-colors shadow-inner"></div>
+                  <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform peer-checked:translate-x-4"></div>
+                </div>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider group-hover/toggle:text-red-600 transition-colors">
+                  Substituir existentes
+                </span>
+                {csvReplaceExisting && (
+                  <span className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded text-[8px] font-black uppercase">
+                    Todos os dados atuais serao deletados
+                  </span>
+                )}
+              </label>
+              <div className="flex gap-3 w-full sm:w-auto">
+              {!csvFile && (
+                <button onClick={resetCsvState} className="px-8 py-2.5 rounded-xl text-sm font-black text-slate-600 hover:bg-slate-100 transition-all w-full sm:w-auto">
+                  Cancelar
+                </button>
+              )}
+              {csvFile && !isCsvUploading && !csvResult && (
+                <button
+                  onClick={handleCsvImport}
+                  disabled={csvRecords.length === 0}
+                  className="px-8 py-2.5 rounded-xl text-sm font-black text-white bg-gradient-to-r from-emerald-600 to-emerald-700 shadow-lg hover:shadow-xl transition-all active:scale-95 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <Upload className="w-4 h-4" />
+                  Iniciar Importação ({csvRecords.length} registros em {Math.ceil(csvRecords.length / 500)} lotes)
+                </button>
+              )}
+              {csvResult && (
+                <button onClick={resetCsvState} className="px-8 py-2.5 rounded-xl text-sm font-black text-white bg-[#001b3d] shadow-lg hover:shadow-xl transition-all active:scale-95 w-full sm:w-auto">
+                  Concluído
+                </button>
+              )}
+              </div>
             </div>
           </div>
         </div>

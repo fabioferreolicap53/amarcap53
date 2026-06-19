@@ -28,96 +28,185 @@ const FIELD_ALIASES = {
 // Campos do tipo date — precisam conversão DD/MM/YYYY → YYYY-MM-DD
 const DATE_FIELDS = new Set(['data_nascimento', 'cito_lab', 'cito_pep', 'dna_hpv_gal', 'dna_hpv_pep']);
 
-// ─── Helpers ───────────────────────────────────────────────
+// ─── Helpers (var p/ compat Goja PB v0.39.x) ──────────────
 
-function normalizeHeader(h) {
+var normalizeHeader = function(h) {
   return h.trim()
     .toUpperCase()
-    .replace(/[^\w\s]/g, ' ')   // pontuação → espaço
-    .replace(/\s+/g, ' ')       // colapsa espaços
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
-}
+};
 
-function findField(csvHeader) {
-  const n = normalizeHeader(csvHeader);
-  // Exact match direto no nome do campo
+var findField = function(csvHeader) {
+  var n = normalizeHeader(csvHeader);
   if (FIELD_ALIASES[n]) return n;
-  // Check aliases
-  for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
-    for (const a of aliases) {
-      if (normalizeHeader(a) === n) return field;
+  for (var fieldName in FIELD_ALIASES) {
+    var aliases = FIELD_ALIASES[fieldName];
+    for (var ai = 0; ai < aliases.length; ai++) {
+      if (normalizeHeader(aliases[ai]) === n) return fieldName;
     }
   }
-  // Contains match
-  for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
-    for (const a of aliases) {
-      const na = normalizeHeader(a);
-      if (n.includes(na) || na.includes(n)) return field;
+  for (var fieldName2 in FIELD_ALIASES) {
+    var aliases2 = FIELD_ALIASES[fieldName2];
+    for (var aj = 0; aj < aliases2.length; aj++) {
+      var na = normalizeHeader(aliases2[aj]);
+      if (n.includes(na) || na.includes(n)) return fieldName2;
     }
   }
   return null;
-}
+};
 
-// CSV line parser — respeita aspas duplas
-function parseCSVLine(line) {
-  const fields = [];
-  let cur = '', inQ = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
+var parseCSVLine = function(line) {
+  var fields = [];
+  var cur = '', inQ = false;
+  for (var i = 0; i < line.length; i++) {
+    var ch = line[i];
     if (ch === '"') { inQ = !inQ; continue; }
     if (ch === ',' && !inQ) { fields.push(cur.trim()); cur = ''; continue; }
     cur += ch;
   }
   fields.push(cur.trim());
   return fields;
-}
+};
 
-// Parse CSV completo → { headers: [CampoPB, ...], rows: [{ CampoPB: valor }] }
-function parseCSV(text) {
-  const lines = text.replace(/^\ufeff/, '').replace(/\r/g, '').split('\n').filter(l => l.trim());
+var parseCSV = function(text) {
+  var lines = text.replace(/^\ufeff/, '').replace(/\r/g, '').split('\n').filter(function(l) { return l.trim(); });
   if (lines.length < 2) return { headers: [], rows: [] };
 
-  const rawHeaders = parseCSVLine(lines[0]);
-  const headers = rawHeaders.map(h => findField(h));
-  const rows = [];
+  var rawHeaders = parseCSVLine(lines[0]);
+  var headers = [];
+  for (var hi = 0; hi < rawHeaders.length; hi++) {
+    headers.push(findField(rawHeaders[hi]));
+  }
+  var rows = [];
 
-  for (let i = 1; i < lines.length; i++) {
-    const vals = parseCSVLine(lines[i]);
-    const row = {};
-    let hasData = false;
-    for (let j = 0; j < headers.length && j < vals.length; j++) {
-      if (!headers[j]) continue; // coluna sem mapeamento
+  for (var ri = 1; ri < lines.length; ri++) {
+    var vals = parseCSVLine(lines[ri]);
+    var row = {};
+    var hasData = false;
+    for (var j = 0; j < headers.length && j < vals.length; j++) {
+      if (!headers[j]) continue;
       row[headers[j]] = vals[j] || '';
       if (vals[j] && vals[j].trim()) hasData = true;
     }
     if (hasData) rows.push(row);
   }
 
-  return { headers, rows };
-}
+  return { headers: headers, rows: rows };
+};
 
-function parseDate(str) {
+var parseDate = function(str) {
   if (!str || str === '--' || str.trim() === '') return null;
-  const s = str.trim();
+  var s = str.trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s;
-  const parts = s.split('/');
+  var parts = s.split('/');
   if (parts.length === 3) {
-    let [d, m, y] = parts;
+    var d = parts[0], m = parts[1], y = parts[2];
     if (y.length === 2) y = '20' + y;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    return y + '-' + m.padStart(2, '0') + '-' + d.padStart(2, '0');
   }
   return null;
-}
+};
 
-function sanitizeValue(field, val) {
+var sanitizeValue = function(field, val) {
   if (val === undefined || val === null) return null;
-  const s = String(val).trim();
+  var s = String(val).trim();
   if (s === '' || s === '--') return null;
   if (DATE_FIELDS.has(field)) return parseDate(s);
   if (field === 'microarea' || field === 'idade') return parseInt(s, 10) || 0;
   if (field === 'cns') return s.replace(/\D/g, '').padStart(15, '0').slice(-15);
   return s;
-}
+};
+
+// ─── Handler legado (var p/ compat Goja PB v0.39.x) ───────
+
+var handleLegacyBody = function(c, body, auth) {
+  var records = body.records;
+  var fileName = body.fileName || 'import.csv';
+  var mode = body.mode === 'append' ? 'append' : 'replace';
+
+  if (records.length > 30000)
+    return c.json(413, { code: 413, message: 'Max 30000 registros por lote no modo legado' });
+
+  var dao = $app.dao();
+  var collection = dao.findCollectionByNameOrId(COLLECTION);
+  if (!collection) return c.json(500, { code: 500, message: 'Collection "' + COLLECTION + '" nao encontrada' });
+
+  var oldCount = 0, newCount = 0;
+  var errors = [];
+
+  try {
+    dao.runInTransaction(function(txDao) {
+      if (mode === 'replace') {
+        try {
+          var row = txDao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
+          oldCount = row && row.get ? (row.get('total') || 0) : 0;
+        } catch (_) { oldCount = 0; }
+        txDao.db().newQuery('DELETE FROM ' + COLLECTION).execute();
+      }
+
+      for (var i = 0; i < records.length; i++) {
+        var r = records[i];
+        try {
+          var rec = txDao.createRecord(collection);
+          if (r.unidade) rec.set('unidade', String(r.unidade).trim());
+          if (r.equipe) rec.set('equipe', String(r.equipe).trim());
+          if (r.microarea !== undefined && r.microarea !== null && r.microarea !== '')
+            rec.set('microarea', parseInt(r.microarea, 10) || 0);
+          if (r.cns) rec.set('cns', String(r.cns).replace(/\D/g, '').padStart(15, '0').slice(-15));
+          if (r.nome) rec.set('nome', String(r.nome).trim());
+          if (r.data_nascimento) rec.set('data_nascimento', r.data_nascimento);
+          if (r.idade !== undefined && r.idade !== null && r.idade !== '')
+            rec.set('idade', parseInt(r.idade, 10) || 0);
+          if (r.grupo !== undefined && r.grupo !== null) rec.set('grupo', String(r.grupo).trim());
+          if (r.cito_lab) rec.set('cito_lab', r.cito_lab);
+          if (r.cito_pep) rec.set('cito_pep', r.cito_pep);
+          if (r.dna_hpv_gal) rec.set('dna_hpv_gal', r.dna_hpv_gal);
+          if (r.alertas_rastreamento) rec.set('alertas_rastreamento', r.alertas_rastreamento);
+          txDao.saveRecord(rec);
+          newCount++;
+        } catch (e) {
+          errors.push('#' + (i + 1) + ' CNS=' + (r.cns || '?') + ': ' + ((e && e.message) || 'Erro'));
+        }
+      }
+
+      if (newCount === 0 && records.length > 0)
+        throw new Error('Nenhum registro inserido. Transacao revertida.');
+    });
+  } catch (e) {
+    return c.json(500, {
+      code: 500,
+      message: (e && e.message) || 'Erro na importacao',
+      oldCount: oldCount,
+      rollback: true,
+    });
+  }
+
+  try {
+    var logColl = dao.findCollectionByNameOrId(LOG_COLLECTION);
+    if (logColl) {
+      var log = dao.createRecord(logColl);
+      log.set('filename', fileName);
+      log.set('total_records', records.length);
+      log.set('success_count', newCount);
+      log.set('error_count', records.length - newCount);
+      log.set('user_id', auth.getId());
+      if (errors.length > 0) log.set('details', errors.slice(0, 100).join('\n'));
+      dao.saveRecord(log);
+    }
+  } catch (_) {}
+
+  return c.json(200, {
+    success: true,
+    mode: mode,
+    total: records.length,
+    imported: newCount,
+    errors: records.length - newCount,
+    oldCount: oldCount,
+    errorDetails: errors.slice(0, 10),
+  });
+};
 
 // ─── Router ────────────────────────────────────────────────
 
@@ -274,91 +363,4 @@ routerAdd('POST', '/api/custom/import-pacientes', (c) => {
   }
 });
 
-// ─── Handler legado (mesma lógica de antes) ────────────────
 
-function handleLegacyBody(c, body, auth) {
-  const records = body.records;
-  const fileName = body.fileName || 'import.csv';
-  const mode = body.mode === 'append' ? 'append' : 'replace';
-
-  if (records.length > 30000)
-    return c.json(413, { code: 413, message: 'Máx 30000 registros por lote no modo legado' });
-
-  const dao = $app.dao();
-  const collection = dao.findCollectionByNameOrId(COLLECTION);
-  if (!collection) return c.json(500, { code: 500, message: `Collection "${COLLECTION}" não encontrada` });
-
-  let oldCount = 0, newCount = 0;
-  const errors = [];
-
-  try {
-    dao.runInTransaction((txDao) => {
-      if (mode === 'replace') {
-        try {
-          const row = txDao.db().newQuery(`SELECT COUNT(*) as total FROM ${COLLECTION}`).one();
-          oldCount = row?.get('total') || 0;
-        } catch (_) { oldCount = 0; }
-        txDao.db().newQuery(`DELETE FROM ${COLLECTION}`).execute();
-      }
-
-      for (let i = 0; i < records.length; i++) {
-        const r = records[i];
-        try {
-          const rec = txDao.createRecord(collection);
-          if (r.unidade) rec.set('unidade', String(r.unidade).trim());
-          if (r.equipe) rec.set('equipe', String(r.equipe).trim());
-          if (r.microarea !== undefined && r.microarea !== null && r.microarea !== '')
-            rec.set('microarea', parseInt(r.microarea, 10) || 0);
-          if (r.cns) rec.set('cns', String(r.cns).replace(/\D/g, '').padStart(15, '0').slice(-15));
-          if (r.nome) rec.set('nome', String(r.nome).trim());
-          if (r.data_nascimento) rec.set('data_nascimento', r.data_nascimento);
-          if (r.idade !== undefined && r.idade !== null && r.idade !== '')
-            rec.set('idade', parseInt(r.idade, 10) || 0);
-          if (r.grupo !== undefined && r.grupo !== null) rec.set('grupo', String(r.grupo).trim());
-          if (r.cito_lab) rec.set('cito_lab', r.cito_lab);
-          if (r.cito_pep) rec.set('cito_pep', r.cito_pep);
-          if (r.dna_hpv_gal) rec.set('dna_hpv_gal', r.dna_hpv_gal);
-          if (r.alertas_rastreamento) rec.set('alertas_rastreamento', r.alertas_rastreamento);
-          txDao.saveRecord(rec);
-          newCount++;
-        } catch (e) {
-          errors.push(`#${i + 1} CNS=${r.cns || '?'}: ${(e && e.message) || 'Erro'}`);
-        }
-      }
-
-      if (newCount === 0 && records.length > 0)
-        throw new Error('Nenhum registro inserido. Transação revertida.');
-    });
-  } catch (e) {
-    return c.json(500, {
-      code: 500,
-      message: (e && e.message) || 'Erro na importação',
-      oldCount,
-      rollback: true,
-    });
-  }
-
-  try {
-    const logColl = dao.findCollectionByNameOrId(LOG_COLLECTION);
-    if (logColl) {
-      const log = dao.createRecord(logColl);
-      log.set('filename', fileName);
-      log.set('total_records', records.length);
-      log.set('success_count', newCount);
-      log.set('error_count', records.length - newCount);
-      log.set('user_id', auth.getId());
-      if (errors.length > 0) log.set('details', errors.slice(0, 100).join('\n'));
-      dao.saveRecord(log);
-    }
-  } catch (_) {}
-
-  return c.json(200, {
-    success: true,
-    mode,
-    total: records.length,
-    imported: newCount,
-    errors: records.length - newCount,
-    oldCount,
-    errorDetails: errors.slice(0, 10),
-  });
-}

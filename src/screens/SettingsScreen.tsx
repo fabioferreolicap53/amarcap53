@@ -4,6 +4,7 @@ import { Edit2, User, Check, ShieldCheck, MapPin, Moon, AlignJustify, Mail, Aler
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { motion, AnimatePresence } from 'motion/react';
+import Papa from 'papaparse';
 
 type UploadStage = 'idle' | 'reading' | 'cleaning' | 'importing' | 'completed' | 'error';
 
@@ -69,6 +70,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     current: 0, 
     total: 0 
   });
+  const [replaceExisting, setReplaceExisting] = useState(false);
 
   // Sincroniza o estado do input com o usuário do contexto sempre que ele mudar
   useEffect(() => {
@@ -210,7 +212,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     // Limite de 50MB
     const MAX_FILE_SIZE = 50 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
-      setUploadStatus({ stage: 'error', message: 'Arquivo muito grande (máx. 50MB). Divida em partes menores.', current: 0, total: 0 });
+      setUploadStatus({ stage: 'error', message: 'Arquivo muito grande (max. 50MB). Divida em partes menores.', current: 0, total: 0 });
       return;
     }
 
@@ -222,60 +224,103 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       try {
         const csvText = e.target?.result as string;
 
-        // Divide em linhas (raw CSV, backend parseCSV cuida do parsing)
-        const lines = csvText.replace(/\r/g, '').split('\n').filter(l => l.trim());
-        if (lines.length < 2) throw new Error('CSV vazio ou sem dados');
+        const parsed = Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          transformHeader: (h: string) => h.replace(/,+$/, '').trim(),
+        });
+        const allRecords = parsed.data.filter((r: any) => r.nome && r.nome.trim());
+        if (allRecords.length === 0) throw new Error('CSV vazio ou sem dados validos');
 
-        const header = lines[0];
-        const dataLines = lines.slice(1);
+        const convertDate = (val: string) => {
+          if (!val || val === '--' || val.trim() === '') return '';
+          if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val;
+          const parts = val.split('/');
+          if (parts.length === 3) {
+            let [d, m, y] = parts;
+            if (y.length === 2) y = '20' + y;
+            return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+          }
+          return val;
+        };
 
-        // Chunk size: ~4000 linhas por request (~6-7MB de JSON, seguros p/ 8MB)
-        const CHUNK_SIZE = 4000;
-        const totalChunks = Math.ceil(dataLines.length / CHUNK_SIZE);
+        const DATE_FIELDS = ['data_nascimento', 'cito_lab', 'cito_pep', 'dna_hpv_gal', 'dna_hpv_pep'];
+
+        const cleanedRecords = allRecords.map((r: any) => {
+          const record: Record<string, any> = {};
+          for (const key in r) {
+            if (r.hasOwnProperty(key) && key) record[key] = r[key];
+          }
+          DATE_FIELDS.forEach(f => { if (record[f]) record[f] = convertDate(record[f]); });
+          if (record.cns) record.cns = String(record.cns).replace(/\D/g, '').padStart(15, '0').slice(-15);
+          if (record.idade) record.idade = parseInt(record.idade, 10) || 0;
+          if (record.microarea !== undefined && record.microarea !== '') record.microarea = parseInt(record.microarea, 10) || 0;
+          return record;
+        });
+
+        // Se "Substituir existentes" marcado, deleta todos os registros antigos
+        if (replaceExisting) {
+          setUploadStatus({ stage: 'cleaning', message: 'Removendo registros antigos...', current: 0, total: 1, fileName: file.name });
+          let delPage = 1;
+          let totalDeleted = 0;
+          let totalFailed = 0;
+          while (true) {
+            const page = await pb.collection('amarcap53_pacientes').getList(delPage, 200);
+            if (page.items.length === 0) break;
+
+            const ids = page.items.map(r => r.id);
+            for (let di = 0; di < ids.length; di += 50) {
+              const chunk = ids.slice(di, di + 50);
+              const results = await Promise.allSettled(
+                chunk.map(id => pb.collection('amarcap53_pacientes').delete(id))
+              );
+              results.forEach((r, idx) => {
+                if (r.status === 'fulfilled') totalDeleted++;
+                else {
+                  totalFailed++;
+                  console.warn(`[CSV] Falha delete ${chunk[idx]}:`, r.reason?.message || r.reason);
+                }
+              });
+            }
+
+            if (page.items.length < 200) break;
+            delPage++;
+          }
+          console.log(`[CSV] Deletados ${totalDeleted} registros antigos (${totalFailed} falhas)`);
+          if (totalDeleted > 0) await new Promise(r => setTimeout(r, 300));
+        }
+
+        // Chunk de 500 — Promise.allSettled via SDK
+        const BATCH_SIZE = 500;
+        const totalChunks = Math.ceil(cleanedRecords.length / BATCH_SIZE);
 
         let importedTotal = 0;
         let errorsTotal = 0;
 
         for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
-          const start = chunkIdx * CHUNK_SIZE;
-          const end = Math.min(start + CHUNK_SIZE, dataLines.length);
-          const chunkLines = dataLines.slice(start, end);
-          const chunkCsv = [header, ...chunkLines].join('\n');
+          const start = chunkIdx * BATCH_SIZE;
+          const end = Math.min(start + BATCH_SIZE, cleanedRecords.length);
+          const chunkRecords = cleanedRecords.slice(start, end);
 
           setUploadStatus({
             stage: 'importing',
-            message: `Enviando parte ${chunkIdx + 1} de ${totalChunks}...`,
+            message: `Enviando lote ${chunkIdx + 1} de ${totalChunks}...`,
             current: chunkIdx + 1,
             total: totalChunks,
             fileName: file.name,
           });
 
-          const response = await fetch(`${pb.baseUrl}/api/custom/import-pacientes`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': pb.authStore.token ? `Bearer ${pb.authStore.token}` : '',
-            },
-            body: JSON.stringify({
-              csvText: chunkCsv,
-              fileName: file.name,
-              mode: chunkIdx === 0 ? 'replace' : 'append',
-            }),
+          const batchPromises = chunkRecords.map((rec) =>
+            pb.collection('amarcap53_pacientes').create(rec, { requestKey: null })
+          );
+          const results = await Promise.allSettled(batchPromises);
+          results.forEach((r) => {
+            if (r.status === 'fulfilled') importedTotal++;
+            else {
+              errorsTotal++;
+              if (errorsTotal <= 3) console.warn(`Lote ${chunkIdx + 1}:`, r.reason?.message || r.reason);
+            }
           });
-
-          let result;
-          try {
-            result = await response.json();
-          } catch (_) {
-            throw new Error(`Servidor retornou ${response.status} na parte ${chunkIdx + 1}`);
-          }
-
-          if (!response.ok) {
-            throw new Error(result.message || `Erro HTTP ${response.status} na parte ${chunkIdx + 1}`);
-          }
-
-          importedTotal += result.imported || 0;
-          errorsTotal += result.errors || 0;
         }
 
         fetchImportHistory();
@@ -288,9 +333,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
           fileName: file.name,
         });
       } catch (err: any) {
-        console.error('Erro na importação:', err);
+        console.error('Erro na importacao:', err);
         const rollbackMsg = err.message?.includes('revertida') ? ' Dados antigos preservados.' : '';
-        setUploadStatus({ stage: 'error', message: `Erro: ${err.message || 'Falha na comunicação'}.${rollbackMsg}`, current: 0, total: 0 });
+        setUploadStatus({ stage: 'error', message: `Erro: ${err.message || 'Falha na comunicacao'}.${rollbackMsg}`, current: 0, total: 0 });
       } finally {
         setIsUploading(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -634,6 +679,29 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                         )}
                       </AnimatePresence>
                     </div>
+
+                    {/* Toggle Substituir */}
+                    <label className="flex items-center gap-3 mt-5 cursor-pointer select-none group/toggle">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={replaceExisting}
+                          onChange={(e) => setReplaceExisting(e.target.checked)}
+                          disabled={isUploading}
+                          className="sr-only peer"
+                        />
+                        <div className="w-10 h-6 bg-slate-200 rounded-full peer-checked:bg-red-500 transition-colors shadow-inner"></div>
+                        <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform peer-checked:translate-x-4"></div>
+                      </div>
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider group-hover/toggle:text-red-600 transition-colors">
+                        Substituir existentes
+                      </span>
+                      {replaceExisting && (
+                        <span className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded text-[8px] font-black uppercase">
+                          Dados atuais serao deletados
+                        </span>
+                      )}
+                    </label>
 
                     {uploadStatus.stage === 'completed' && (
                       <motion.div 
