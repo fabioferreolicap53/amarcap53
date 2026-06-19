@@ -938,31 +938,46 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     if (csvReplaceExisting) {
       setCsvProgress({ current: 0, total: 1 });
 
-      // Fase 1: Coleta TODOS os IDs antes de deletar
+      // Fase 1: Conta total e coleta IDs em páginas (getList é confiável)
+      let remaining = Infinity;
       const allIds: string[] = [];
-      let fetchPage = 1;
-      while (true) {
-        const page = await pb.collection('amarcap53_pacientes').getList(fetchPage, 200, {
-          requestKey: null,
-        });
-        allIds.push(...page.items.map(r => r.id));
-        if (allIds.length >= page.totalItems || page.items.length < 200) break;
-        fetchPage++;
+      {
+        const probe = await pb.collection('amarcap53_pacientes').getList(1, 1);
+        remaining = probe.totalItems;
       }
 
-      console.log(`[CSV] ${allIds.length} registros encontrados para deletar`);
-
-      // Fase 2: Deleta sequencialmente 1 por 1
-      let totalDeleted = 0;
-      for (const id of allIds) {
-        await pb.collection('amarcap53_pacientes').delete(id);
-        totalDeleted++;
-        if (totalDeleted % 100 === 0) {
-          setCsvProgress({ current: totalDeleted, total: allIds.length });
+      if (remaining > 0) {
+        // Coleta IDs em páginas
+        let pg = 1;
+        while (allIds.length < remaining) {
+          const page = await pb.collection('amarcap53_pacientes').getList(pg, 200);
+          if (page.items.length === 0) break;
+          allIds.push(...page.items.map(r => r.id));
+          if (page.items.length < 200) break;
+          pg++;
         }
+
+        console.log(`[CSV] ${allIds.length} registros encontrados para deletar`);
+
+        // Fase 2: Deleta sequencialmente 1 por 1
+        for (const id of allIds) {
+          await pb.collection('amarcap53_pacientes').delete(id);
+        }
+
+        console.log(`[CSV] ${allIds.length} registros deletados`);
+
+        // Fase 3: VERIFICA — se coleção não estiv vazia, ABORTA import
+        const check = await pb.collection('amarcap53_pacientes').getList(1, 1);
+        if (check.totalItems > 0) {
+          setIsCsvUploading(false);
+          setCsvResult({ success: 0, errors: 1, total: 0 });
+          alert(`ERRO: Ainda restam ${check.totalItems} registros antigos. Importação abortada. Tente novamente.`);
+          return;
+        }
+      } else {
+        console.log(`[CSV] Nenhum registro antigo para deletar`);
       }
 
-      console.log(`[CSV] ${totalDeleted} registros antigos deletados`);
       await new Promise(r => setTimeout(r, 300));
     }
 

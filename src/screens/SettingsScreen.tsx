@@ -262,28 +262,41 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         if (replaceExisting) {
           setUploadStatus({ stage: 'cleaning', message: 'Removendo registros antigos...', current: 0, total: 1, fileName: file.name });
 
-          // Fase 1: Coleta TODOS os IDs antes de deletar (evita paginação deslizante)
+          // Fase 1: Conta total e coleta IDs em páginas
+          const probe = await pb.collection('amarcap53_pacientes').getList(1, 1);
+          const remaining = probe.totalItems;
           const allIds: string[] = [];
-          let fetchPage = 1;
-          while (true) {
-            const page = await pb.collection('amarcap53_pacientes').getList(fetchPage, 200, { requestKey: null });
-            allIds.push(...page.items.map(r => r.id));
-            if (allIds.length >= page.totalItems || page.items.length < 200) break;
-            fetchPage++;
-          }
 
-          // Fase 2: Deleta sequencialmente 1 por 1 (estável, sem silenciar erros)
-          let totalDeleted = 0;
-          for (const id of allIds) {
-            await pb.collection('amarcap53_pacientes').delete(id);
-            totalDeleted++;
-            if (totalDeleted % 100 === 0) {
-              setUploadStatus({ stage: 'cleaning', message: `Removendo registros antigos... ${totalDeleted}/${allIds.length}`, current: totalDeleted, total: allIds.length, fileName: file.name });
+          if (remaining > 0) {
+            let pg = 1;
+            while (allIds.length < remaining) {
+              const page = await pb.collection('amarcap53_pacientes').getList(pg, 200);
+              if (page.items.length === 0) break;
+              allIds.push(...page.items.map(r => r.id));
+              if (page.items.length < 200) break;
+              pg++;
+            }
+
+            // Fase 2: Deleta sequencialmente 1 por 1
+            for (let di = 0; di < allIds.length; di++) {
+              await pb.collection('amarcap53_pacientes').delete(allIds[di]);
+              if ((di + 1) % 100 === 0) {
+                setUploadStatus({ stage: 'cleaning', message: `Removendo registros antigos... ${di + 1}/${allIds.length}`, current: di + 1, total: allIds.length, fileName: file.name });
+              }
+            }
+
+            console.log(`[CSV] ${allIds.length} registros antigos deletados`);
+
+            // Fase 3: VERIFICA — se coleção não estiver vazia, ABORTA import
+            const check = await pb.collection('amarcap53_pacientes').getList(1, 1);
+            if (check.totalItems > 0) {
+              setIsUploading(false);
+              setUploadStatus({ stage: 'error', message: `ERRO: Ainda restam ${check.totalItems} registros antigos. Importação abortada.`, current: 0, total: 0, fileName: file.name });
+              return;
             }
           }
 
-          console.log(`[CSV] ${totalDeleted} registros antigos deletados`);
-          if (totalDeleted > 0) await new Promise(r => setTimeout(r, 300));
+          await new Promise(r => setTimeout(r, 300));
         }
 
         // Chunk de 500 — Promise.allSettled via SDK
