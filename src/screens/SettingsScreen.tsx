@@ -263,11 +263,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
           setUploadStatus({ stage: 'cleaning', message: 'Removendo registros antigos...', current: 0, total: 1, fileName: file.name });
 
           // DELETE em massa via SQL no backend — 1 request, instantâneo
-          const delRes = await pb.send('/api/custom/delete-all', {
+          const baseUrl = pb.baseURL;
+          const token = pb.authStore.token;
+          const delRes = await fetch(`${baseUrl}/api/custom/delete-all`, {
             method: 'POST',
-            body: { collection: 'amarcap53_pacientes' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ collection: 'amarcap53_pacientes' }),
           });
-          console.log(`[CSV] ${delRes.deleted} registros antigos deletados via SQL`);
+          if (!delRes.ok) {
+            const delErr = await delRes.json().catch(() => ({}));
+            throw new Error(`Falha ao deletar: ${delErr.message || delRes.status}`);
+          }
+          const delData = await delRes.json();
+          console.log(`[DELETE-ALL] ${delData.deleted} registros antigos deletados via SQL`);
 
           // Verifica que coleção está vazia
           const check = await pb.collection('amarcap53_pacientes').getList(1, 1);
