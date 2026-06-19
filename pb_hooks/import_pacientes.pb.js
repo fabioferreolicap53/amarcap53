@@ -283,50 +283,57 @@ routerAdd('POST', '/api/custom/import-pacientes', (c) => {
     let oldCount = 0, newCount = 0, totalErrors = 0;
     const errorDetails = [];
 
-    try {
-      dao.runInTransaction((txDao) => {
-        // Conta dados existentes
-        try {
-          const row = txDao.db().newQuery(`SELECT COUNT(*) as total FROM ${COLLECTION}`).one();
-          oldCount = row?.get('total') || 0;
-        } catch (_) { oldCount = 0; }
+    // ─── FASE 1: DELETE FORA da transação (garantido) ───
+    if (mode === 'replace') {
+      try {
+        const row = dao.db().newQuery(`SELECT COUNT(*) as total FROM ${COLLECTION}`).one();
+        oldCount = row?.get('total') || 0;
+      } catch (_) { oldCount = 0; }
 
-        // Modo replace: deleta antigos. Modo append: mantem.
-        if (mode === 'replace') {
-          txDao.db().newQuery(`DELETE FROM ${COLLECTION}`).execute();
-        }
+      dao.db().newQuery(`DELETE FROM ${COLLECTION}`).execute();
+      console.log(`[import-pacientes] DELETE realizado: ${oldCount} registros removidos`);
+    }
 
-        // Processa em lotes
-        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-          const batch = rows.slice(i, i + BATCH_SIZE);
-          for (let j = 0; j < batch.length; j++) {
-            const r = batch[j];
-            try {
-              const rec = txDao.createRecord(collection);
-              for (const field of mappedFields) {
-                const val = sanitizeValue(field, r[field]);
-                if (val !== null) rec.set(field, val);
+    // ─── FASE 2: INSERT dentro da transação ───
+    if (rows.length > 0) {
+      try {
+        dao.runInTransaction((txDao) => {
+          for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+            const batch = rows.slice(i, i + BATCH_SIZE);
+            for (let j = 0; j < batch.length; j++) {
+              const r = batch[j];
+              try {
+                const rec = txDao.createRecord(collection);
+                for (const field of mappedFields) {
+                  const val = sanitizeValue(field, r[field]);
+                  if (val !== null) rec.set(field, val);
+                }
+                txDao.saveRecord(rec);
+                newCount++;
+              } catch (e) {
+                totalErrors++;
+                const errMsg = (e && e.message) || 'Erro desconhecido';
+                errorDetails.push(`#${i + j + 1} ${r.cns || r.nome || '?'}: ${errMsg}`);
               }
-              txDao.saveRecord(rec);
-              newCount++;
-            } catch (e) {
-              totalErrors++;
-              const errMsg = (e && e.message) || 'Erro desconhecido';
-              errorDetails.push(`#${i + j + 1} ${r.cns || r.nome || '?'}: ${errMsg}`);
             }
           }
-        }
 
-        if (newCount === 0 && rows.length > 0 && mode === 'replace')
-          throw new Error('Nenhum registro inserido. Transação revertida.');
-      });
-    } catch (e) {
-      return c.json(500, {
-        code: 500,
-        message: (e && e.message) || 'Erro na importação',
-        oldCount,
-        rollback: true,
-      });
+          if (newCount === 0 && rows.length > 0)
+            throw new Error('Nenhum registro inserido. Transação revertida.');
+        });
+      } catch (e) {
+        // INSERT falhou, mas DELETE já foi feito — dados antigos foram removidos
+        const msg = (e && e.message) || 'Erro na importação';
+        console.error('[import-pacientes] INSERT falhou após DELETE:', msg);
+        return c.json(500, {
+          code: 500,
+          message: 'DELETE realizado mas INSERT falhou: ' + msg,
+          oldCount,
+          imported: 0,
+          errors: totalErrors || rows.length,
+          rollback: false,
+        });
+      }
     }
 
     // 6. Log
