@@ -258,35 +258,31 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
           return record;
         });
 
-        // Se "Substituir existentes" marcado, deleta todos os registros antigos
+        // Se "Substituir existentes" marcado, deleta TODOS os registros antigos ANTES de importar
         if (replaceExisting) {
           setUploadStatus({ stage: 'cleaning', message: 'Removendo registros antigos...', current: 0, total: 1, fileName: file.name });
-          let delPage = 1;
-          let totalDeleted = 0;
-          let totalFailed = 0;
+
+          // Fase 1: Coleta TODOS os IDs antes de deletar (evita paginação deslizante)
+          const allIds: string[] = [];
+          let fetchPage = 1;
           while (true) {
-            const page = await pb.collection('amarcap53_pacientes').getList(delPage, 200);
-            if (page.items.length === 0) break;
-
-            const ids = page.items.map(r => r.id);
-            for (let di = 0; di < ids.length; di += 50) {
-              const chunk = ids.slice(di, di + 50);
-              const results = await Promise.allSettled(
-                chunk.map(id => pb.collection('amarcap53_pacientes').delete(id))
-              );
-              results.forEach((r, idx) => {
-                if (r.status === 'fulfilled') totalDeleted++;
-                else {
-                  totalFailed++;
-                  console.warn(`[CSV] Falha delete ${chunk[idx]}:`, r.reason?.message || r.reason);
-                }
-              });
-            }
-
-            if (page.items.length < 200) break;
-            delPage++;
+            const page = await pb.collection('amarcap53_pacientes').getList(fetchPage, 200, { requestKey: null });
+            allIds.push(...page.items.map(r => r.id));
+            if (allIds.length >= page.totalItems || page.items.length < 200) break;
+            fetchPage++;
           }
-          console.log(`[CSV] Deletados ${totalDeleted} registros antigos (${totalFailed} falhas)`);
+
+          // Fase 2: Deleta sequencialmente 1 por 1 (estável, sem silenciar erros)
+          let totalDeleted = 0;
+          for (const id of allIds) {
+            await pb.collection('amarcap53_pacientes').delete(id);
+            totalDeleted++;
+            if (totalDeleted % 100 === 0) {
+              setUploadStatus({ stage: 'cleaning', message: `Removendo registros antigos... ${totalDeleted}/${allIds.length}`, current: totalDeleted, total: allIds.length, fileName: file.name });
+            }
+          }
+
+          console.log(`[CSV] ${totalDeleted} registros antigos deletados`);
           if (totalDeleted > 0) await new Promise(r => setTimeout(r, 300));
         }
 
