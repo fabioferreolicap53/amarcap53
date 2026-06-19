@@ -262,41 +262,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         if (replaceExisting) {
           setUploadStatus({ stage: 'cleaning', message: 'Removendo registros antigos...', current: 0, total: 1, fileName: file.name });
 
-          // Fase 1: Conta total e coleta IDs em páginas
-          const probe = await pb.collection('amarcap53_pacientes').getList(1, 1);
-          const remaining = probe.totalItems;
-          const allIds: string[] = [];
-
-          if (remaining > 0) {
-            let pg = 1;
-            while (allIds.length < remaining) {
-              const page = await pb.collection('amarcap53_pacientes').getList(pg, 200);
-              if (page.items.length === 0) break;
-              allIds.push(...page.items.map(r => r.id));
-              if (page.items.length < 200) break;
-              pg++;
+          // Loop until empty: sempre pega página 1, deleta todos, repete até voltar vazia
+          let totalDeleted = 0;
+          let hasMore = true;
+          while (hasMore) {
+            const page = await pb.collection('amarcap53_pacientes').getList(1, 200, { requestKey: null });
+            if (page.items.length === 0) {
+              hasMore = false;
+              break;
             }
-
-            // Fase 2: Deleta sequencialmente 1 por 1
-            for (let di = 0; di < allIds.length; di++) {
-              await pb.collection('amarcap53_pacientes').delete(allIds[di]);
-              if ((di + 1) % 100 === 0) {
-                setUploadStatus({ stage: 'cleaning', message: `Removendo registros antigos... ${di + 1}/${allIds.length}`, current: di + 1, total: allIds.length, fileName: file.name });
-              }
+            for (const item of page.items) {
+              await pb.collection('amarcap53_pacientes').delete(item.id);
+              totalDeleted++;
             }
-
-            console.log(`[CSV] ${allIds.length} registros antigos deletados`);
-
-            // Fase 3: VERIFICA — se coleção não estiver vazia, ABORTA import
-            const check = await pb.collection('amarcap53_pacientes').getList(1, 1);
-            if (check.totalItems > 0) {
-              setIsUploading(false);
-              setUploadStatus({ stage: 'error', message: `ERRO: Ainda restam ${check.totalItems} registros antigos. Importação abortada.`, current: 0, total: 0, fileName: file.name });
-              return;
-            }
+            setUploadStatus({ stage: 'cleaning', message: `Removendo registros antigos... ${totalDeleted}`, current: totalDeleted, total: totalDeleted, fileName: file.name });
+            console.log(`[CSV] ${totalDeleted} registros deletados... (${page.items.length} restantes na última página)`);
           }
 
-          await new Promise(r => setTimeout(r, 300));
+          console.log(`[CSV] Limpeza concluída: ${totalDeleted} registros antigos deletados`);
+          if (totalDeleted > 0) await new Promise(r => setTimeout(r, 300));
         }
 
         // Chunk de 500 — Promise.allSettled via SDK
