@@ -5,33 +5,19 @@
 // Apenas cap/admin. Transação all-or-nothing.
 // Otimizado para 1GB RAM VM: processa em lotes de 500
 
-// ─── ES5 Polyfills for Goja engine ─────────────────────
-// Goja is ES5-based — no Set/Map/padStart/includes etc.
-
-if (!String.prototype.padStart) {
-  String.prototype.padStart = function(len, ch) {
-    var s = String(this);
-    ch = ch || ' ';
-    while (s.length < len) s = ch + s;
-    return s;
-  };
-}
-if (!String.prototype.includes) {
-  String.prototype.includes = function(s) {
-    return this.indexOf(s) !== -1;
-  };
-}
-if (!Array.prototype.includes) {
-  Array.prototype.includes = function(v) {
-    return this.indexOf(v) !== -1;
-  };
-}
-
 console.log('[pb_hooks] import_pacientes.pb.js CARREGADO com sucesso!');
 
 var COLLECTION = 'amarcap53_pacientes';
 var LOG_COLLECTION = 'amarcap53_importacoes';
 var BATCH_SIZE = 500;
+
+// Goja ES5 helper — substitui padStart nativo
+function padLeft(str, len, ch) {
+  var s = String(str);
+  ch = ch || ' ';
+  while (s.length < len) s = ch + s;
+  return s;
+}
 
 // Mapa: nome do campo no PocketBase → aliases do CSV (normalizados)
 var FIELD_ALIASES = {
@@ -134,7 +120,7 @@ var parseDate = function(str) {
   if (parts.length === 3) {
     var d = parts[0], m = parts[1], y = parts[2];
     if (y.length === 2) y = '20' + y;
-    return y + '-' + m.padStart(2, '0') + '-' + d.padStart(2, '0');
+    return y + '-' + padLeft(m, 2, '0') + '-' + padLeft(d, 2, '0');
   }
   return null;
 };
@@ -145,7 +131,7 @@ var sanitizeValue = function(field, val) {
   if (s === '' || s === '--') return null;
   if (isDateField(field)) return parseDate(s);
   if (field === 'microarea' || field === 'idade') return parseInt(s, 10) || 0;
-  if (field === 'cns') return s.replace(/\D/g, '').padStart(15, '0').slice(-15);
+  if (field === 'cns') return padLeft(s.replace(/\D/g, ''), 15, '0').slice(-15);
   return s;
 };
 
@@ -184,7 +170,7 @@ var handleLegacyBody = function(c, body, auth) {
           if (r.equipe) rec.set('equipe', String(r.equipe).trim());
           if (r.microarea !== undefined && r.microarea !== null && r.microarea !== '')
             rec.set('microarea', parseInt(r.microarea, 10) || 0);
-          if (r.cns) rec.set('cns', String(r.cns).replace(/\D/g, '').padStart(15, '0').slice(-15));
+          if (r.cns) rec.set('cns', padLeft(String(r.cns).replace(/\D/g, ''), 15, '0').slice(-15));
           if (r.nome) rec.set('nome', String(r.nome).trim());
           if (r.data_nascimento) rec.set('data_nascimento', r.data_nascimento);
           if (r.idade !== undefined && r.idade !== null && r.idade !== '')
