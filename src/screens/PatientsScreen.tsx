@@ -289,6 +289,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvRecords, setCsvRecords] = useState<any[]>([]);
+  const [csvText, setCsvText] = useState('');
   const [csvFileName, setCsvFileName] = useState('');
   const [isCsvUploading, setIsCsvUploading] = useState(false);
   const [csvProgress, setCsvProgress] = useState({ current: 0, total: 0 });
@@ -916,6 +917,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
+      setCsvText(text);
       const result = Papa.parse(text, {
         header: true,
         skipEmptyLines: true,
@@ -934,40 +936,45 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     setIsCsvUploading(true);
     const totalRecords = csvRecords.length;
 
-    // Se "Substituir existentes" marcado, deleta TODOS os registros antigos ANTES de importar
+    // ─── MODO SUBSTITUIR: envia CSV inteiro pro backend ─────
+    // Backend faz DELETE + INSERT na mesma transação SQL (atômico)
     if (csvReplaceExisting) {
-      setCsvProgress({ current: 0, total: 1 });
+      setCsvProgress({ current: 1, total: 1 });
 
-      // DELETE em massa via SQL no backend — 1 request, instantâneo
-      const baseUrl = pb.baseURL;
-      const token = pb.authStore.token;
-      const delRes = await fetch(`${baseUrl}/api/custom/delete-all`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ collection: 'amarcap53_pacientes' }),
-      });
-      if (!delRes.ok) {
-        const delErr = await delRes.json().catch(() => ({}));
-        throw new Error(`Falha ao deletar: ${delErr.message || delRes.status}`);
-      }
-      const delData = await delRes.json();
-      console.log(`[DELETE-ALL] ${delData.deleted} registros antigos deletados via SQL`);
+      try {
+        const baseUrl = pb.baseURL;
+        const token = pb.authStore.token;
+        const res = await fetch(`${baseUrl}/api/custom/import-pacientes`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            csvText: csvText,
+            fileName: csvFileName,
+            mode: 'replace',
+          }),
+        });
 
-      // Verifica que coleção está vazia
-      const check = await pb.collection('amarcap53_pacientes').getList(1, 1);
-      if (check.totalItems > 0) {
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || `Erro HTTP ${res.status}`);
+        }
+
+        console.log(`[IMPORT] Backend: ${data.oldCount} antigos deletados, ${data.imported} novos inseridos, ${data.errors} erros`);
         setIsCsvUploading(false);
-        setCsvResult({ success: 0, errors: 1, total: 0 });
-        alert(`ERRO: Ainda restam ${check.totalItems} registros antigos. Importação abortada.`);
-        return;
+        setCsvResult({ success: data.imported, errors: data.errors, total: totalRecords });
+      } catch (err: any) {
+        console.error('[IMPORT] Erro:', err);
+        setIsCsvUploading(false);
+        setCsvResult({ success: 0, errors: totalRecords, total: totalRecords });
       }
-
-      await new Promise(r => setTimeout(r, 300));
+      return;
     }
 
+    // ─── MODO ADICIONAR: insere registros novos pelo SDK ─────
     const BATCH_SIZE = 500;
     const chunks: any[][] = [];
 
@@ -1031,6 +1038,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     setIsCsvModalOpen(false);
     setCsvFile(null);
     setCsvRecords([]);
+    setCsvText('');
     setCsvFileName('');
     setCsvResult(null);
     setCsvPreview([]);
