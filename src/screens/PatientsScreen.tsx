@@ -938,32 +938,37 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     if (csvReplaceExisting) {
       try {
         setCsvProgress({ current: 0, total: 1 });
-        let delPage = 1;
+
+        // Fase 1: Coleta TODOS os IDs antes de deletar (evita paginação deslizante)
+        const allIds: string[] = [];
+        let fetchPage = 1;
+        while (true) {
+          const page = await pb.collection('amarcap53_pacientes').getList(fetchPage, 200, {
+            requestKey: null,
+          });
+          allIds.push(...page.items.map(r => r.id));
+          if (allIds.length >= page.totalItems || page.items.length < 200) break;
+          fetchPage++;
+        }
+
+        console.log(`[CSV] ${allIds.length} registros encontrados para deletar`);
+
+        // Fase 2: Deleta sequencialmente 1 por 1 (estável, sem silenciar erros)
         let totalDeleted = 0;
         let totalFailed = 0;
-        while (true) {
-          const page = await pb.collection('amarcap53_pacientes').getList(delPage, 200);
-          if (page.items.length === 0) break;
-
-          // Deleta em paralelo, lotes de 50
-          const ids = page.items.map(r => r.id);
-          for (let di = 0; di < ids.length; di += 50) {
-            const chunk = ids.slice(di, di + 50);
-            const results = await Promise.allSettled(
-              chunk.map(id => pb.collection('amarcap53_pacientes').delete(id))
-            );
-            results.forEach((r, idx) => {
-              if (r.status === 'fulfilled') totalDeleted++;
-              else {
-                totalFailed++;
-                console.warn(`[CSV] Falha delete ${chunk[idx]}:`, r.reason?.message || r.reason);
-              }
-            });
+        for (const id of allIds) {
+          try {
+            await pb.collection('amarcap53_pacientes').delete(id);
+            totalDeleted++;
+          } catch (err: any) {
+            totalFailed++;
+            console.warn(`[CSV] Falha delete ${id}:`, err?.message || err);
           }
-
-          if (page.items.length < 200) break;
-          delPage++;
+          if (totalDeleted % 100 === 0 && totalDeleted > 0) {
+            setCsvProgress({ current: totalDeleted, total: allIds.length });
+          }
         }
+
         console.log(`[CSV] Deletados ${totalDeleted} registros antigos (${totalFailed} falhas)`);
         if (totalDeleted > 0) await new Promise(r => setTimeout(r, 300));
       } catch (error) {
