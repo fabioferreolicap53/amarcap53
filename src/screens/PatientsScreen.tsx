@@ -933,6 +933,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const handleCsvImport = async () => {
     if (!csvRecords.length || !csvFileName) return;
 
+    console.log('[PATIENTS] handleCsvImport V3 - build novo carregado');
     setIsCsvUploading(true);
     const totalRecords = csvRecords.length;
 

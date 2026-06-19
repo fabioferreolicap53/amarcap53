@@ -201,6 +201,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[SETTINGS] handleFileUpload V3 - build novo carregado');
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -258,81 +259,85 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
           return record;
         });
 
-        // Se "Substituir existentes" marcado, deleta TODOS os registros antigos ANTES de importar
+        // Se "Substituir existentes" marcado: envia CSV inteiro pro backend
+        // Backend faz DELETE + INSERT na mesma transação SQL (atômico)
         if (replaceExisting) {
-          setUploadStatus({ stage: 'cleaning', message: 'Removendo registros antigos...', current: 0, total: 1, fileName: file.name });
+          setUploadStatus({ stage: 'cleaning', message: 'Substituindo base via backend (transação atômica)...', current: 1, total: 1, fileName: file.name });
 
-          // DELETE em massa via SQL no backend — 1 request, instantâneo
           const baseUrl = pb.baseURL;
           const token = pb.authStore.token;
-          const delRes = await fetch(`${baseUrl}/api/custom/delete-all`, {
+          const res = await fetch(`${baseUrl}/api/custom/import-pacientes`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`,
             },
-            body: JSON.stringify({ collection: 'amarcap53_pacientes' }),
+            body: JSON.stringify({
+              csvText: csvText,
+              fileName: file.name,
+              mode: 'replace',
+            }),
           });
-          if (!delRes.ok) {
-            const delErr = await delRes.json().catch(() => ({}));
-            throw new Error(`Falha ao deletar: ${delErr.message || delRes.status}`);
-          }
-          const delData = await delRes.json();
-          console.log(`[DELETE-ALL] ${delData.deleted} registros antigos deletados via SQL`);
 
-          // Verifica que coleção está vazia
-          const check = await pb.collection('amarcap53_pacientes').getList(1, 1);
-          if (check.totalItems > 0) {
-            setIsUploading(false);
-            setUploadStatus({ stage: 'error', message: `ERRO: Ainda restam ${check.totalItems} registros antigos. Importação abortada.`, current: 0, total: 0, fileName: file.name });
-            return;
+          const data = await res.json();
+
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || `Erro HTTP ${res.status}`);
           }
 
-          await new Promise(r => setTimeout(r, 300));
-        }
-
-        // Chunk de 500 — Promise.allSettled via SDK
-        const BATCH_SIZE = 500;
-        const totalChunks = Math.ceil(cleanedRecords.length / BATCH_SIZE);
-
-        let importedTotal = 0;
-        let errorsTotal = 0;
-
-        for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
-          const start = chunkIdx * BATCH_SIZE;
-          const end = Math.min(start + BATCH_SIZE, cleanedRecords.length);
-          const chunkRecords = cleanedRecords.slice(start, end);
-
+          console.log(`[IMPORT] Backend: ${data.oldCount} antigos deletados, ${data.imported} novos inseridos, ${data.errors} erros`);
+          fetchImportHistory();
+          fetchStats();
           setUploadStatus({
-            stage: 'importing',
-            message: `Enviando lote ${chunkIdx + 1} de ${totalChunks}...`,
-            current: chunkIdx + 1,
-            total: totalChunks,
+            stage: 'completed',
+            message: `Sucesso! ${data.oldCount} antigos removidos, ${data.imported} novos inseridos${data.errors > 0 ? `, ${data.errors} erros` : ''}.`,
+            current: data.imported,
+            total: data.imported,
             fileName: file.name,
           });
+        } else {
+          // Modo ADICIONAR: insere registros novos pelo SDK
+          const BATCH_SIZE = 500;
+          const totalChunks = Math.ceil(cleanedRecords.length / BATCH_SIZE);
+          let importedTotal = 0;
+          let errorsTotal = 0;
 
-          const batchPromises = chunkRecords.map((rec) =>
-            pb.collection('amarcap53_pacientes').create(rec, { requestKey: null })
-          );
-          const results = await Promise.allSettled(batchPromises);
-          results.forEach((r) => {
-            if (r.status === 'fulfilled') importedTotal++;
-            else {
-              errorsTotal++;
-              if (errorsTotal <= 3) console.warn(`Lote ${chunkIdx + 1}:`, r.reason?.message || r.reason);
-            }
+          for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+            const start = chunkIdx * BATCH_SIZE;
+            const end = Math.min(start + BATCH_SIZE, cleanedRecords.length);
+            const chunkRecords = cleanedRecords.slice(start, end);
+
+            setUploadStatus({
+              stage: 'importing',
+              message: `Enviando lote ${chunkIdx + 1} de ${totalChunks}...`,
+              current: chunkIdx + 1,
+              total: totalChunks,
+              fileName: file.name,
+            });
+
+            const batchPromises = chunkRecords.map((rec) =>
+              pb.collection('amarcap53_pacientes').create(rec, { requestKey: null })
+            );
+            const results = await Promise.allSettled(batchPromises);
+            results.forEach((r) => {
+              if (r.status === 'fulfilled') importedTotal++;
+              else {
+                errorsTotal++;
+                if (errorsTotal <= 3) console.warn(`Lote ${chunkIdx + 1}:`, r.reason?.message || r.reason);
+              }
+            });
+          }
+
+          fetchImportHistory();
+          fetchStats();
+          setUploadStatus({
+            stage: 'completed',
+            message: `Sucesso! ${importedTotal} registros importados${errorsTotal > 0 ? `, ${errorsTotal} falhas` : ''}.`,
+            current: importedTotal,
+            total: importedTotal,
+            fileName: file.name,
           });
         }
-
-        fetchImportHistory();
-        fetchStats();
-        setUploadStatus({
-          stage: 'completed',
-          message: `Sucesso! ${importedTotal} registros importados${errorsTotal > 0 ? `, ${errorsTotal} falhas` : ''}.`,
-          current: importedTotal,
-          total: importedTotal,
-          fileName: file.name,
-        });
       } catch (err: any) {
         console.error('Erro na importacao:', err);
         const rollbackMsg = err.message?.includes('revertida') ? ' Dados antigos preservados.' : '';
