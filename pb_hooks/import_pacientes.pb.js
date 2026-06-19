@@ -363,4 +363,63 @@ routerAdd('POST', '/api/custom/import-pacientes', (c) => {
   }
 });
 
+// ─── DELETE em massa: remove TODOS os registros de uma coleção ───
+// POST /api/custom/delete-all  { collection: "amarcap53_pacientes" }
+// Apenas cap/admin. SQL direto = instantâneo.
+routerAdd('POST', '/api/custom/delete-all', (c) => {
+  try {
+    const auth = c.auth;
+    if (!auth) return c.json(401, { code: 401, message: 'Não autenticado' });
+    const role = auth.get('role');
+    if (role !== 'cap' && role !== 'admin')
+      return c.json(403, { code: 403, message: 'Apenas usuários CAP ou admin' });
+
+    let body;
+    try {
+      const info = c.requestInfo();
+      if (info && info.body) {
+        body = (typeof info.body === 'object') ? info.body : {};
+        if (body && typeof body.get === 'function') {
+          body = { collection: body.get('collection') };
+        }
+      } else {
+        body = {};
+      }
+    } catch (_) {
+      try {
+        const raw = c.parseBody();
+        body = (typeof raw === 'object' && raw !== null) ? raw : {};
+      } catch (_2) {
+        body = {};
+      }
+    }
+
+    const collection = body.collection;
+    if (!collection || typeof collection !== 'string')
+      return c.json(400, { code: 400, message: 'Envie collection nome' });
+
+    // Valida que a coleção existe
+    const dao = $app.dao();
+    const col = dao.findCollectionByNameOrId(collection);
+    if (!col) return c.json(404, { code: 404, message: 'Coleção "' + collection + '" não encontrada' });
+
+    // Conta antes
+    let beforeCount = 0;
+    try {
+      const row = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + collection).one();
+      beforeCount = row && row.get ? (row.get('total') || 0) : 0;
+    } catch (_) {}
+
+    // DELETE em massa via SQL
+    dao.db().newQuery('DELETE FROM ' + collection).execute();
+
+    console.log('[delete-all] ' + collection + ': ' + beforeCount + ' registros removidos');
+    return c.json(200, { success: true, deleted: beforeCount });
+  } catch (err) {
+    const msg = (err && err.message) || 'Erro ao deletar registros';
+    console.error('[delete-all] CRASH:', msg);
+    return c.json(500, { code: 500, message: msg });
+  }
+});
+
 

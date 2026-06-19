@@ -938,21 +938,22 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     if (csvReplaceExisting) {
       setCsvProgress({ current: 0, total: 1 });
 
-      // Loop until empty: usa SDK com auth, SEM requestKey: null
-      let totalDeleted = 0;
-      while (true) {
-        const page = await pb.collection('amarcap53_pacientes').getList(1, 200);
-        if (page.items.length === 0) break;
+      // DELETE em massa via SQL no backend — 1 request, instantâneo
+      const delRes = await pb.send('/api/custom/delete-all', {
+        method: 'POST',
+        body: { collection: 'amarcap53_pacientes' },
+      });
+      console.log(`[CSV] ${delRes.deleted} registros antigos deletados via SQL`);
 
-        for (const item of page.items) {
-          await pb.collection('amarcap53_pacientes').delete(item.id);
-          totalDeleted++;
-        }
-        setCsvProgress({ current: totalDeleted, total: totalDeleted });
-        console.log(`[CSV] ${totalDeleted} registros deletados... (${page.items.length} na última página)`);
+      // Verifica que coleção está vazia
+      const check = await pb.collection('amarcap53_pacientes').getList(1, 1);
+      if (check.totalItems > 0) {
+        setIsCsvUploading(false);
+        setCsvResult({ success: 0, errors: 1, total: 0 });
+        alert(`ERRO: Ainda restam ${check.totalItems} registros antigos. Importação abortada.`);
+        return;
       }
 
-      console.log(`[CSV] Limpeza concluída: ${totalDeleted} registros antigos deletados`);
       await new Promise(r => setTimeout(r, 300));
     }
 

@@ -262,25 +262,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         if (replaceExisting) {
           setUploadStatus({ stage: 'cleaning', message: 'Removendo registros antigos...', current: 0, total: 1, fileName: file.name });
 
-          // Loop until empty: sempre pega página 1, deleta todos, repete até voltar vazia
-          let totalDeleted = 0;
-          let hasMore = true;
-          while (hasMore) {
-            const page = await pb.collection('amarcap53_pacientes').getList(1, 200);
-            if (page.items.length === 0) {
-              hasMore = false;
-              break;
-            }
-            for (const item of page.items) {
-              await pb.collection('amarcap53_pacientes').delete(item.id);
-              totalDeleted++;
-            }
-            setUploadStatus({ stage: 'cleaning', message: `Removendo registros antigos... ${totalDeleted}`, current: totalDeleted, total: totalDeleted, fileName: file.name });
-            console.log(`[CSV] ${totalDeleted} registros deletados... (${page.items.length} restantes na última página)`);
+          // DELETE em massa via SQL no backend — 1 request, instantâneo
+          const delRes = await pb.send('/api/custom/delete-all', {
+            method: 'POST',
+            body: { collection: 'amarcap53_pacientes' },
+          });
+          console.log(`[CSV] ${delRes.deleted} registros antigos deletados via SQL`);
+
+          // Verifica que coleção está vazia
+          const check = await pb.collection('amarcap53_pacientes').getList(1, 1);
+          if (check.totalItems > 0) {
+            setIsUploading(false);
+            setUploadStatus({ stage: 'error', message: `ERRO: Ainda restam ${check.totalItems} registros antigos. Importação abortada.`, current: 0, total: 0, fileName: file.name });
+            return;
           }
 
-          console.log(`[CSV] Limpeza concluída: ${totalDeleted} registros antigos deletados`);
-          if (totalDeleted > 0) await new Promise(r => setTimeout(r, 300));
+          await new Promise(r => setTimeout(r, 300));
         }
 
         // Chunk de 500 — Promise.allSettled via SDK
