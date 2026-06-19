@@ -938,22 +938,18 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     if (csvReplaceExisting) {
       setCsvProgress({ current: 0, total: 1 });
 
-      // Loop until empty: pega página 1, deleta todos, repete até voltar vazia.
-      // Não depende de totalItems — funciona mesmo com cache inconsistente.
+      // Loop until empty: usa SDK com auth, SEM requestKey: null
       let totalDeleted = 0;
-      let hasMore = true;
-      while (hasMore) {
-        const page = await pb.collection('amarcap53_pacientes').getList(1, 200, { requestKey: null });
-        if (page.items.length === 0) {
-          hasMore = false;
-          break;
-        }
+      while (true) {
+        const page = await pb.collection('amarcap53_pacientes').getList(1, 200);
+        if (page.items.length === 0) break;
+
         for (const item of page.items) {
           await pb.collection('amarcap53_pacientes').delete(item.id);
           totalDeleted++;
         }
         setCsvProgress({ current: totalDeleted, total: totalDeleted });
-        console.log(`[CSV] Deletados ${totalDeleted} registros... (${page.items.length} restantes na última página)`);
+        console.log(`[CSV] ${totalDeleted} registros deletados... (${page.items.length} na última página)`);
       }
 
       console.log(`[CSV] Limpeza concluída: ${totalDeleted} registros antigos deletados`);

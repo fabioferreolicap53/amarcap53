@@ -266,7 +266,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
           let totalDeleted = 0;
           let hasMore = true;
           while (hasMore) {
-            const page = await pb.collection('amarcap53_pacientes').getList(1, 200, { requestKey: null });
+            const page = await pb.collection('amarcap53_pacientes').getList(1, 200);
             if (page.items.length === 0) {
               hasMore = false;
               break;
