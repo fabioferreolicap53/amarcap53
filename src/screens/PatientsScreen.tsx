@@ -1169,15 +1169,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   )}
                 </button>
 
-                {(isAdmin || user?.role === 'cap') && (
-                  <button
-                    onClick={() => setIsCsvModalOpen(true)}
-                    className="flex items-center gap-2 md:gap-3 px-4 md:px-8 h-12 md:h-14 rounded-2xl text-[10px] md:text-sm font-black uppercase tracking-widest transition-all duration-500 border bg-emerald-600/20 text-emerald-300 border-emerald-500/30 hover:bg-emerald-600/30 hover:border-emerald-500/50 shadow-sm"
-                  >
-                    <Upload className="w-4 h-4 md:w-5 md:h-5" />
-                    <span className="hidden sm:inline">Importar CSV</span>
-                  </button>
-                )}
+                {/* Importação CSV removida — agora disponível apenas em Configurações */}
               </div>
             </div>
 

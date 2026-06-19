@@ -16,6 +16,15 @@ interface UploadStatus {
   fileName?: string;
 }
 
+const stageLabels: Record<UploadStage, string> = {
+  idle: 'Pronto',
+  reading: 'Lendo arquivo',
+  cleaning: 'Limpando registros antigos',
+  importing: 'Importando',
+  completed: 'Concluído',
+  error: 'Erro',
+};
+
 interface ImportLog {
   id: string;
   filename: string;
@@ -647,7 +656,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                             <div className="space-y-2 w-full">
                               <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">{uploadStatus.message}</p>
                               <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase">
-                                <span>{uploadStatus.stage}</span>
+                                <span>{stageLabels[uploadStatus.stage] || uploadStatus.stage}</span>
                                 <span>{Math.round((uploadStatus.current / (uploadStatus.total || 1)) * 100)}%</span>
                               </div>
                               <div className="w-full h-2 bg-blue-100 rounded-full overflow-hidden">
