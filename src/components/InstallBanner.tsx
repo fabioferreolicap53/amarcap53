@@ -6,6 +6,19 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+const DISMISS_KEY = 'pwa-banner-dismiss-count';
+
+function getDismissCount(): number {
+  try {
+    const val = localStorage.getItem(DISMISS_KEY);
+    return val ? parseInt(val, 10) || 0 : 0;
+  } catch { return 0; }
+}
+
+function setDismissCount(n: number) {
+  try { localStorage.setItem(DISMISS_KEY, String(n)); } catch {}
+}
+
 // Checa síncrono — roda na inicialização do state, antes do primeiro render
 function calcInitState(): { show: boolean; isIOS: boolean; standalone: boolean } {
   const standalone =
@@ -16,8 +29,8 @@ function calcInitState(): { show: boolean; isIOS: boolean; standalone: boolean }
 
   if (standalone) return { show: false, isIOS, standalone: true };
 
-  const lastDismissed = localStorage.getItem('pwa-banner-dismissed');
-  if (lastDismissed && Date.now() - parseInt(lastDismissed) < 259200000) {
+  // Após 3 dispensas consecutivas, nunca mais mostra
+  if (getDismissCount() >= 3) {
     return { show: false, isIOS, standalone: false };
   }
 
@@ -41,23 +54,18 @@ export const InstallBanner: React.FC = () => {
   const { show: showBanner, isIOS, standalone: isStandalone } = state;
 
   useEffect(() => {
-    // Se standalone, não faz nada
     if (isStandalone) return;
-
-    // Se já temos o evento guardado e banner já mostrando, só atualiza o ref
     if (deferredRef.current && showBanner) return;
 
-    // Fallback: beforeinstallprompt ainda não disparou — escuta
     const handler = (e: Event) => {
       e.preventDefault();
       deferredRef.current = e as BeforeInstallPromptEvent;
-      setState((prev) => ({ ...prev, show: true }));
+      setState((prev) => ({ ...prev, show: getDismissCount() < 3 }));
     };
     window.addEventListener('beforeinstallprompt', handler);
 
     return () => window.removeEventListener('beforeinstallprompt', handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isStandalone, showBanner]);
 
   const handleInstall = async () => {
     const promptEvent = deferredRef.current;
@@ -66,6 +74,7 @@ export const InstallBanner: React.FC = () => {
     await promptEvent.prompt();
     const { outcome } = await promptEvent.userChoice;
     if (outcome === 'accepted') {
+      setDismissCount(0); // reset contador se instalou
       setState((prev) => ({ ...prev, show: false }));
     }
     deferredRef.current = null;
@@ -73,8 +82,9 @@ export const InstallBanner: React.FC = () => {
   };
 
   const handleClose = () => {
+    const newCount = getDismissCount() + 1;
+    setDismissCount(newCount);
     setState((prev) => ({ ...prev, show: false }));
-    localStorage.setItem('pwa-banner-dismissed', Date.now().toString());
   };
 
   if (!showBanner || isStandalone) return null;
