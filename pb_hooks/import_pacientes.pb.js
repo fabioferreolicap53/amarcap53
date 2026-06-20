@@ -304,26 +304,4 @@ routerAdd('POST', '/api/custom/delete-all', function(c) {
   }
 });
 
-// ─── Hook: auto-delete no primeiro create ───────────────
-var _autoDeleteDone = false;
-onRecordCreate(function(e) {
-  if (_autoDeleteDone) return e.next();
-  _autoDeleteDone = true;
-  try {
-    var dao = getDao();
-    if (!dao) return e.next();
-    var db = dao.db();
-    var total = 0;
-    try { var row = db.newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one(); total = (row && row.get) ? (row.get('total') || 0) : 0; } catch (_) {}
-    if (total === 0) return e.next();
-    var iter = 0;
-    while (iter < 500) {
-      var chk = db.newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
-      var rem = (chk && chk.get) ? (chk.get('total') || 0) : 0;
-      if (rem === 0) break;
-      db.newQuery('DELETE FROM ' + COLLECTION + ' WHERE id IN (SELECT id FROM ' + COLLECTION + ' LIMIT 10000)').execute();
-      iter++;
-    }
-  } catch (err) {}
-  return e.next();
-}, COLLECTION);
+// ─── Hook auto-delete removido (exclusão explícita via card "Excluir Base")

@@ -213,7 +213,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('[SETTINGS] handleFileUpload V3 - build novo carregado');
+    console.log('[SETTINGS] handleFileUpload - client-side');
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -222,7 +222,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       return;
     }
 
-    // Limite de 50MB
     const MAX_FILE_SIZE = 50 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
       setUploadStatus({ stage: 'error', message: 'Arquivo muito grande (max. 50MB). Divida em partes menores.', current: 0, total: 0 });
@@ -232,74 +231,124 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     setIsUploading(true);
     setUploadStatus({ stage: 'reading', message: 'Lendo arquivo...', current: 0, total: 0, fileName: file.name });
 
+    // Aliases de headers CSV → campos PocketBase
+    const FIELD_ALIASES: Record<string, string[]> = {
+      unidade: ['UNIDADE', 'UNIDADE DE SAUDE', 'ESTABELECIMENTO', 'UBS'],
+      equipe: ['EQUIPE', 'EQUIPE DE SAUDE', 'EQ'],
+      microarea: ['MICROAREA', 'MICRO AREA', 'MICRO', 'MICROAREA'],
+      cns: ['CNS', 'CARTAO SUS', 'NUMERO CNS'],
+      nome: ['NOME', 'NOME PACIENTE', 'NOME DO PACIENTE', 'PACIENTE', 'NOME COMPLETO'],
+      data_nascimento: ['NASC', 'DATA DE NASCIMENTO', 'DATA NASCIMENTO', 'NASCIMENTO', 'DATA_NASCIMENTO'],
+      idade: ['IDADE', 'ANOS'],
+      grupo: ['GRUPO', 'FAIXA ETARIA', 'CATEGORIA'],
+      cito_lab: ['CITO LAB', 'CITO LABORATORIO', 'CITO_LAB', 'CITOLAB'],
+      cito_pep: ['CITO PEP', 'CITO_PEP', 'CITOPEP'],
+      dna_hpv_gal: ['DNA-HPV', 'DNA_HPV_GAL', 'DNA HPV', 'DNA HPV GAL'],
+      alertas_rastreamento: ['ALERTAS RASTREAMENTO', 'ALERTAS', 'OBSERVACOES'],
+    };
+
+    function normalize(h: string): string {
+      return h.trim().toUpperCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    function findField(csvHeader: string): string | null {
+      const n = normalize(csvHeader);
+      for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
+        for (const a of aliases) {
+          if (normalize(a) === n) return field;
+        }
+      }
+      for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
+        for (const a of aliases) {
+          const na = normalize(a);
+          if (n.includes(na) || na.includes(n)) return field;
+        }
+      }
+      return null;
+    }
+
+    function convertDate(val: string): string {
+      if (!val || val === '--' || val.trim() === '') return '';
+      if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val;
+      const parts = val.split('/');
+      if (parts.length === 3) {
+        let [d, m, y] = parts;
+        if (y.length === 2) y = '20' + y;
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      }
+      return val;
+    }
+
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
         const csvText = e.target?.result as string;
+        if (!csvText || csvText.trim().length === 0) throw new Error('CSV vazio');
 
-        const parsed = Papa.parse(csvText, {
+        // Parse CSV bruto (sem transformHeader pra preservar original)
+        const parsed = Papa.parse<Record<string, string>>(csvText, {
           header: true,
           skipEmptyLines: true,
-          transformHeader: (h: string) => h.replace(/,+$/, '').trim(),
         });
-        const allRecords = parsed.data.filter((r: any) => r.nome && r.nome.trim());
-        if (allRecords.length === 0) throw new Error('CSV vazio ou sem dados validos');
+        if (parsed.data.length === 0) throw new Error('CSV vazio ou sem dados');
 
-        const convertDate = (val: string) => {
-          if (!val || val === '--' || val.trim() === '') return '';
-          if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val;
-          const parts = val.split('/');
-          if (parts.length === 3) {
-            let [d, m, y] = parts;
-            if (y.length === 2) y = '20' + y;
-            return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-          }
-          return val;
-        };
+        // Mapear headers do CSV → campos do PocketBase
+        const rawHeaders = parsed.meta.fields || [];
+        const headerMap: Record<string, string | null> = {};
+        for (const h of rawHeaders) {
+          headerMap[h] = findField(h);
+        }
 
-        const DATE_FIELDS = ['data_nascimento', 'cito_lab', 'cito_pep', 'dna_hpv_gal', 'dna_hpv_pep'];
+        const DATE_FIELDS = new Set(['data_nascimento', 'cito_lab', 'cito_pep', 'dna_hpv_gal', 'dna_hpv_pep']);
 
-        const cleanedRecords = allRecords.map((r: any) => {
-          const record: Record<string, any> = {};
-          for (const key in r) {
-            if (r.hasOwnProperty(key) && key) record[key] = r[key];
-          }
-          DATE_FIELDS.forEach(f => { if (record[f]) record[f] = convertDate(record[f]); });
-          if (record.cns) record.cns = String(record.cns).replace(/\D/g, '').padStart(15, '0').slice(-15);
-          if (record.idade) record.idade = parseInt(record.idade, 10) || 0;
-          if (record.microarea !== undefined && record.microarea !== '') record.microarea = parseInt(record.microarea, 10) || 0;
-          return record;
-        });
+        // Converter registros
+        const records = parsed.data
+          .filter(r => {
+            const nomeField = rawHeaders.find(h => findField(h) === 'nome');
+            return nomeField && r[nomeField] && r[nomeField].trim();
+          })
+          .map(r => {
+            const rec: Record<string, any> = {};
+            for (const rawH of rawHeaders) {
+              const mapped = headerMap[rawH];
+              if (!mapped) continue;
+              let val: any = r[rawH];
+              if (val === undefined || val === null || val === '' || val === '--') continue;
+              if (DATE_FIELDS.has(mapped)) {
+                val = convertDate(val);
+                if (!val) continue;
+              } else if (mapped === 'cns') {
+                val = String(val).replace(/\D/g, '').padStart(15, '0').slice(-15);
+              } else if (mapped === 'idade' || mapped === 'microarea') {
+                val = parseInt(val, 10) || 0;
+              }
+              rec[mapped] = val;
+            }
+            return rec;
+          })
+          .filter(r => r.nome && r.cns);
 
-        // Modo ADICIONAR: insere registros novos pelo SDK (agrupado em lotes)
-        const BATCH_SIZE = 500;
-        const totalChunks = Math.ceil(cleanedRecords.length / BATCH_SIZE);
-        let importedTotal = 0;
-        let errorsTotal = 0;
+        if (records.length === 0) throw new Error('Nenhum registro com nome e CNS encontrado');
+        if (records.length > 30000) throw new Error('Max 30000 registros por lote');
 
-        for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
-          const start = chunkIdx * BATCH_SIZE;
-          const end = Math.min(start + BATCH_SIZE, cleanedRecords.length);
-          const chunkRecords = cleanedRecords.slice(start, end);
+        setUploadStatus({ stage: 'importing', message: 'Importando...', current: 0, total: records.length, fileName: file.name });
 
+        // Inserir em lotes via SDK
+        const BATCH = 500;
+        let imported = 0;
+        let errors = 0;
+        for (let i = 0; i < records.length; i += BATCH) {
+          const batch = records.slice(i, i + BATCH);
+          const results = await Promise.allSettled(
+            batch.map(rec => pb.collection('amarcap53_pacientes').create(rec, { requestKey: null }))
+          );
+          results.forEach(r => r.status === 'fulfilled' ? imported++ : errors++);
           setUploadStatus({
             stage: 'importing',
-            message: `Enviando lote ${chunkIdx + 1} de ${totalChunks}...`,
-            current: chunkIdx + 1,
-            total: totalChunks,
+            message: `${imported} registros importados...`,
+            current: imported,
+            total: records.length,
             fileName: file.name,
-          });
-
-          const batchPromises = chunkRecords.map((rec) =>
-            pb.collection('amarcap53_pacientes').create(rec, { requestKey: null })
-          );
-          const results = await Promise.allSettled(batchPromises);
-          results.forEach((r) => {
-            if (r.status === 'fulfilled') importedTotal++;
-            else {
-              errorsTotal++;
-              if (errorsTotal <= 3) console.warn(`Lote ${chunkIdx + 1}:`, r.reason?.message || r.reason);
-            }
           });
         }
 
@@ -307,15 +356,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         fetchStats();
         setUploadStatus({
           stage: 'completed',
-          message: `Sucesso! ${importedTotal} registros importados${errorsTotal > 0 ? `, ${errorsTotal} falhas` : ''}.`,
-          current: importedTotal,
-          total: importedTotal,
+          message: `Sucesso! ${imported} registros importados${errors > 0 ? `, ${errors} falhas` : ''}.`,
+          current: imported,
+          total: records.length,
           fileName: file.name,
         });
       } catch (err: any) {
         console.error('Erro na importacao:', err);
-        const rollbackMsg = err.message?.includes('revertida') ? ' Dados antigos preservados.' : '';
-        setUploadStatus({ stage: 'error', message: `Erro: ${err.message || 'Falha na comunicacao'}.${rollbackMsg}`, current: 0, total: 0 });
+        setUploadStatus({ stage: 'error', message: `Erro: ${err.message || 'Falha na comunicacao'}`, current: 0, total: 0 });
       } finally {
         setIsUploading(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
