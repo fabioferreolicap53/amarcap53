@@ -453,11 +453,11 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       const regionFilters: string[] = [];
       if (!isAdmin) {
         if (user.role === 'unidade') {
-          regionFilters.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude) }));
+          regionFilters.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
         } else if (user.role === 'equipe') {
-          regionFilters.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude), e: normalizeText(user.equipe) }));
+          regionFilters.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%'), e: normalizeText(user.equipe).replace(/\s+/g, '%') }));
         } else if (user.role === 'microarea') {
-          regionFilters.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude), e: normalizeText(user.equipe) }));
+          regionFilters.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%'), e: normalizeText(user.equipe).replace(/\s+/g, '%') }));
           regionFilters.push(`microarea = ${Number(user.microarea)}`);
         }
       }

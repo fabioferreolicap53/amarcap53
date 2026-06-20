@@ -256,18 +256,18 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         const patientRegionFilterParts: string[] = [];
         if (!isAdmin) {
           if (user.role === 'unidade') {
-            patientRegionFilterParts.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude) }));
+            patientRegionFilterParts.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
           } else if (user.role === 'equipe') {
-            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude), e: normalizeText(user.equipe) }));
+            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%'), e: normalizeText(user.equipe).replace(/\s+/g, '%') }));
           } else if (user.role === 'microarea') {
-            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude), e: normalizeText(user.equipe) }));
+            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%'), e: normalizeText(user.equipe).replace(/\s+/g, '%') }));
             patientRegionFilterParts.push(`microarea = ${Number(user.microarea)}`);
           }
         }
         if (filterUnidade.length > 0) {
           const uParams: Record<string, string> = {};
           const uClauses = filterUnidade.map((u, i) => {
-            uParams[`u${i}`] = normalizeText(u.trim().replace(/\s+/g, ' '));
+            uParams[`u${i}`] = normalizeText(u).replace(/\s+/g, '%');
             return `unidade ~ {:u${i}}`;
           });
           patientRegionFilterParts.push(pb.filter(uClauses.join(' || '), uParams));
@@ -275,7 +275,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         if (filterEquipe.length > 0) {
           const eParams: Record<string, string> = {};
           const eClauses = filterEquipe.map((e, i) => {
-            eParams[`e${i}`] = normalizeText(e.trim().replace(/\s+/g, ' '));
+            eParams[`e${i}`] = normalizeText(e).replace(/\s+/g, '%');
             return `equipe ~ {:e${i}}`;
           });
           patientRegionFilterParts.push(pb.filter(eClauses.join(' || '), eParams));
