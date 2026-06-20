@@ -391,6 +391,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         if (importEtaTimerRef.current) clearInterval(importEtaTimerRef.current);
         var elapsed = Math.round((Date.now() - importStartTimeRef.current) / 1000);
 
+        // Cria registro de log no histórico
+        try {
+          await pb.collection('amarcap53_importacoes').create({
+            filename: file.name,
+            total_records: records.length,
+            success_count: imported,
+            error_count: errors,
+            user_id: user?.id || '',
+            details: wasCancelled ? 'Interrompido pelo usuario' : 'Concluido',
+          });
+        } catch (logErr: any) {
+          if (logErr?.status !== 404) console.error('Erro ao salvar log de importacao:', logErr);
+        }
+
         fetchImportHistory();
         fetchStats();
 
@@ -613,12 +627,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
               {/* Perfil do Usuário */}
               <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-slate-200/60 relative overflow-hidden">
                 <div className="flex items-center gap-4 mb-10">
-                  <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
-                    <User className="w-6 h-6 text-blue-600" />
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+                    <User className="w-6 h-6 text-white" />
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-slate-800 tracking-tight uppercase">Meu Perfil</h3>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">Gerencie seus dados pessoais</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Gerencie seus dados pessoais</p>
                   </div>
                 </div>
 
@@ -626,7 +640,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                   <div className="space-y-6">
                     {/* Nome */}
                     <div className="space-y-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">NOME</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">NOME</label>
                       <div className="flex gap-3">
                         <div className="flex-1 relative">
                           <input 
@@ -634,7 +648,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                             value={isEditingName ? userName : user?.name || 'Não informado'}
                             onChange={(e) => setUserName(e.target.value)}
                             disabled={!isEditingName}
-                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-blue-500/20 transition-all disabled:opacity-70"
+                            className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-70 disabled:bg-slate-50"
                           />
                         </div>
                         {!isEditingName ? (
@@ -665,7 +679,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
                     {/* Email Display */}
                     <div className="space-y-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">E-mail de Acesso</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mail de Acesso</label>
                       <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-400">
                         {user?.email}
                       </div>
@@ -681,7 +695,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                           placeholder="Novo e-mail"
                           value={newEmail}
                           onChange={(e) => setNewEmail(e.target.value)}
-                          className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-blue-500/20 transition-all"
+                          className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition-all"
                         />
                         <button 
                           type="submit"
@@ -722,132 +736,150 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                 </div>
               </div>
 
-            {/* Card Premium: Gestão de Dados (Dashboard Style) - Apenas CAP */}
+            {/* Card: Gestão de Dados - Apenas CAP */}
             {isCap && (
-              <div className="bg-[#001b3d] rounded-[2.5rem] p-1 shadow-[0_20px_50px_rgba(0,27,61,0.3)] relative overflow-hidden group">
-                {/* Efeitos de Fundo Glassmorphism */}
-                <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] -mr-48 -mt-48"></div>
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] -ml-32 -mb-32"></div>
+              <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-slate-200/60 relative overflow-hidden">
+                {/* Linha decorativa superior */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-800" />
                 
-                <div className="relative z-10 bg-[#001b3d]/40 backdrop-blur-xl rounded-[2.4rem] p-8 md:p-10 border border-white/5">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-                    <div className="flex items-center gap-5">
-                      <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-900/20">
-                        <Database className="w-7 h-7 text-white" />
-                      </div>
-                      <div>
-                        <h2 className="text-2xl font-black text-white tracking-tight uppercase">Gestão de Dados</h2>
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                          <p className="text-[10px] font-black text-emerald-500/80 uppercase tracking-widest">Sistema Operacional</p>
-                        </div>
-                      </div>
+                <div className="flex items-center gap-4 mb-10">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+                    <Database className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800 tracking-tight uppercase">Gestão de Dados</h3>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                      <p className="text-[10px] font-black text-emerald-600/80 uppercase tracking-widest">Sistema Operacional</p>
                     </div>
                   </div>
+                </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-7 border border-white/10 hover:bg-white/10 transition-colors group/card flex flex-col">
-                      <div className="flex items-center gap-3 mb-6">
-                        <Users className="w-4 h-4 text-blue-400 shrink-0" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 truncate">Base Ativa</p>
-                      </div>
-                      <div className="flex flex-col items-start mt-auto">
-                        <span className="text-3xl lg:text-4xl font-black text-white tracking-tight leading-none">{totalPatients.toLocaleString('pt-BR')}</span>
-                        <span className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1.5">Registros</span>
-                      </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="bg-slate-50/80 rounded-[2rem] p-7 border border-slate-100 hover:bg-slate-50 hover:border-slate-200 transition-all flex flex-col">
+                    <div className="flex items-center gap-3 mb-6">
+                      <Users className="w-4 h-4 text-blue-500 shrink-0" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 truncate">Base Ativa</p>
                     </div>
+                    <div className="flex flex-col items-start mt-auto">
+                      <span className="text-3xl lg:text-4xl font-black text-slate-800 tracking-tight leading-none">{totalPatients.toLocaleString('pt-BR')}</span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1.5">Registros</span>
+                    </div>
+                  </div>
                     
-                    <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-7 border border-white/10 hover:bg-white/10 transition-colors flex flex-col">
-                      <div className="flex items-center gap-3 mb-6">
-                        <Activity className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 truncate">Status Sincro</p>
-                      </div>
-                      <div className="flex flex-col items-start mt-auto">
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-lg lg:text-xl font-black text-white tracking-tight">{lastSync !== '--' ? 'ATUALIZADO' : 'PENDENTE'}</span>
-                          <CheckCircle className={`w-4 h-4 ${lastSync !== '--' ? 'text-emerald-500' : 'text-white/20'}`} />
-                        </div>
-                        {lastSync !== '--' && (
-                          <span className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1.5">Base sincronizada</span>
-                        )}
-                      </div>
+                  <div className="bg-slate-50/80 rounded-[2rem] p-7 border border-slate-100 hover:bg-slate-50 hover:border-slate-200 transition-all flex flex-col">
+                    <div className="flex items-center gap-3 mb-6">
+                      <Activity className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 truncate">Status Sincro</p>
                     </div>
+                    <div className="flex flex-col items-start mt-auto">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-lg lg:text-xl font-black text-slate-800 tracking-tight">{lastSync !== '--' ? 'ATUALIZADO' : 'PENDENTE'}</span>
+                        <CheckCircle className={`w-4 h-4 ${lastSync !== '--' ? 'text-emerald-500' : 'text-slate-300'}`} />
+                      </div>
+                      {lastSync !== '--' && (
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1.5">Base sincronizada</span>
+                      )}
+                    </div>
+                  </div>
 
-                    <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-7 border border-white/10 hover:bg-white/10 transition-colors flex flex-col">
-                      <div className="flex items-center gap-3 mb-6">
-                        <History className="w-4 h-4 text-indigo-400 shrink-0" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 truncate">Última Carga</p>
-                      </div>
-                      <div className="flex flex-col items-start mt-auto">
-                        <span className="text-lg lg:text-xl font-black text-white tracking-tight leading-none">{lastSync.split(',')[0]}</span>
-                        <span className="text-[9px] font-medium text-white/30 uppercase tracking-wider mt-1.5">{lastSync.split(',')[1] || '—'}</span>
-                      </div>
+                  <div className="bg-slate-50/80 rounded-[2rem] p-7 border border-slate-100 hover:bg-slate-50 hover:border-slate-200 transition-all flex flex-col">
+                    <div className="flex items-center gap-3 mb-6">
+                      <History className="w-4 h-4 text-indigo-500 shrink-0" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 truncate">Última Carga</p>
+                    </div>
+                    <div className="flex flex-col items-start mt-auto">
+                      <span className="text-lg lg:text-xl font-black text-slate-800 tracking-tight leading-none">{lastSync.split(',')[0]}</span>
+                      <span className="text-[9px] font-medium text-slate-400 uppercase tracking-wider mt-1.5">{lastSync.split(',')[1] || '—'}</span>
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Instruções Processuais - Apenas CAP */}
+            {/* Protocolo de Importação - Apenas CAP */}
             {isCap && (
               <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-slate-200/60 relative overflow-hidden">
+                {/* Linha decorativa superior */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
+
                 <div className="flex items-center gap-4 mb-10">
-                  <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
-                    <ShieldCheck className="w-6 h-6 text-blue-600" />
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+                    <BadgeCheck className="w-6 h-6 text-white" />
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-slate-800 tracking-tight uppercase">Protocolo de Importação</h3>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">Siga as diretrizes para garantir a integridade</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">Processamento inteligente em lotes com controle total</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-8">
-                    <div className="flex gap-5">
-                      <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center font-black flex-shrink-0 border border-slate-100">01</div>
+                    {/* Passo 01 */}
+                    <div className="flex gap-5 group">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black flex-shrink-0 border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">01</div>
                       <div className="space-y-1">
-                        <h4 className="text-sm font-black text-slate-800 uppercase">Formato do Arquivo</h4>
+                        <h4 className="text-sm font-black text-slate-800 uppercase">Arquivo CSV</h4>
                         <p className="text-xs font-medium text-slate-500 leading-relaxed">
-                          Utilize apenas arquivos <span className="text-blue-600 font-bold">.CSV</span> com delimitador de vírgula.
+                          Formatos aceitos: <span className="text-blue-600 font-bold">.CSV</span> com delimitador de vírgula. Cabeçalho na primeira linha.
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex gap-5">
-                      <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center font-black flex-shrink-0 border border-slate-100">02</div>
+                    {/* Passo 02 */}
+                    <div className="flex gap-5 group">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black flex-shrink-0 border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">02</div>
                       <div className="space-y-1">
-                        <h4 className="text-sm font-black text-slate-800 uppercase">Política de Dados</h4>
+                        <h4 className="text-sm font-black text-slate-800 uppercase">Mapeamento Automático</h4>
                         <p className="text-xs font-medium text-slate-500 leading-relaxed">
-                          A importação <span className="text-emerald-600 font-bold">adiciona</span> registros à base. Use card "Excluir Base" para remoção total.
+                          Headers reconhecidos automaticamente. CNS <span className="font-bold text-slate-600">(15 dígitos)</span>, datas <span className="font-bold text-slate-600">(ISO)</span> e campos numéricos são sanitizados em tempo real.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Passo 03 */}
+                    <div className="flex gap-5 group">
+                      <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center font-black flex-shrink-0 border border-violet-100 group-hover:bg-violet-600 group-hover:text-white transition-all duration-300">03</div>
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-black text-slate-800 uppercase">Processamento Controlado</h4>
+                        <p className="text-xs font-medium text-slate-500 leading-relaxed">
+                          Importação em lotes com pause/<span className="font-bold text-amber-600">continuar</span>, cancelamento, barra de progresso, <span className="font-bold text-slate-600">ETA</span> dinâmico e contagem de falhas.
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Ordem das Colunas (Mandatório)</h4>
+                  {/* Colunas */}
+                  <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-3xl p-6 border border-slate-200/80">
+                    <div className="flex items-center gap-2 mb-5">
+                      <FileText className="w-4 h-4 text-slate-400" />
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Colunas Esperadas</h4>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       {[
-                        { n: 'Unidade', t: 'Texto' },
-                        { n: 'Equipe', t: 'Texto' },
-                        { n: 'Microárea', t: 'Número' },
-                        { n: 'CNS', t: 'Número' },
-                        { n: 'Nome', t: 'Texto' },
-                        { n: 'Nasc.', t: 'Data' },
-                        { n: 'Idade', t: 'Número' },
-                        { n: 'Grupo', t: 'Texto' },
-                        { n: 'Cito Lab', t: 'Data' },
-                        { n: 'Cito PEP', t: 'Data' },
-                        { n: 'DNA-HPV', t: 'Data' }
+                        { n: 'Unidade', t: 'texto', c: 'text-blue-600 bg-blue-50 border-blue-100' },
+                        { n: 'Equipe', t: 'texto', c: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
+                        { n: 'Microárea', t: 'número', c: 'text-violet-600 bg-violet-50 border-violet-100' },
+                        { n: 'CNS', t: 'número', c: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+                        { n: 'Nome', t: 'texto', c: 'text-sky-600 bg-sky-50 border-sky-100' },
+                        { n: 'Nasc.', t: 'data', c: 'text-amber-600 bg-amber-50 border-amber-100' },
+                        { n: 'Idade', t: 'número', c: 'text-rose-600 bg-rose-50 border-rose-100' },
+                        { n: 'Grupo', t: 'texto', c: 'text-teal-600 bg-teal-50 border-teal-100' },
+                        { n: 'Cito Lab', t: 'data', c: 'text-orange-600 bg-orange-50 border-orange-100' },
+                        { n: 'Cito PEP', t: 'data', c: 'text-cyan-600 bg-cyan-50 border-cyan-100' },
+                        { n: 'DNA-HPV', t: 'data', c: 'text-purple-600 bg-purple-50 border-purple-100' }
                       ].map((col, idx) => (
                         <div key={idx} className="flex flex-col items-center">
-                          <span className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[9px] font-black text-slate-600 uppercase tracking-tighter shadow-sm">
+                          <span className={`px-3 py-1.5 border rounded-xl text-[9px] font-black uppercase tracking-tighter shadow-sm ${col.c} transition-transform hover:scale-105`}>
                             {col.n}
                           </span>
                           <span className="text-[7px] font-bold text-slate-400 uppercase mt-1">{col.t}</span>
                         </div>
                       ))}
                     </div>
+                    <p className="text-[8px] font-medium text-slate-400 mt-4 leading-relaxed border-t border-slate-200/60 pt-3">
+                      A ordem das colunas no CSV deve seguir esta sequência. O sistema reconhece variações nos nomes dos headers automaticamente.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -859,10 +891,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
             {isCap ? (
               <>
                   {/* Card: Importar CSV */}
-                  <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60 flex-1 flex flex-col">
-                    <div className="mb-8 shrink-0">
-                      <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Importar CSV</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Adicione registros à base de pacientes</p>
+                  <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-slate-200/60 flex-1 flex flex-col">
+                    <div className="flex items-center gap-4 mb-8 shrink-0">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+                        <UploadCloud className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Importar CSV</h3>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Adicione registros à base de pacientes</p>
+                      </div>
                     </div>
 
                     <div className="relative flex-1 flex flex-col justify-center">
@@ -931,13 +968,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                             <div className="flex gap-3">
                               <button
                                 onClick={handlePauseResumeImport}
-                                className="flex-1 py-3.5 bg-amber-500 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 text-xs flex items-center justify-center gap-2"
+                                className="flex-1 py-4 bg-amber-500 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 text-xs flex items-center justify-center gap-2"
                               >
                                 {importControl === 'paused' ? '▶ Continuar' : '⏸ Pausar'}
                               </button>
                               <button
                                 onClick={handleCancelImport}
-                                className="flex-1 py-3.5 bg-slate-200 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-300 transition-all text-xs flex items-center justify-center gap-2"
+                                className="flex-1 py-4 bg-slate-200 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-300 transition-all text-xs flex items-center justify-center gap-2"
                               >
                                 ⏹ Interromper
                               </button>
@@ -947,7 +984,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                           <motion.label 
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="flex flex-col items-center justify-center w-full border-2 border-slate-200 border-dashed aspect-square rounded-[2rem] cursor-pointer bg-slate-50/50 hover:bg-white hover:border-blue-400 hover:shadow-xl hover:shadow-blue-500/5 transition-all relative group overflow-hidden"
+                            className="flex flex-col items-center justify-center w-full border-2 border-slate-200 border-dashed min-h-[220px] rounded-[2rem] cursor-pointer bg-slate-50/50 hover:bg-white hover:border-blue-400 hover:shadow-xl hover:shadow-blue-500/5 transition-all relative group overflow-hidden"
                           >
                             <div className="flex flex-col items-center justify-center text-center px-6 relative z-10">
                               <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:bg-blue-600 transition-all duration-500">
@@ -975,7 +1012,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                         animate={{ opacity: 1, y: 0 }}
                         className="mt-6 w-full space-y-5"
                       >
-                        <div className={'p-5 rounded-2xl flex items-center gap-4 ' + (importSummary.cancelled ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-100')}>
+                        <div className={'p-6 rounded-2xl flex items-center gap-4 ' + (importSummary.cancelled ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-100')}>
                           <div className={'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ' + (importSummary.cancelled ? 'bg-amber-500 shadow-amber-200' : 'bg-emerald-500 shadow-emerald-200')}>
                             {importSummary.cancelled ? (
                               <AlertTriangle className="w-5 h-5 text-white" />
@@ -989,17 +1026,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                         </div>
 
                         <div className="grid grid-cols-3 gap-2">
-                          <div className="bg-slate-50 rounded-xl p-3 text-center">
+                          <div className="bg-white rounded-xl p-3 text-center">
                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">REGISTROS</p>
                             <p className="text-sm font-black text-slate-800 mt-0.5">{importSummary.total}</p>
                           </div>
-                          <div className="bg-slate-50 rounded-xl p-3 text-center">
+                          <div className="bg-white rounded-xl p-3 text-center">
                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">DURAÇÃO</p>
                             <p className="text-sm font-black text-slate-800 mt-0.5">
                               {function() { var m = Math.floor(importSummary.elapsedSec / 60); var s = importSummary.elapsedSec % 60; return m + 'm ' + s.toString().padStart(2, '0') + 's'; }()}
                             </p>
                           </div>
-                          <div className={'rounded-xl p-3 text-center ' + (importSummary.errors > 0 ? 'bg-rose-50' : 'bg-slate-50')}>
+                          <div className={'rounded-xl p-3 text-center ' + (importSummary.errors > 0 ? 'bg-rose-50' : 'bg-white')}>
                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">FALHAS</p>
                             <p className={'text-sm font-black mt-0.5 ' + (importSummary.errors > 0 ? 'text-rose-600' : 'text-slate-400')}>
                               {importSummary.errors}
@@ -1009,7 +1046,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
                         <button
                           onClick={function() { setUploadStatus({ stage: 'idle', message: '', current: 0, total: 0 }); setImportControl('idle'); setImportSummary(null); }}
-                          className="w-full py-3 bg-slate-100 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all text-xs"
+                          className="w-full py-4 bg-slate-100 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all text-xs"
                         >
                           Voltar
                         </button>
@@ -1044,16 +1081,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                   </div>
 
                   {/* Card: Excluir Base */}
-                  <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60 flex-1 flex flex-col">
-                    <div className="mb-8 shrink-0">
-                      <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Excluir Base</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Remova todos os registros de pacientes</p>
+                  <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-slate-200/60 flex-1 flex flex-col">
+                    <div className="flex items-center gap-4 mb-8 shrink-0">
+                      <div className="w-12 h-12 bg-gradient-to-br from-rose-500 to-rose-700 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-200">
+                        <Trash2 className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Excluir Base</h3>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Remova todos os registros de pacientes</p>
+                      </div>
                     </div>
 
-                    <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6">
-                      <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center">
-                        <Trash2 className="w-8 h-8 text-rose-500" />
-                      </div>
+                    <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 min-h-[220px]">
                       <p className="text-sm font-bold text-slate-600">Excluir todos os registros</p>
                       <p className="text-[10px] font-medium text-slate-400 leading-relaxed max-w-[200px]">
                         Esta ação remove permanentemente todos os dados da coleção de pacientes.
@@ -1088,7 +1127,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
                           {/* Métricas: tempo + erros + ETA */}
                           <div className="grid grid-cols-3 gap-2">
-                            <div className="bg-slate-50 rounded-xl p-2.5 text-center">
+                            <div className="bg-white rounded-xl p-2.5 text-center">
                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">TEMPO</p>
                               <p className="text-[11px] font-black text-slate-700 mt-0.5">
                                 {deleteStartTimeRef.current > 0
@@ -1096,13 +1135,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                                   : '0m 00s'}
                               </p>
                             </div>
-                            <div className="bg-slate-50 rounded-xl p-2.5 text-center">
+                            <div className="bg-white rounded-xl p-2.5 text-center">
                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">ERROS</p>
                               <p className={`text-[11px] font-black mt-0.5 ${deleteProgress.errors > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                                 {deleteProgress.errors}
                               </p>
                             </div>
-                            <div className="bg-slate-50 rounded-xl p-2.5 text-center">
+                            <div className="bg-white rounded-xl p-2.5 text-center">
                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">
                                 {deleteControl === 'paused' ? 'RESTANTE' : 'ESTIMADO'}
                               </p>
@@ -1134,13 +1173,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                           <div className="flex gap-3">
                             <button
                               onClick={handlePauseResume}
-                              className="flex-1 py-3.5 bg-amber-500 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 text-xs flex items-center justify-center gap-2"
+                              className="flex-1 py-4 bg-amber-500 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 text-xs flex items-center justify-center gap-2"
                             >
                               {deleteControl === 'paused' ? '▶ Continuar' : '⏸ Pausar'}
                             </button>
                             <button
                               onClick={handleCancelDelete}
-                              className="flex-1 py-3.5 bg-slate-200 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-300 transition-all text-xs flex items-center justify-center gap-2"
+                              className="flex-1 py-4 bg-slate-200 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-300 transition-all text-xs flex items-center justify-center gap-2"
                             >
                               ⏹ Interromper
                             </button>
@@ -1155,7 +1194,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                           className="w-full space-y-5"
                         >
                           {/* Header: ícone diferente se cancelado */}
-                          <div className={`p-5 rounded-2xl flex items-center gap-4 ${deleteSummary.cancelled ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-100'}`}>
+                          <div className={`p-6 rounded-2xl flex items-center gap-4 ${deleteSummary.cancelled ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-100'}`}>
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ${deleteSummary.cancelled ? 'bg-amber-500 shadow-amber-200' : 'bg-emerald-500 shadow-emerald-200'}`}>
                               {deleteSummary.cancelled ? (
                                 <AlertTriangle className="w-5 h-5 text-white" />
@@ -1170,17 +1209,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
                           {/* Métricas finais */}
                           <div className="grid grid-cols-3 gap-2">
-                            <div className="bg-slate-50 rounded-xl p-3 text-center">
+                            <div className="bg-white rounded-xl p-3 text-center">
                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">REGISTROS</p>
                               <p className="text-sm font-black text-slate-800 mt-0.5">{deleteSummary.total}</p>
                             </div>
-                            <div className="bg-slate-50 rounded-xl p-3 text-center">
+                            <div className="bg-white rounded-xl p-3 text-center">
                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">DURAÇÃO</p>
                               <p className="text-sm font-black text-slate-800 mt-0.5">
                                 {(() => { var m = Math.floor(deleteSummary.elapsedSec / 60); var s = deleteSummary.elapsedSec % 60; return `${m}m ${s.toString().padStart(2, '0')}s`; })()}
                               </p>
                             </div>
-                            <div className={`rounded-xl p-3 text-center ${deleteSummary.errors > 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
+                            <div className={`rounded-xl p-3 text-center ${deleteSummary.errors > 0 ? 'bg-rose-50' : 'bg-white'}`}>
                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">FALHAS</p>
                               <p className={`text-sm font-black mt-0.5 ${deleteSummary.errors > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
                                 {deleteSummary.errors}
@@ -1190,7 +1229,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
                           <button
                             onClick={() => { setDeleteStatus({ message: '', type: 'idle' }); setDeleteControl('idle'); setDeleteSummary(null); }}
-                            className="w-full py-3 bg-slate-100 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all text-xs"
+                            className="w-full py-4 bg-slate-100 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all text-xs"
                           >
                             Voltar
                           </button>
@@ -1211,7 +1250,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                           </div>
                           <button
                             onClick={() => { setDeleteStatus({ message: '', type: 'idle' }); setDeleteControl('idle'); setDeleteSummary(null); }}
-                            className="w-full py-3 bg-slate-100 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all text-xs"
+                            className="w-full py-4 bg-slate-100 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all text-xs"
                           >
                             Voltar
                           </button>
@@ -1221,50 +1260,56 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                   </div>
 
                   {/* Histórico de Operações */}
-                  <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60 flex-1 flex flex-col">
+                  <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-slate-200/60 flex-1 flex flex-col">
                     <div className="flex items-center justify-between mb-8 shrink-0">
-                      <div>
-                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Histórico</h3>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Últimos sincronismos</p>
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-slate-600 to-slate-800 rounded-2xl flex items-center justify-center shadow-lg shadow-slate-200">
+                          <History className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Histórico</h3>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Últimos sincronismos</p>
+                        </div>
                       </div>
                       <button onClick={fetchImportHistory} className="p-2.5 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors border border-slate-100">
                         <History className={`w-4 h-4 text-slate-500 ${isLoadingHistory ? 'animate-spin' : ''}`} />
                       </button>
                     </div>
 
-                    <div className="flex-1 flex flex-col justify-center">
-                      <div className="space-y-4">
+                    <div className="flex-1 flex flex-col justify-center min-h-[220px]">
+                      <div className="space-y-3">
                         {importHistory.length > 0 ? importHistory.map((log) => (
-                        <div key={log.id} className="p-5 bg-slate-50/50 border border-slate-100 rounded-3xl relative group hover:border-blue-200 transition-colors">
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center border border-slate-100 shadow-sm">
+                        <div key={log.id} className="p-4 bg-slate-50/80 border border-slate-100 rounded-2xl relative group hover:border-blue-200 hover:bg-white hover:shadow-sm transition-all">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 bg-white rounded-xl flex items-center justify-center border border-slate-100 shadow-sm shrink-0">
                                 <FileText className="w-4 h-4 text-blue-600" />
                               </div>
-                              <div>
-                                <p className="text-xs font-black text-slate-800 truncate max-w-[140px]">{log.filename}</p>
+                              <div className="min-w-0">
+                                <p className="text-xs font-black text-slate-800 truncate max-w-[130px]">{log.filename}</p>
                                 <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(log.created).toLocaleDateString('pt-BR')}</p>
                               </div>
                             </div>
                             <button 
                               onClick={(e) => handleDeleteImport(e, log.id)} 
-                              className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
+                              className="p-1.5 text-slate-300 hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-50 shrink-0"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                          <div className="flex justify-between items-center bg-white/50 rounded-2xl p-3 border border-white">
-                            <div className="flex flex-col">
+                          <div className="flex items-center justify-between bg-white rounded-xl px-3.5 py-2.5 border border-slate-100">
+                            <div className="flex items-center gap-2">
                               <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Registros</span>
-                              <span className="text-xs font-black text-slate-700">{log.total_records}</span>
+                              <span className="text-sm font-black text-slate-700">{log.total_records}</span>
                             </div>
-                            <div className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-[8px] font-black uppercase">
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[8px] font-black uppercase border border-emerald-200">
+                              <CheckCircle className="w-3 h-3" />
                               Sucesso
                             </div>
                           </div>
                         </div>
                       )) : (
-                        <div className="py-12 flex flex-col items-center justify-center text-center opacity-40">
+                        <div className="py-12 flex flex-col items-center justify-center text-center">
                           <Search className="w-8 h-8 text-slate-300 mb-3" />
                           <p className="text-[10px] font-black text-slate-400 uppercase">Nenhum registro encontrado</p>
                         </div>
@@ -1274,11 +1319,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                 </div>
                 </>
               ) : (
-                <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60 flex flex-col items-center justify-center text-center opacity-60 flex-1">
-                  <Shield className="w-12 h-12 text-slate-200 mb-4" />
+                <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-slate-200/60 flex flex-col items-center justify-center text-center flex-1">
+                  <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mb-5 border border-slate-100">
+                    <Shield className="w-7 h-7 text-slate-300" />
+                  </div>
                   <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter mb-2">Área Administrativa</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest max-w-[200px]">
-                    Recursos de importação disponíveis apenas para administradores.
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest max-w-[220px] leading-relaxed">
+                    Recursos de importação e exclusão disponíveis apenas para administradores.
                   </p>
                 </div>
               )}
@@ -1330,7 +1377,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
               {/* Input Senha */}
               <div className="space-y-2 mb-6">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                   Digite sua senha para confirmar
                 </label>
                 <div className="relative">
