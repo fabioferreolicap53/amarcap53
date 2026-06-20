@@ -329,7 +329,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
           .filter(r => r.nome && r.cns);
 
         if (records.length === 0) throw new Error('Nenhum registro com nome e CNS encontrado');
-        if (records.length > 30000) throw new Error('Max 30000 registros por lote');
 
         setUploadStatus({ stage: 'importing', message: 'Importando...', current: 0, total: records.length, fileName: file.name });
 
