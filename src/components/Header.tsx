@@ -108,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Coluna: Nav + User Info */}
         <div className="flex items-center gap-3 lg:gap-4 xl:gap-6 min-w-0 flex-1 h-full">
           {/* Navegação */}
-          <nav className="flex items-center justify-center gap-1 lg:gap-2 overflow-x-auto no-scrollbar pb-1 flex-1">
+          <nav className="flex items-center justify-end gap-0.5 lg:gap-1 xl:gap-1.5 overflow-x-auto no-scrollbar pb-1 flex-1 min-w-0 ml-auto">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -116,14 +116,14 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   key={item.id}
                   onClick={() => setActiveTab?.(item.id)}
-                  className={`flex items-center gap-1.5 xl:gap-2.5 px-2.5 xl:px-4 py-2 xl:py-2.5 rounded-xl transition-all duration-300 whitespace-nowrap group ${
+                  className={`flex items-center gap-1 lg:gap-1.5 xl:gap-2 px-1.5 lg:px-2 xl:px-3 py-1.5 lg:py-2 xl:py-2.5 rounded-xl transition-all duration-300 whitespace-nowrap group shrink-0 ${
                     isActive 
                       ? 'bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.1)] border border-white/20' 
                       : 'text-white/60 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  <Icon className={`w-3.5 xl:w-4 h-3.5 xl:h-4 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
-                  <span className="text-[10px] xl:text-xs font-bold tracking-wide uppercase">{item.label}</span>
+                  <Icon className={`w-3.5 lg:w-3.5 xl:w-4 h-3.5 lg:h-3.5 xl:h-4 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
+                  <span className="text-[9px] lg:text-[10px] xl:text-xs font-bold tracking-wide uppercase">{item.label}</span>
                 </button>
               );
             })}
@@ -131,47 +131,47 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Informações do Usuário */}
           {user && (
-            <div className="hidden md:flex items-center justify-center gap-2 lg:gap-3 xl:gap-5 min-w-0 border-l border-white/10 pl-2 lg:pl-3 xl:pl-5 h-full flex-1">
+            <div className="hidden md:flex items-center justify-center gap-2 lg:gap-2 xl:gap-5 min-w-0 border-l border-white/10 pl-2 lg:pl-3 xl:pl-5 h-full flex-[0.86]">
               {/* Unidade */}
               {user.unidade_saude && (
-                <div className="flex items-center gap-1.5 xl:gap-2.5 group/info min-w-0 shrink-0 max-w-[200px] lg:max-w-[260px] xl:max-w-none">
-                  <Building className="w-3.5 xl:w-4 h-3.5 xl:h-4 text-blue-300 shrink-0 group-hover/info:scale-110 transition-transform" />
+                <div className="flex items-center gap-1.5 lg:gap-2 xl:gap-2.5 group/info min-w-0 shrink-0 max-w-[180px] lg:max-w-[220px] xl:max-w-none">
+                  <Building className="w-3.5 lg:w-3.5 xl:w-4 h-3.5 lg:h-3.5 xl:h-4 text-blue-300 shrink-0 group-hover/info:scale-110 transition-transform" />
                   <div className="flex flex-col min-w-0 leading-tight xl:leading-snug">
-                    <span className="text-[7px] xl:text-[8px] uppercase tracking-[0.2em] text-white/40 font-black group-hover/info:text-blue-300 transition-colors">Unidade</span>
-                    <span className="text-[10px] xl:text-xs font-black text-white uppercase tracking-wide truncate">{user.unidade_saude}</span>
+                    <span className="text-[7px] lg:text-[7px] xl:text-[8px] uppercase tracking-[0.2em] text-white/40 font-black group-hover/info:text-blue-300 transition-colors">Unidade</span>
+                    <span className="text-[9px] lg:text-[10px] xl:text-xs font-black text-white uppercase tracking-wide truncate">{user.unidade_saude}</span>
                   </div>
                 </div>
               )}
 
               {/* Equipe */}
               {(user.role === 'equipe' || user.role === 'microarea') && user.equipe && (
-                <div className="flex items-center gap-1.5 xl:gap-2.5 group/info min-w-0 shrink-0 max-w-[140px] xl:max-w-none">
-                  <Users className="w-3.5 xl:w-4 h-3.5 xl:h-4 text-purple-300 shrink-0 group-hover/info:scale-110 transition-transform" />
+                <div className="flex items-center gap-1.5 lg:gap-2 xl:gap-2.5 group/info min-w-0 shrink-0 max-w-[120px] lg:max-w-[140px] xl:max-w-none">
+                  <Users className="w-3.5 lg:w-3.5 xl:w-4 h-3.5 lg:h-3.5 xl:h-4 text-purple-300 shrink-0 group-hover/info:scale-110 transition-transform" />
                   <div className="flex flex-col min-w-0 leading-tight xl:leading-snug">
-                    <span className="text-[7px] xl:text-[8px] uppercase tracking-[0.2em] text-white/40 font-black group-hover/info:text-purple-300 transition-colors">Equipe</span>
-                    <span className="text-[10px] xl:text-xs font-black text-white uppercase tracking-wide truncate">{user.equipe}</span>
+                    <span className="text-[7px] lg:text-[7px] xl:text-[8px] uppercase tracking-[0.2em] text-white/40 font-black group-hover/info:text-purple-300 transition-colors">Equipe</span>
+                    <span className="text-[9px] lg:text-[10px] xl:text-xs font-black text-white uppercase tracking-wide truncate">{user.equipe}</span>
                   </div>
                 </div>
               )}
 
               {/* Microárea */}
               {user.role === 'microarea' && user.microarea && (
-                <div className="flex items-center gap-1.5 xl:gap-2.5 group/info shrink-0">
-                  <MapPin className="w-3.5 xl:w-4 h-3.5 xl:h-4 text-emerald-300 shrink-0 group-hover/info:scale-110 transition-transform" />
+                <div className="flex items-center gap-1.5 lg:gap-2 xl:gap-2.5 group/info shrink-0">
+                  <MapPin className="w-3.5 lg:w-3.5 xl:w-4 h-3.5 lg:h-3.5 xl:h-4 text-emerald-300 shrink-0 group-hover/info:scale-110 transition-transform" />
                   <div className="flex flex-col leading-tight xl:leading-snug">
-                    <span className="text-[7px] xl:text-[8px] uppercase tracking-[0.2em] text-white/40 font-black group-hover/info:text-emerald-300 transition-colors">MA</span>
-                    <span className="text-[10px] xl:text-xs font-black text-white uppercase tracking-wide">{user.microarea}</span>
+                    <span className="text-[7px] lg:text-[7px] xl:text-[8px] uppercase tracking-[0.2em] text-white/40 font-black group-hover/info:text-emerald-300 transition-colors">MA</span>
+                    <span className="text-[9px] lg:text-[10px] xl:text-xs font-black text-white uppercase tracking-wide">{user.microarea}</span>
                   </div>
                 </div>
               )}
 
               {/* CAP */}
               {user.role === 'cap' && (
-                <div className="flex items-center gap-1.5 xl:gap-2.5 group/info shrink-0">
-                  <Building className="w-3.5 xl:w-4 h-3.5 xl:h-4 text-amber-300 shrink-0 group-hover/info:scale-110 transition-transform" />
+                <div className="flex items-center gap-1.5 lg:gap-2 xl:gap-2.5 group/info shrink-0">
+                  <Building className="w-3.5 lg:w-3.5 xl:w-4 h-3.5 lg:h-3.5 xl:h-4 text-amber-300 shrink-0 group-hover/info:scale-110 transition-transform" />
                   <div className="flex flex-col leading-tight xl:leading-snug">
-                    <span className="text-[7px] xl:text-[8px] uppercase tracking-[0.2em] text-white/40 font-black group-hover/info:text-amber-300 transition-colors">Perfil</span>
-                    <span className="text-[10px] xl:text-xs font-black text-white uppercase tracking-wide">COORDENAÇÃO</span>
+                    <span className="text-[7px] lg:text-[7px] xl:text-[8px] uppercase tracking-[0.2em] text-white/40 font-black group-hover/info:text-amber-300 transition-colors">Perfil</span>
+                    <span className="text-[9px] lg:text-[10px] xl:text-xs font-black text-white uppercase tracking-wide">COORDENAÇÃO</span>
                   </div>
                 </div>
               )}
