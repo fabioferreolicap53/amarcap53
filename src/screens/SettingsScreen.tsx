@@ -79,7 +79,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     current: 0, 
     total: 0 
   });
-  const [replaceExisting, setReplaceExisting] = useState(false);
+
+  // Estados para exclusão total
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteStatus, setDeleteStatus] = useState<{ message: string; type: 'idle' | 'confirming' | 'deleting' | 'completed' | 'error' }>({ message: '', type: 'idle' });
 
   // Sincroniza o estado do input com o usuário do contexto sempre que ele mudar
   useEffect(() => {
@@ -268,85 +271,47 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
           return record;
         });
 
-        // Se "Substituir existentes" marcado: envia CSV inteiro pro backend
-        // Backend faz DELETE + INSERT na mesma transação SQL (atômico)
-        if (replaceExisting) {
-          setUploadStatus({ stage: 'cleaning', message: 'Substituindo base via backend (transação atômica)...', current: 1, total: 1, fileName: file.name });
+        // Modo ADICIONAR: insere registros novos pelo SDK (agrupado em lotes)
+        const BATCH_SIZE = 500;
+        const totalChunks = Math.ceil(cleanedRecords.length / BATCH_SIZE);
+        let importedTotal = 0;
+        let errorsTotal = 0;
 
-          const baseUrl = pb.baseURL;
-          const token = pb.authStore.token;
-          const res = await fetch(`${baseUrl}/api/custom/import-pacientes`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              csvText: csvText,
-              fileName: file.name,
-              mode: 'replace',
-            }),
-          });
+        for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+          const start = chunkIdx * BATCH_SIZE;
+          const end = Math.min(start + BATCH_SIZE, cleanedRecords.length);
+          const chunkRecords = cleanedRecords.slice(start, end);
 
-          const data = await res.json();
-
-          if (!res.ok || !data.success) {
-            throw new Error(data.message || `Erro HTTP ${res.status}`);
-          }
-
-          console.log(`[IMPORT] Backend: ${data.oldCount} antigos deletados, ${data.imported} novos inseridos, ${data.errors} erros`);
-          fetchImportHistory();
-          fetchStats();
           setUploadStatus({
-            stage: 'completed',
-            message: `Sucesso! ${data.oldCount} antigos removidos, ${data.imported} novos inseridos${data.errors > 0 ? `, ${data.errors} erros` : ''}.`,
-            current: data.imported,
-            total: data.imported,
+            stage: 'importing',
+            message: `Enviando lote ${chunkIdx + 1} de ${totalChunks}...`,
+            current: chunkIdx + 1,
+            total: totalChunks,
             fileName: file.name,
           });
-        } else {
-          // Modo ADICIONAR: insere registros novos pelo SDK
-          const BATCH_SIZE = 500;
-          const totalChunks = Math.ceil(cleanedRecords.length / BATCH_SIZE);
-          let importedTotal = 0;
-          let errorsTotal = 0;
 
-          for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
-            const start = chunkIdx * BATCH_SIZE;
-            const end = Math.min(start + BATCH_SIZE, cleanedRecords.length);
-            const chunkRecords = cleanedRecords.slice(start, end);
-
-            setUploadStatus({
-              stage: 'importing',
-              message: `Enviando lote ${chunkIdx + 1} de ${totalChunks}...`,
-              current: chunkIdx + 1,
-              total: totalChunks,
-              fileName: file.name,
-            });
-
-            const batchPromises = chunkRecords.map((rec) =>
-              pb.collection('amarcap53_pacientes').create(rec, { requestKey: null })
-            );
-            const results = await Promise.allSettled(batchPromises);
-            results.forEach((r) => {
-              if (r.status === 'fulfilled') importedTotal++;
-              else {
-                errorsTotal++;
-                if (errorsTotal <= 3) console.warn(`Lote ${chunkIdx + 1}:`, r.reason?.message || r.reason);
-              }
-            });
-          }
-
-          fetchImportHistory();
-          fetchStats();
-          setUploadStatus({
-            stage: 'completed',
-            message: `Sucesso! ${importedTotal} registros importados${errorsTotal > 0 ? `, ${errorsTotal} falhas` : ''}.`,
-            current: importedTotal,
-            total: importedTotal,
-            fileName: file.name,
+          const batchPromises = chunkRecords.map((rec) =>
+            pb.collection('amarcap53_pacientes').create(rec, { requestKey: null })
+          );
+          const results = await Promise.allSettled(batchPromises);
+          results.forEach((r) => {
+            if (r.status === 'fulfilled') importedTotal++;
+            else {
+              errorsTotal++;
+              if (errorsTotal <= 3) console.warn(`Lote ${chunkIdx + 1}:`, r.reason?.message || r.reason);
+            }
           });
         }
+
+        fetchImportHistory();
+        fetchStats();
+        setUploadStatus({
+          stage: 'completed',
+          message: `Sucesso! ${importedTotal} registros importados${errorsTotal > 0 ? `, ${errorsTotal} falhas` : ''}.`,
+          current: importedTotal,
+          total: importedTotal,
+          fileName: file.name,
+        });
       } catch (err: any) {
         console.error('Erro na importacao:', err);
         const rollbackMsg = err.message?.includes('revertida') ? ' Dados antigos preservados.' : '';
@@ -362,6 +327,50 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       setUploadStatus({ stage: 'error', message: 'Erro ao ler arquivo', current: 0, total: 0 });
     };
     reader.readAsText(file);
+  };
+
+  const handleDeleteAll = async () => {
+    if (deleteStatus.type !== 'confirming') {
+      setDeleteStatus({ message: 'Tem certeza? Esta ação é irreversível!', type: 'confirming' });
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteStatus({ message: 'Buscando registros para exclusão...', type: 'deleting' });
+
+    try {
+      // Busca apenas IDs dos registros
+      const records = await pb.collection('amarcap53_pacientes').getFullList({ fields: 'id' });
+      const total = records.length;
+
+      if (total === 0) {
+        setDeleteStatus({ message: 'Nenhum registro para excluir. Base já vazia.', type: 'completed' });
+        fetchStats();
+        return;
+      }
+
+      setDeleteStatus({ message: `Excluindo ${total} registros...`, type: 'deleting' });
+
+      // Deleta em lotes de 100
+      const BATCH = 100;
+      let deleted = 0;
+      for (let i = 0; i < total; i += BATCH) {
+        const batch = records.slice(i, i + BATCH);
+        const results = await Promise.allSettled(
+          batch.map(r => pb.collection('amarcap53_pacientes').delete(r.id))
+        );
+        deleted += results.filter(r => r.status === 'fulfilled').length;
+        setDeleteStatus({ message: `Excluindo... ${deleted}/${total}`, type: 'deleting' });
+      }
+
+      fetchStats();
+      setDeleteStatus({ message: `${deleted} registros excluídos com sucesso!`, type: 'completed' });
+    } catch (err: any) {
+      console.error('Erro ao excluir registros:', err);
+      setDeleteStatus({ message: `Erro: ${err.message || 'Falha na comunicação'}`, type: 'error' });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -588,7 +597,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                       <div className="space-y-1">
                         <h4 className="text-sm font-black text-slate-800 uppercase">Política de Dados</h4>
                         <p className="text-xs font-medium text-slate-500 leading-relaxed">
-                          A importação utiliza <span className="text-rose-500 font-bold underline decoration-rose-200 underline-offset-4">Substituição Total</span>. A base anterior será removida.
+                          A importação <span className="text-emerald-600 font-bold">adiciona</span> registros à base. Use card "Excluir Base" para remoção total.
                         </p>
                       </div>
                     </div>
@@ -628,11 +637,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
           <div className="lg:col-span-1 flex flex-col gap-8">
             {isCap ? (
               <>
-                  {/* Card de Ação: Upload */}
+                  {/* Card: Importar CSV */}
                   <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60 flex-1 flex flex-col">
                     <div className="mb-8 shrink-0">
-                      <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Novo Upload</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Atualize a base de pacientes</p>
+                      <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Importar CSV</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Adicione registros à base de pacientes</p>
                     </div>
 
                     <div className="relative flex-1 flex flex-col justify-center">
@@ -695,29 +704,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                       </AnimatePresence>
                     </div>
 
-                    {/* Toggle Substituir */}
-                    <label className="flex items-center gap-3 mt-5 cursor-pointer select-none group/toggle">
-                      <div className="relative">
-                        <input
-                          type="checkbox"
-                          checked={replaceExisting}
-                          onChange={(e) => setReplaceExisting(e.target.checked)}
-                          disabled={isUploading}
-                          className="sr-only peer"
-                        />
-                        <div className="w-10 h-6 bg-slate-200 rounded-full peer-checked:bg-red-500 transition-colors shadow-inner"></div>
-                        <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform peer-checked:translate-x-4"></div>
-                      </div>
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider group-hover/toggle:text-red-600 transition-colors">
-                        Substituir existentes
-                      </span>
-                      {replaceExisting && (
-                        <span className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded text-[8px] font-black uppercase">
-                          Dados atuais serao deletados
-                        </span>
-                      )}
-                    </label>
-
                     {uploadStatus.stage === 'completed' && (
                       <motion.div 
                         initial={{ opacity: 0, y: 10 }}
@@ -743,6 +729,100 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                         <p className="text-[10px] font-black text-rose-800 uppercase leading-tight">{uploadStatus.message}</p>
                       </motion.div>
                     )}
+                  </div>
+
+                  {/* Card: Excluir Base */}
+                  <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60 flex-1 flex flex-col">
+                    <div className="mb-8 shrink-0">
+                      <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Excluir Base</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Remova todos os registros de pacientes</p>
+                    </div>
+
+                    <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6">
+                      <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center">
+                        <Trash2 className="w-8 h-8 text-rose-500" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-600">Excluir todos os registros</p>
+                      <p className="text-[10px] font-medium text-slate-400 leading-relaxed max-w-[200px]">
+                        Esta ação remove permanentemente todos os dados da coleção de pacientes.
+                      </p>
+
+                      {deleteStatus.type === 'idle' && (
+                        <button
+                          onClick={handleDeleteAll}
+                          className="w-full py-4 bg-rose-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 text-xs"
+                        >
+                          Excluir Tudo
+                        </button>
+                      )}
+
+                      {deleteStatus.type === 'confirming' && (
+                        <div className="w-full space-y-3">
+                          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl">
+                            <p className="text-[10px] font-black text-rose-700 uppercase text-center leading-relaxed">
+                              {deleteStatus.message}
+                            </p>
+                          </div>
+                          <button
+                            onClick={handleDeleteAll}
+                            disabled={isDeleting}
+                            className="w-full py-4 bg-rose-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 text-xs disabled:opacity-30"
+                          >
+                            {isDeleting ? 'Excluindo...' : 'Sim, Excluir Permanentemente'}
+                          </button>
+                          <button
+                            onClick={() => setDeleteStatus({ message: '', type: 'idle' })}
+                            disabled={isDeleting}
+                            className="w-full py-3 bg-slate-100 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all text-xs"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      )}
+
+                      {deleteStatus.type === 'deleting' && (
+                        <div className="w-full space-y-3">
+                          <div className="flex items-center justify-center gap-3">
+                            <Loader2 className="w-5 h-5 text-rose-500 animate-spin" />
+                            <p className="text-[10px] font-black text-rose-600 uppercase">{deleteStatus.message}</p>
+                          </div>
+                          <div className="w-full h-2 bg-rose-100 rounded-full overflow-hidden">
+                            <motion.div 
+                              className="h-full bg-rose-600"
+                              initial={{ width: 0 }}
+                              animate={{ width: '100%' }}
+                              transition={{ duration: 0.5 }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {deleteStatus.type === 'completed' && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="w-full p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3"
+                        >
+                          <div className="w-8 h-8 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-200">
+                            <CheckCircle className="w-4 h-4 text-white" />
+                          </div>
+                          <p className="text-[10px] font-black text-emerald-800 uppercase leading-tight">{deleteStatus.message}</p>
+                        </motion.div>
+                      )}
+
+                      {deleteStatus.type === 'error' && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="w-full p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3"
+                        >
+                          <div className="w-8 h-8 bg-rose-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-rose-200">
+                            <AlertTriangle className="w-4 h-4 text-white" />
+                          </div>
+                          <p className="text-[10px] font-black text-rose-800 uppercase leading-tight">{deleteStatus.message}</p>
+                        </motion.div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Histórico de Operações */}

@@ -8,6 +8,11 @@ var LOG_COLLECTION = 'amarcap53_importacoes';
 var BATCH_SIZE = 500;
 var DATE_FIELDS = ['data_nascimento', 'cito_lab', 'cito_pep', 'dna_hpv_gal', 'dna_hpv_pep'];
 
+// Helper: obtém DAO (funciona em v0.24+ e v0.25+)
+function getDao() {
+  try { return $app.dao(); } catch(e) { return null; }
+}
+
 function padLeft(str, len, ch) {
   var s = String(str);
   ch = ch || ' ';
@@ -157,7 +162,8 @@ function handleLegacyBody(c, body, auth) {
   var fileName = body.fileName || 'import.csv';
   var mode = body.mode === 'append' ? 'append' : 'replace';
   if (records.length > 30000) return c.json(413, { code: 413, message: 'Max 30000 registros por lote' });
-  var dao = $app.dao();
+  var dao = getDao();
+  if (!dao) return c.json(500, { code: 500, message: 'DAO API indisponivel' });
   var coll = dao.findCollectionByNameOrId(COLLECTION);
   if (!coll) return c.json(500, { code: 500, message: 'Collection nao encontrada' });
   var oldCount = 0;
@@ -236,7 +242,8 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
       if (mappedFields[vi] === 'cns') hasCns = true;
     }
     if (!hasNome || !hasCns) return c.json(400, { code: 400, message: 'CSV precisa de "nome" e "cns". Encontradas: ' + mappedFields.join(', ') });
-    var dao = $app.dao();
+    var dao = getDao();
+    if (!dao) return c.json(500, { code: 500, message: 'DAO API indisponivel' });
     var collection = dao.findCollectionByNameOrId(COLLECTION);
     if (!collection) return c.json(500, { code: 500, message: 'Collection nao encontrada' });
     var oldCount = 0;
@@ -276,6 +283,8 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
 // ─── DELETE em massa ────────────────────────────────────
 routerAdd('POST', '/api/custom/delete-all', function(c) {
   try {
+    var dao = getDao();
+    if (!dao) return c.json(500, { code: 500, message: 'DAO API indisponivel' });
     var auth = c.auth;
     if (!auth) return c.json(401, { code: 401, message: 'Nao autenticado' });
     var role = auth.get('role');
@@ -284,14 +293,13 @@ routerAdd('POST', '/api/custom/delete-all', function(c) {
     try { var info = c.requestInfo(); if (info && info.body) { body = (typeof info.body === 'object') ? info.body : {}; if (body && typeof body.get === 'function') { body = { collection: body.get('collection') }; } } else { body = {}; } } catch (_) { try { body = c.parseBody() || {}; } catch (_2) { body = {}; } }
     var collName = body.collection;
     if (!collName || typeof collName !== 'string') return c.json(400, { code: 400, message: 'Envie collection' });
-    var dao = $app.dao();
-    var col = dao.findCollectionByNameOrId(collName);
-    if (!col) return c.json(404, { code: 404, message: 'Colecao nao encontrada' });
-    var beforeCount = 0;
-    try { var row = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + collName).one(); beforeCount = (row && row.get) ? (row.get('total') || 0) : 0; } catch (_) {}
-    dao.db().newQuery('DELETE FROM ' + collName).execute();
-    return c.json(200, { success: true, deleted: beforeCount });
+    var db = dao.db();
+    var row = db.newQuery('SELECT COUNT(*) as total FROM ' + collName).one();
+    var before = (row && row.get) ? (row.get('total') || 0) : 0;
+    db.newQuery('DELETE FROM ' + collName).execute();
+    return c.json(200, { success: true, deleted: before });
   } catch (err) {
+    console.error('delete-all ERROR:', (err && err.message) || err);
     return c.json(500, { code: 500, message: (err && err.message) || 'Erro' });
   }
 });
@@ -302,16 +310,18 @@ onRecordCreate(function(e) {
   if (_autoDeleteDone) return e.next();
   _autoDeleteDone = true;
   try {
-    var dao = $app.dao();
+    var dao = getDao();
+    if (!dao) return e.next();
+    var db = dao.db();
     var total = 0;
-    try { var row = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one(); total = (row && row.get) ? (row.get('total') || 0) : 0; } catch (_) {}
+    try { var row = db.newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one(); total = (row && row.get) ? (row.get('total') || 0) : 0; } catch (_) {}
     if (total === 0) return e.next();
     var iter = 0;
     while (iter < 500) {
-      var chk = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
+      var chk = db.newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
       var rem = (chk && chk.get) ? (chk.get('total') || 0) : 0;
       if (rem === 0) break;
-      dao.db().newQuery('DELETE FROM ' + COLLECTION + ' WHERE id IN (SELECT id FROM ' + COLLECTION + ' LIMIT 10000)').execute();
+      db.newQuery('DELETE FROM ' + COLLECTION + ' WHERE id IN (SELECT id FROM ' + COLLECTION + ' LIMIT 10000)').execute();
       iter++;
     }
   } catch (err) {}
