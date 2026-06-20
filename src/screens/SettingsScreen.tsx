@@ -80,9 +80,31 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     total: 0 
   });
 
+  // Estados para importação com pause/cancel (inspirados na exclusão)
+  const [importControl, setImportControl] = useState<'idle' | 'running' | 'paused'>('idle');
+  const [importProgress, setImportProgress] = useState({ imported: 0, total: 0, errors: 0 });
+  const [importSummary, setImportSummary] = useState<{ elapsedSec: number; errors: number; total: number; cancelled: boolean } | null>(null);
+  const [importEta, setImportEta] = useState<string>('');
+  const importFlagsRef = useRef({ paused: false, cancelled: false });
+  const importStartTimeRef = useRef(0);
+  const importEtaTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Estados para exclusão total
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteStatus, setDeleteStatus] = useState<{ message: string; type: 'idle' | 'confirming' | 'deleting' | 'completed' | 'error' }>({ message: '', type: 'idle' });
+  const [deleteStatus, setDeleteStatus] = useState<{ message: string; type: 'idle' | 'deleting' | 'completed' | 'error' }>({ message: '', type: 'idle' });
+
+  // Password confirmation + pause/cancel controls
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [deleteControl, setDeleteControl] = useState<'idle' | 'running' | 'paused'>('idle');
+  const [deleteProgress, setDeleteProgress] = useState({ deleted: 0, total: 0, errors: 0 });
+  const [deleteSummary, setDeleteSummary] = useState<{ elapsedSec: number; errors: number; total: number; cancelled: boolean } | null>(null);
+  const [deleteEta, setDeleteEta] = useState<string>('');
+  const deleteFlagsRef = useRef({ paused: false, cancelled: false });
+  const deleteStartTimeRef = useRef(0);
+  const deleteEtaTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Sincroniza o estado do input com o usuário do contexto sempre que ele mudar
   useEffect(() => {
@@ -213,7 +235,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('[SETTINGS] handleFileUpload - client-side');
+    console.log('[SETTINGS] handleFileUpload - V5 com pause/cancel');
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -222,17 +244,41 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       return;
     }
 
-    const MAX_FILE_SIZE = 50 * 1024 * 1024;
+    var MAX_FILE_SIZE = 50 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
       setUploadStatus({ stage: 'error', message: 'Arquivo muito grande (max. 50MB). Divida em partes menores.', current: 0, total: 0 });
       return;
     }
 
+    setImportSummary(null);
+    setImportEta('');
     setIsUploading(true);
+    setImportControl('running');
     setUploadStatus({ stage: 'reading', message: 'Lendo arquivo...', current: 0, total: 0, fileName: file.name });
+    setImportProgress({ imported: 0, total: 0, errors: 0 });
+    importFlagsRef.current = { paused: false, cancelled: false };
+    importStartTimeRef.current = Date.now();
 
-    // Aliases de headers CSV → campos PocketBase
-    const FIELD_ALIASES: Record<string, string[]> = {
+    // Interval pra atualizar ETA a cada 2s
+    importEtaTimerRef.current = setInterval(() => {
+      var p = importProgress;
+      if (p.total > 0 && p.imported > 0 && importControl === 'running') {
+        var elapsed = (Date.now() - importStartTimeRef.current) / 1000;
+        var rate = p.imported / elapsed;
+        var remaining = (p.total - p.imported) / rate;
+        if (rate > 0 && remaining > 0 && remaining < 3600) {
+          var mins = Math.floor(remaining / 60);
+          var secs = Math.floor(remaining % 60);
+          setImportEta(`${mins}m ${secs}s`);
+        } else if (rate > 0 && remaining >= 3600) {
+          setImportEta('> 1h');
+        } else {
+          setImportEta('...');
+        }
+      }
+    }, 2000);
+
+    var FIELD_ALIASES: Record<string, string[]> = {
       unidade: ['UNIDADE', 'UNIDADE DE SAUDE', 'ESTABELECIMENTO', 'UBS'],
       equipe: ['EQUIPE', 'EQUIPE DE SAUDE', 'EQ'],
       microarea: ['MICROAREA', 'MICRO AREA', 'MICRO', 'MICROAREA'],
@@ -252,16 +298,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     }
 
     function findField(csvHeader: string): string | null {
-      const n = normalize(csvHeader);
-      for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
-        for (const a of aliases) {
-          if (normalize(a) === n) return field;
-        }
+      var n = normalize(csvHeader);
+      for (var fld in FIELD_ALIASES) {
+        for (var a of FIELD_ALIASES[fld]) { if (normalize(a) === n) return fld; }
       }
-      for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
-        for (const a of aliases) {
-          const na = normalize(a);
-          if (n.includes(na) || na.includes(n)) return field;
+      for (var fld2 in FIELD_ALIASES) {
+        for (var a2 of FIELD_ALIASES[fld2]) {
+          var na = normalize(a2);
+          if (n.includes(na) || na.includes(n)) return fld2;
         }
       }
       return null;
@@ -270,154 +314,284 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     function convertDate(val: string): string {
       if (!val || val === '--' || val.trim() === '') return '';
       if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val;
-      const parts = val.split('/');
+      var parts = val.split('/');
       if (parts.length === 3) {
-        let [d, m, y] = parts;
+        var d = parts[0], m = parts[1], y = parts[2];
         if (y.length === 2) y = '20' + y;
-        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        return y + '-' + m.padStart(2, '0') + '-' + d.padStart(2, '0');
       }
       return val;
     }
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
+    var reader = new FileReader();
+    reader.onload = async (ev) => {
       try {
-        const csvText = e.target?.result as string;
+        var csvText = ev.target?.result as string;
         if (!csvText || csvText.trim().length === 0) throw new Error('CSV vazio');
 
-        // Parse CSV bruto (sem transformHeader pra preservar original)
-        const parsed = Papa.parse<Record<string, string>>(csvText, {
-          header: true,
-          skipEmptyLines: true,
-        });
+        var parsed = Papa.parse<Record<string, string>>(csvText, { header: true, skipEmptyLines: true });
         if (parsed.data.length === 0) throw new Error('CSV vazio ou sem dados');
 
-        // Mapear headers do CSV → campos do PocketBase
-        const rawHeaders = parsed.meta.fields || [];
-        const headerMap: Record<string, string | null> = {};
-        for (const h of rawHeaders) {
-          headerMap[h] = findField(h);
-        }
+        var rawHeaders = parsed.meta.fields || [];
+        var headerMap: Record<string, string | null> = {};
+        for (var h of rawHeaders) headerMap[h] = findField(h);
 
-        const DATE_FIELDS = new Set(['data_nascimento', 'cito_lab', 'cito_pep', 'dna_hpv_gal', 'dna_hpv_pep']);
+        var DATE_FIELDS = new Set(['data_nascimento', 'cito_lab', 'cito_pep', 'dna_hpv_gal', 'dna_hpv_pep']);
 
-        // Converter registros
-        const records = parsed.data
-          .filter(r => {
-            const nomeField = rawHeaders.find(h => findField(h) === 'nome');
+        var records = parsed.data
+          .filter(function(r) {
+            var nomeField = rawHeaders.find(function(h) { return findField(h) === 'nome'; });
             return nomeField && r[nomeField] && r[nomeField].trim();
           })
-          .map(r => {
-            const rec: Record<string, any> = {};
-            for (const rawH of rawHeaders) {
-              const mapped = headerMap[rawH];
+          .map(function(r) {
+            var rec: Record<string, any> = {};
+            for (var rawH of rawHeaders) {
+              var mapped = headerMap[rawH];
               if (!mapped) continue;
-              let val: any = r[rawH];
+              var val: any = r[rawH];
               if (val === undefined || val === null || val === '' || val === '--') continue;
-              if (DATE_FIELDS.has(mapped)) {
-                val = convertDate(val);
-                if (!val) continue;
-              } else if (mapped === 'cns') {
-                val = String(val).replace(/\D/g, '').padStart(15, '0').slice(-15);
-              } else if (mapped === 'idade' || mapped === 'microarea') {
-                val = parseInt(val, 10) || 0;
-              }
+              if (DATE_FIELDS.has(mapped)) { val = convertDate(val); if (!val) continue; }
+              else if (mapped === 'cns') { val = String(val).replace(/\D/g, '').padStart(15, '0').slice(-15); }
+              else if (mapped === 'idade' || mapped === 'microarea') { val = parseInt(val, 10) || 0; }
               rec[mapped] = val;
             }
             return rec;
           })
-          .filter(r => r.nome && r.cns);
+          .filter(function(r) { return r.nome && r.cns; });
 
         if (records.length === 0) throw new Error('Nenhum registro com nome e CNS encontrado');
 
+        setImportProgress({ imported: 0, total: records.length, errors: 0 });
         setUploadStatus({ stage: 'importing', message: 'Importando...', current: 0, total: records.length, fileName: file.name });
 
-        // Inserir em lotes via SDK
-        const BATCH = 500;
-        let imported = 0;
-        let errors = 0;
-        for (let i = 0; i < records.length; i += BATCH) {
-          const batch = records.slice(i, i + BATCH);
-          const results = await Promise.allSettled(
-            batch.map(rec => pb.collection('amarcap53_pacientes').create(rec, { requestKey: null }))
+        var BATCH = 500;
+        var imported = 0;
+        var errors = 0;
+        var wasCancelled = false;
+
+        for (var i = 0; i < records.length; i += BATCH) {
+          if (importFlagsRef.current.cancelled) { wasCancelled = true; break; }
+          while (importFlagsRef.current.paused && !importFlagsRef.current.cancelled) {
+            await new Promise(function(r2) { setTimeout(r2, 200); });
+          }
+          if (importFlagsRef.current.cancelled) { wasCancelled = true; break; }
+
+          var batch = records.slice(i, i + BATCH);
+          var results = await Promise.allSettled(
+            batch.map(function(rec) { return pb.collection('amarcap53_pacientes').create(rec, { requestKey: null }); })
           );
-          results.forEach(r => r.status === 'fulfilled' ? imported++ : errors++);
+          results.forEach(function(r) { r.status === 'fulfilled' ? imported++ : errors++; });
+          setImportProgress({ imported: imported, total: records.length, errors: errors });
           setUploadStatus({
-            stage: 'importing',
-            message: `${imported} registros importados...`,
-            current: imported,
-            total: records.length,
-            fileName: file.name,
+            stage: 'importing', message: imported + ' registros importados...',
+            current: imported, total: records.length, fileName: file.name,
           });
         }
 
+        if (importEtaTimerRef.current) clearInterval(importEtaTimerRef.current);
+        var elapsed = Math.round((Date.now() - importStartTimeRef.current) / 1000);
+
         fetchImportHistory();
         fetchStats();
-        setUploadStatus({
-          stage: 'completed',
-          message: `Sucesso! ${imported} registros importados${errors > 0 ? `, ${errors} falhas` : ''}.`,
-          current: imported,
-          total: records.length,
-          fileName: file.name,
-        });
+
+        if (wasCancelled) {
+          setImportSummary({ elapsedSec: elapsed, errors: errors, total: imported, cancelled: true });
+          setUploadStatus({ stage: 'completed', message: imported + ' registros importados. Operação interrompida.', current: imported, total: records.length, fileName: file.name });
+        } else {
+          setImportSummary({ elapsedSec: elapsed, errors: errors, total: imported, cancelled: false });
+          setUploadStatus({ stage: 'completed', message: 'Sucesso! ' + imported + ' registros importados' + (errors > 0 ? ', ' + errors + ' falhas' : '') + '.', current: imported, total: records.length, fileName: file.name });
+        }
+        setImportControl('idle');
       } catch (err: any) {
+        if (importEtaTimerRef.current) clearInterval(importEtaTimerRef.current);
+        var elapsedErr = Math.round((Date.now() - importStartTimeRef.current) / 1000);
+        setImportSummary({ elapsedSec: elapsedErr, errors: 0, total: 0, cancelled: false });
         console.error('Erro na importacao:', err);
-        setUploadStatus({ stage: 'error', message: `Erro: ${err.message || 'Falha na comunicacao'}`, current: 0, total: 0 });
+        setUploadStatus({ stage: 'error', message: 'Erro: ' + (err.message || 'Falha na comunicacao'), current: 0, total: 0 });
+        setImportControl('idle');
       } finally {
         setIsUploading(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     };
 
-    reader.onerror = () => {
+    reader.onerror = function() {
+      if (importEtaTimerRef.current) clearInterval(importEtaTimerRef.current);
       setIsUploading(false);
+      setImportControl('idle');
       setUploadStatus({ stage: 'error', message: 'Erro ao ler arquivo', current: 0, total: 0 });
     };
     reader.readAsText(file);
   };
 
-  const handleDeleteAll = async () => {
-    if (deleteStatus.type !== 'confirming') {
-      setDeleteStatus({ message: 'Tem certeza? Esta ação é irreversível!', type: 'confirming' });
+  const handlePauseResumeImport = () => {
+    if (importFlagsRef.current.paused) {
+      importFlagsRef.current.paused = false;
+      setImportControl('running');
+    } else {
+      importFlagsRef.current.paused = true;
+      setImportControl('paused');
+    }
+  };
+
+  const handleCancelImport = () => {
+    importFlagsRef.current.cancelled = true;
+    importFlagsRef.current.paused = false;
+    setImportControl('idle');
+  };
+
+  const handleDeleteAll = () => {
+    setShowPasswordModal(true);
+    setPasswordInput('');
+    setPasswordError('');
+  };
+
+  const handlePasswordSubmit = async () => {
+    if (!passwordInput) {
+      setPasswordError('Digite sua senha');
       return;
     }
 
+    try {
+      // Valida senha via REST direto — SEMPRE usa identity fixa do usuário logado
+      // IMPORTANTE: não usa SDK authWithPassword para não disparar onChange da authStore
+      var identity = user?.email || user?.username || '';
+      if (!identity) {
+        // Fallback: extrai do token JWT
+        try {
+          var payload = JSON.parse(atob(pb.authStore.token.split('.')[1]));
+          identity = payload.email || payload.username || payload.id || '';
+        } catch {}
+      }
+
+      var resp = await fetch(pb.baseURL + '/api/collections/amarcap53_users/auth-with-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identity, password: passwordInput }),
+      });
+      var data = await resp.json();
+      if (!resp.ok || !data.token) {
+        setPasswordError('Senha incorreta');
+        return;
+      }
+      // Valida role
+      if (data.record?.role !== 'cap' && data.record?.role !== 'admin') {
+        setPasswordError('Apenas usuarios CAP ou admin podem excluir dados');
+        return;
+      }
+    } catch {
+      setPasswordError('Erro ao validar senha');
+      return;
+    }
+
+    setShowPasswordModal(false);
+    setDeleteSummary(null);
+    setDeleteEta('');
     setIsDeleting(true);
+    setDeleteControl('running');
     setDeleteStatus({ message: 'Buscando registros para exclusão...', type: 'deleting' });
+    setDeleteProgress({ deleted: 0, total: 0, errors: 0 });
+    deleteFlagsRef.current = { paused: false, cancelled: false };
+    deleteStartTimeRef.current = Date.now();
+
+    // Interval pra atualizar ETA a cada 2s
+    deleteEtaTimerRef.current = setInterval(() => {
+      var p = deleteProgress;
+      if (p.total > 0 && p.deleted > 0 && deleteControl === 'running') {
+        var elapsed = (Date.now() - deleteStartTimeRef.current) / 1000;
+        var rate = p.deleted / elapsed;
+        var remaining = (p.total - p.deleted) / rate;
+        if (rate > 0 && remaining > 0 && remaining < 3600) {
+          var mins = Math.floor(remaining / 60);
+          var secs = Math.floor(remaining % 60);
+          setDeleteEta(`${mins}m ${secs}s`);
+        } else if (rate > 0 && remaining >= 3600) {
+          setDeleteEta('> 1h');
+        } else {
+          setDeleteEta('...');
+        }
+      }
+    }, 2000);
 
     try {
-      // Busca apenas IDs dos registros
       const records = await pb.collection('amarcap53_pacientes').getFullList({ fields: 'id' });
       const total = records.length;
 
       if (total === 0) {
+        if (deleteEtaTimerRef.current) clearInterval(deleteEtaTimerRef.current);
+        setDeleteSummary({ elapsedSec: 0, errors: 0, total: 0, cancelled: false });
         setDeleteStatus({ message: 'Nenhum registro para excluir. Base já vazia.', type: 'completed' });
+        setDeleteControl('idle');
         fetchStats();
         return;
       }
 
+      setDeleteProgress({ deleted: 0, total, errors: 0 });
       setDeleteStatus({ message: `Excluindo ${total} registros...`, type: 'deleting' });
 
-      // Deleta em lotes de 100
-      const BATCH = 100;
-      let deleted = 0;
-      for (let i = 0; i < total; i += BATCH) {
-        const batch = records.slice(i, i + BATCH);
-        const results = await Promise.allSettled(
+      var BATCH = 100;
+      var deleted = 0;
+      var errorsCount = 0;
+      var wasCancelled = false;
+      for (var i = 0; i < total; i += BATCH) {
+        if (deleteFlagsRef.current.cancelled) { wasCancelled = true; break; }
+        while (deleteFlagsRef.current.paused && !deleteFlagsRef.current.cancelled) {
+          await new Promise(r => setTimeout(r, 200));
+        }
+        if (deleteFlagsRef.current.cancelled) { wasCancelled = true; break; }
+
+        var batch = records.slice(i, i + BATCH);
+        var results = await Promise.allSettled(
           batch.map(r => pb.collection('amarcap53_pacientes').delete(r.id))
         );
-        deleted += results.filter(r => r.status === 'fulfilled').length;
-        setDeleteStatus({ message: `Excluindo... ${deleted}/${total}`, type: 'deleting' });
+        results.forEach(r => r.status === 'fulfilled' ? deleted++ : errorsCount++);
+        setDeleteProgress({ deleted, total, errors: errorsCount });
       }
 
+      if (deleteEtaTimerRef.current) clearInterval(deleteEtaTimerRef.current);
+      var elapsed = Math.round((Date.now() - deleteStartTimeRef.current) / 1000);
+
+      if (wasCancelled) {
+        setDeleteSummary({ elapsedSec: elapsed, errors: errorsCount, total: deleted, cancelled: true });
+        setDeleteStatus({ message: `${deleted} registros excluídos. Operação interrompida.`, type: 'completed' });
+      } else {
+        setDeleteSummary({ elapsedSec: elapsed, errors: errorsCount, total: deleted, cancelled: false });
+        setDeleteStatus({ message: `${deleted} registros excluídos com sucesso!`, type: 'completed' });
+      }
+      setDeleteControl('idle');
       fetchStats();
-      setDeleteStatus({ message: `${deleted} registros excluídos com sucesso!`, type: 'completed' });
     } catch (err: any) {
+      if (deleteEtaTimerRef.current) clearInterval(deleteEtaTimerRef.current);
+      var elapsedErr = Math.round((Date.now() - deleteStartTimeRef.current) / 1000);
+      setDeleteSummary({ elapsedSec: elapsedErr, errors: 0, total: 0, cancelled: false });
       console.error('Erro ao excluir registros:', err);
       setDeleteStatus({ message: `Erro: ${err.message || 'Falha na comunicação'}`, type: 'error' });
+      setDeleteControl('idle');
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const handlePauseResume = () => {
+    if (deleteFlagsRef.current.paused) {
+      deleteFlagsRef.current.paused = false;
+      setDeleteControl('running');
+    } else {
+      deleteFlagsRef.current.paused = true;
+      setDeleteControl('paused');
+    }
+  };
+
+  const handleCancelDelete = () => {
+    deleteFlagsRef.current.cancelled = true;
+    deleteFlagsRef.current.paused = false;
+    setDeleteControl('idle');
+  };
+
+  const closePasswordModal = () => {
+    setShowPasswordModal(false);
+    setPasswordInput('');
+    setPasswordError('');
   };
 
   return (
@@ -698,38 +872,82 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
-                            className="w-full aspect-square bg-slate-50 rounded-[2rem] border-2 border-blue-100 p-6 flex flex-col items-center justify-center text-center space-y-6"
+                            className="w-full bg-slate-50 rounded-[2rem] border-2 border-blue-100 p-6 flex flex-col text-center space-y-5"
                           >
-                            <div className="relative">
-                              <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 animate-bounce">
-                                <FileText className="w-8 h-8 text-white" />
+                            {/* Barra de progresso */}
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase">
+                                <span>{importProgress.imported} / {importProgress.total} registros</span>
+                                <span>{importProgress.total > 0 ? Math.round((importProgress.imported / importProgress.total) * 100) : 0}%</span>
                               </div>
-                              <div className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-4 border-slate-50 flex items-center justify-center">
-                                <Loader2 className="w-3 h-3 text-white animate-spin" />
-                              </div>
-                            </div>
-                            
-                            <div className="space-y-2 w-full">
-                              <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">{uploadStatus.message}</p>
-                              <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase">
-                                <span>{stageLabels[uploadStatus.stage] || uploadStatus.stage}</span>
-                                <span>{Math.round((uploadStatus.current / (uploadStatus.total || 1)) * 100)}%</span>
-                              </div>
-                              <div className="w-full h-2 bg-blue-100 rounded-full overflow-hidden">
+                              <div className="w-full h-3 bg-blue-100 rounded-full overflow-hidden">
                                 <motion.div 
-                                  className="h-full bg-blue-600"
+                                  className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"
                                   initial={{ width: 0 }}
-                                  animate={{ width: `${(uploadStatus.current / (uploadStatus.total || 1)) * 100}%` }}
+                                  animate={{ width: (importProgress.total > 0 ? (importProgress.imported / importProgress.total) * 100 : 0) + '%' }}
+                                  transition={{ duration: 0.3 }}
                                 />
                               </div>
-                              <p className="text-[9px] font-bold text-slate-400 uppercase">{uploadStatus.current} / {uploadStatus.total} Registros</p>
+                            </div>
+
+                            {/* Grid métricas: TEMPO, ERROS, ESTIMADO */}
+                            <div className="grid grid-cols-3 gap-2">
+                              <div className="bg-white rounded-xl p-2.5 text-center">
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">TEMPO</p>
+                                <p className="text-[11px] font-black text-slate-700 mt-0.5">
+                                  {importStartTimeRef.current > 0
+                                    ? (function() { var s = Math.round((Date.now() - importStartTimeRef.current) / 1000); var m = Math.floor(s / 60); var seg = s % 60; return m + 'm ' + seg.toString().padStart(2, '0') + 's'; })()
+                                    : '0m 00s'}
+                                </p>
+                              </div>
+                              <div className="bg-white rounded-xl p-2.5 text-center">
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">ERROS</p>
+                                <p className={'text-[11px] font-black mt-0.5 ' + (importProgress.errors > 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                                  {importProgress.errors}
+                                </p>
+                              </div>
+                              <div className="bg-white rounded-xl p-2.5 text-center">
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">
+                                  {importControl === 'paused' ? 'RESTANTE' : 'ESTIMADO'}
+                                </p>
+                                <p className="text-[11px] font-black text-slate-700 mt-0.5">
+                                  {importEta || '...'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Status + Controles */}
+                            <div className="flex items-center justify-center gap-3">
+                              {importControl === 'paused' ? (
+                                <div className="w-3 h-3 bg-amber-400 rounded-full animate-pulse" />
+                              ) : (
+                                <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                              )}
+                              <p className="text-[10px] font-black text-slate-600 uppercase">
+                                {importControl === 'paused' ? 'PAUSADO' : 'IMPORTANDO'}
+                              </p>
+                            </div>
+
+                            <div className="flex gap-3">
+                              <button
+                                onClick={handlePauseResumeImport}
+                                className="flex-1 py-3.5 bg-amber-500 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 text-xs flex items-center justify-center gap-2"
+                              >
+                                {importControl === 'paused' ? '▶ Continuar' : '⏸ Pausar'}
+                              </button>
+                              <button
+                                onClick={handleCancelImport}
+                                className="flex-1 py-3.5 bg-slate-200 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-300 transition-all text-xs flex items-center justify-center gap-2"
+                              >
+                                ⏹ Interromper
+                              </button>
                             </div>
                           </motion.div>
                         ) : (
                           <motion.label 
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="flex flex-col items-center justify-center w-full aspect-square border-2 border-slate-200 border-dashed rounded-[2rem] cursor-pointer bg-slate-50/50 hover:bg-white hover:border-blue-400 hover:shadow-xl hover:shadow-blue-500/5 transition-all relative group overflow-hidden"
+                            className="flex flex-col items-center justify-center w-full border-2 border-slate-200 border-dashed aspect-square rounded-[2rem] cursor-pointer bg-slate-50/50 hover:bg-white hover:border-blue-400 hover:shadow-xl hover:shadow-blue-500/5 transition-all relative group overflow-hidden"
                           >
                             <div className="flex flex-col items-center justify-center text-center px-6 relative z-10">
                               <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:bg-blue-600 transition-all duration-500">
@@ -751,7 +969,54 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                       </AnimatePresence>
                     </div>
 
-                    {uploadStatus.stage === 'completed' && (
+                    {uploadStatus.stage === 'completed' && importSummary && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-6 w-full space-y-5"
+                      >
+                        <div className={'p-5 rounded-2xl flex items-center gap-4 ' + (importSummary.cancelled ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-100')}>
+                          <div className={'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ' + (importSummary.cancelled ? 'bg-amber-500 shadow-amber-200' : 'bg-emerald-500 shadow-emerald-200')}>
+                            {importSummary.cancelled ? (
+                              <AlertTriangle className="w-5 h-5 text-white" />
+                            ) : (
+                              <CheckCircle className="w-5 h-5 text-white" />
+                            )}
+                          </div>
+                          <p className={'text-[10px] font-black uppercase leading-tight ' + (importSummary.cancelled ? 'text-amber-800' : 'text-emerald-800')}>
+                            {uploadStatus.message}
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-slate-50 rounded-xl p-3 text-center">
+                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">REGISTROS</p>
+                            <p className="text-sm font-black text-slate-800 mt-0.5">{importSummary.total}</p>
+                          </div>
+                          <div className="bg-slate-50 rounded-xl p-3 text-center">
+                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">DURAÇÃO</p>
+                            <p className="text-sm font-black text-slate-800 mt-0.5">
+                              {function() { var m = Math.floor(importSummary.elapsedSec / 60); var s = importSummary.elapsedSec % 60; return m + 'm ' + s.toString().padStart(2, '0') + 's'; }()}
+                            </p>
+                          </div>
+                          <div className={'rounded-xl p-3 text-center ' + (importSummary.errors > 0 ? 'bg-rose-50' : 'bg-slate-50')}>
+                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">FALHAS</p>
+                            <p className={'text-sm font-black mt-0.5 ' + (importSummary.errors > 0 ? 'text-rose-600' : 'text-slate-400')}>
+                              {importSummary.errors}
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={function() { setUploadStatus({ stage: 'idle', message: '', current: 0, total: 0 }); setImportControl('idle'); setImportSummary(null); }}
+                          className="w-full py-3 bg-slate-100 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all text-xs"
+                        >
+                          Voltar
+                        </button>
+                      </motion.div>
+                    )}
+
+                    {uploadStatus.stage === 'completed' && !importSummary && (
                       <motion.div 
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -803,57 +1068,132 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                         </button>
                       )}
 
-                      {deleteStatus.type === 'confirming' && (
-                        <div className="w-full space-y-3">
-                          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl">
-                            <p className="text-[10px] font-black text-rose-700 uppercase text-center leading-relaxed">
-                              {deleteStatus.message}
+                      {deleteStatus.type === 'deleting' && (
+                        <div className="w-full space-y-5">
+                          {/* Progresso */}
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase">
+                              <span>{deleteProgress.deleted} / {deleteProgress.total} registros</span>
+                              <span>{deleteProgress.total > 0 ? Math.round((deleteProgress.deleted / deleteProgress.total) * 100) : 0}%</span>
+                            </div>
+                            <div className="w-full h-3 bg-rose-100 rounded-full overflow-hidden">
+                              <motion.div 
+                                className="h-full bg-gradient-to-r from-rose-500 to-rose-600 rounded-full"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${deleteProgress.total > 0 ? (deleteProgress.deleted / deleteProgress.total) * 100 : 0}%` }}
+                                transition={{ duration: 0.3 }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Métricas: tempo + erros + ETA */}
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="bg-slate-50 rounded-xl p-2.5 text-center">
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">TEMPO</p>
+                              <p className="text-[11px] font-black text-slate-700 mt-0.5">
+                                {deleteStartTimeRef.current > 0
+                                  ? (() => { var s = Math.round((Date.now() - deleteStartTimeRef.current) / 1000); var m = Math.floor(s / 60); var seg = s % 60; return `${m}m ${seg.toString().padStart(2, '0')}s`; })()
+                                  : '0m 00s'}
+                              </p>
+                            </div>
+                            <div className="bg-slate-50 rounded-xl p-2.5 text-center">
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">ERROS</p>
+                              <p className={`text-[11px] font-black mt-0.5 ${deleteProgress.errors > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                {deleteProgress.errors}
+                              </p>
+                            </div>
+                            <div className="bg-slate-50 rounded-xl p-2.5 text-center">
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">
+                                {deleteControl === 'paused' ? 'RESTANTE' : 'ESTIMADO'}
+                              </p>
+                              {deleteControl === 'paused' ? (
+                                <p className="text-[11px] font-black text-amber-600 mt-0.5">
+                                  {deleteEta || '...'}
+                                </p>
+                              ) : (
+                                <p className="text-[11px] font-black text-slate-700 mt-0.5">
+                                  {deleteEta || '...'}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Status */}
+                          <div className="flex items-center justify-center gap-3">
+                            {deleteControl === 'paused' ? (
+                              <div className="w-3 h-3 bg-amber-400 rounded-full animate-pulse" />
+                            ) : (
+                              <Loader2 className="w-4 h-4 text-rose-500 animate-spin" />
+                            )}
+                            <p className="text-[10px] font-black text-slate-600 uppercase">
+                              {deleteControl === 'paused' ? 'PAUSADO' : 'EXCLUINDO'}
                             </p>
                           </div>
-                          <button
-                            onClick={handleDeleteAll}
-                            disabled={isDeleting}
-                            className="w-full py-4 bg-rose-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 text-xs disabled:opacity-30"
-                          >
-                            {isDeleting ? 'Excluindo...' : 'Sim, Excluir Permanentemente'}
-                          </button>
-                          <button
-                            onClick={() => setDeleteStatus({ message: '', type: 'idle' })}
-                            disabled={isDeleting}
-                            className="w-full py-3 bg-slate-100 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all text-xs"
-                          >
-                            Cancelar
-                          </button>
-                        </div>
-                      )}
 
-                      {deleteStatus.type === 'deleting' && (
-                        <div className="w-full space-y-3">
-                          <div className="flex items-center justify-center gap-3">
-                            <Loader2 className="w-5 h-5 text-rose-500 animate-spin" />
-                            <p className="text-[10px] font-black text-rose-600 uppercase">{deleteStatus.message}</p>
-                          </div>
-                          <div className="w-full h-2 bg-rose-100 rounded-full overflow-hidden">
-                            <motion.div 
-                              className="h-full bg-rose-600"
-                              initial={{ width: 0 }}
-                              animate={{ width: '100%' }}
-                              transition={{ duration: 0.5 }}
-                            />
+                          {/* Controles: Pause/Resume + Cancelar */}
+                          <div className="flex gap-3">
+                            <button
+                              onClick={handlePauseResume}
+                              className="flex-1 py-3.5 bg-amber-500 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 text-xs flex items-center justify-center gap-2"
+                            >
+                              {deleteControl === 'paused' ? '▶ Continuar' : '⏸ Pausar'}
+                            </button>
+                            <button
+                              onClick={handleCancelDelete}
+                              className="flex-1 py-3.5 bg-slate-200 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-300 transition-all text-xs flex items-center justify-center gap-2"
+                            >
+                              ⏹ Interromper
+                            </button>
                           </div>
                         </div>
                       )}
 
-                      {deleteStatus.type === 'completed' && (
+                      {deleteStatus.type === 'completed' && deleteSummary && (
                         <motion.div 
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="w-full p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3"
+                          className="w-full space-y-5"
                         >
-                          <div className="w-8 h-8 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-200">
-                            <CheckCircle className="w-4 h-4 text-white" />
+                          {/* Header: ícone diferente se cancelado */}
+                          <div className={`p-5 rounded-2xl flex items-center gap-4 ${deleteSummary.cancelled ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-100'}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ${deleteSummary.cancelled ? 'bg-amber-500 shadow-amber-200' : 'bg-emerald-500 shadow-emerald-200'}`}>
+                              {deleteSummary.cancelled ? (
+                                <AlertTriangle className="w-5 h-5 text-white" />
+                              ) : (
+                                <CheckCircle className="w-5 h-5 text-white" />
+                              )}
+                            </div>
+                            <p className={`text-[10px] font-black uppercase leading-tight ${deleteSummary.cancelled ? 'text-amber-800' : 'text-emerald-800'}`}>
+                              {deleteStatus.message}
+                            </p>
                           </div>
-                          <p className="text-[10px] font-black text-emerald-800 uppercase leading-tight">{deleteStatus.message}</p>
+
+                          {/* Métricas finais */}
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="bg-slate-50 rounded-xl p-3 text-center">
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">REGISTROS</p>
+                              <p className="text-sm font-black text-slate-800 mt-0.5">{deleteSummary.total}</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-xl p-3 text-center">
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">DURAÇÃO</p>
+                              <p className="text-sm font-black text-slate-800 mt-0.5">
+                                {(() => { var m = Math.floor(deleteSummary.elapsedSec / 60); var s = deleteSummary.elapsedSec % 60; return `${m}m ${s.toString().padStart(2, '0')}s`; })()}
+                              </p>
+                            </div>
+                            <div className={`rounded-xl p-3 text-center ${deleteSummary.errors > 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">FALHAS</p>
+                              <p className={`text-sm font-black mt-0.5 ${deleteSummary.errors > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                                {deleteSummary.errors}
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => { setDeleteStatus({ message: '', type: 'idle' }); setDeleteControl('idle'); setDeleteSummary(null); }}
+                            className="w-full py-3 bg-slate-100 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all text-xs"
+                          >
+                            Voltar
+                          </button>
                         </motion.div>
                       )}
 
@@ -861,12 +1201,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                         <motion.div 
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="w-full p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3"
+                          className="w-full space-y-4"
                         >
-                          <div className="w-8 h-8 bg-rose-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-rose-200">
-                            <AlertTriangle className="w-4 h-4 text-white" />
+                          <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3">
+                            <div className="w-8 h-8 bg-rose-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-rose-200">
+                              <AlertTriangle className="w-4 h-4 text-white" />
+                            </div>
+                            <p className="text-[10px] font-black text-rose-800 uppercase leading-tight">{deleteStatus.message}</p>
                           </div>
-                          <p className="text-[10px] font-black text-rose-800 uppercase leading-tight">{deleteStatus.message}</p>
+                          <button
+                            onClick={() => { setDeleteStatus({ message: '', type: 'idle' }); setDeleteControl('idle'); setDeleteSummary(null); }}
+                            className="w-full py-3 bg-slate-100 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all text-xs"
+                          >
+                            Voltar
+                          </button>
                         </motion.div>
                       )}
                     </div>
@@ -937,7 +1285,109 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
             </div>
           </div>
         </div>
-      </div>
     </div>
+
+      {/* Modal de Confirmação de Senha */}
+      <AnimatePresence>
+      {showPasswordModal && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={closePasswordModal}
+        >
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            transition={{ type: 'spring', duration: 0.5 }}
+            className="w-full max-w-md bg-white rounded-[2.5rem] p-8 shadow-2xl border border-rose-100 relative overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Bg decorativo */}
+            <div className="absolute top-0 right-0 w-40 h-40 bg-rose-500/5 rounded-full blur-3xl -mr-16 -mt-16" />
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-rose-500/5 rounded-full blur-3xl -ml-12 -mb-12" />
+
+            <div className="relative z-10">
+              {/* Header */}
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-14 h-14 bg-gradient-to-br from-rose-500 to-rose-700 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-200">
+                  <Shield className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Confirmação de Segurança</h3>
+                  <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mt-0.5">Ação irreversível</p>
+                </div>
+              </div>
+
+              {/* Aviso */}
+              <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl mb-6">
+                <p className="text-[10px] font-black text-rose-700 uppercase text-center leading-relaxed">
+                  Esta ação irá remover permanentemente TODOS os registros da coleção de pacientes. Esta operação não pode ser desfeita.
+                </p>
+              </div>
+
+              {/* Input Senha */}
+              <div className="space-y-2 mb-6">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">
+                  Digite sua senha para confirmar
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={passwordInput}
+                    onChange={e => setPasswordInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handlePasswordSubmit()}
+                    placeholder="••••••••"
+                    className="w-full py-4 pl-11 pr-5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-rose-400 focus:bg-white transition-all"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    )}
+                  </button>
+                  {passwordError && (
+                    <motion.p 
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-[10px] font-black text-rose-500 mt-2 ml-1"
+                    >
+                      {passwordError}
+                    </motion.p>
+                  )}
+                </div>
+              </div>
+
+              {/* Ações */}
+              <div className="flex gap-3">
+                <button
+                  onClick={closePasswordModal}
+                  className="flex-1 py-4 bg-slate-100 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handlePasswordSubmit}
+                  className="flex-1 py-4 bg-gradient-to-r from-rose-600 to-rose-700 text-white font-black uppercase tracking-widest rounded-2xl hover:from-rose-700 hover:to-rose-800 transition-all shadow-lg shadow-rose-200 text-xs"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+      </AnimatePresence>
+
+  </div>
   );
 };
