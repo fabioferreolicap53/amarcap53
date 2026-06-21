@@ -249,6 +249,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   }, [filteredRecords]);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchAcompanhamentos = async () => {
       if (!user) return;
       try {
@@ -384,6 +385,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     };
 
     fetchAcompanhamentos();
+    return () => { cancelled = true; };
   }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, filterUnidade, filterEquipe, filterMicroarea, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal]);
 
   const handleDelete = async (id: string) => {

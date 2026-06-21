@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, HeartPulse, Calendar, BadgeCheck, TrendingUp, ClipboardList, PieChart, BarChart3, MapPin, LayoutDashboard, Filter, CheckCircle, AlertCircle, Building, X, UserCheck } from 'lucide-react';
-import { Bar } from 'react-chartjs-2';
+import { Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -252,6 +252,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     examesEmDia: 0,
     resultadosAlterados: 0,
     coberturaPercent: 0,
+    pepMol: 0,
+    coltMol: 0,
+    pepCito: 0,
+    coltCito: 0,
     alertBreakdown: {} as Record<string, number>,
     grupoBreakdown: {} as Record<string, number>,
     examVolume: { cito: 0, hpv: 0, pendente: 0 },
@@ -388,17 +392,28 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           const groups: Record<string, number> = {};
 
           records.forEach(p => {
-            let status = 'NAO_IDENTIFICADO';
-            if (hasValue(p.dna_hpv_pep)) status = 'PEP_MOLECULAR';
-            else if (hasValue(p.dna_hpv_gal)) status = 'COLETA_MOLECULAR';
-            else if (hasValue(p.cito_pep)) status = 'PEP_CITO';
-            else if (hasValue(p.cito_lab)) status = 'COLETA_CITO';
+            let status: string;
+            if (hasValue(p.dna_hpv_pep)) {
+              status = 'PEP_MOLECULAR';
+            } else if (hasValue(p.dna_hpv_gal)) {
+              status = 'COLETA_MOLECULAR';
+            } else if (hasValue(p.cito_pep)) {
+              status = 'PEP_CITO';
+            } else if (hasValue(p.cito_lab)) {
+              status = 'COLETA_CITO';
+            } else {
+              status = 'NAO_IDENTIFICADO';
+            }
             alerts[status] = (alerts[status] || 0) + 1;
             groups[p.grupo || 'NÃO INFORMADO'] = (groups[p.grupo || 'NÃO INFORMADO'] || 0) + 1;
           });
 
+          const pepMolCount = alerts['PEP_MOLECULAR'] || 0;
+          const coltMolCount = alerts['COLETA_MOLECULAR'] || 0;
+          const pepCitoCount = alerts['PEP_CITO'] || 0;
+          const coltCitoCount = alerts['COLETA_CITO'] || 0;
           const atrasadas = alerts['NAO_IDENTIFICADO'] || 0;
-          const alterados = (alerts['PEP_MOLECULAR'] || 0) + (alerts['COLETA_MOLECULAR'] || 0) + (alerts['PEP_CITO'] || 0) + (alerts['COLETA_CITO'] || 0);
+          const alterados = pepMolCount + coltMolCount + pepCitoCount + coltCitoCount;
           const emDia = Math.max(totalPacientes - atrasadas, 0);
 
           setStats({
@@ -407,17 +422,22 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             examesEmDia: emDia,
             resultadosAlterados: alterados,
             coberturaPercent: totalPacientes > 0 ? Math.round((emDia / totalPacientes) * 100) : 0,
+            pepMol: pepMolCount,
+            coltMol: coltMolCount,
+            pepCito: pepCitoCount,
+            coltCito: coltCitoCount,
             alertBreakdown: alerts,
             grupoBreakdown: groups,
-            examVolume: { cito: (alerts['PEP_CITO'] || 0) + (alerts['COLETA_CITO'] || 0), hpv: (alerts['PEP_MOLECULAR'] || 0) + (alerts['COLETA_MOLECULAR'] || 0), pendente: atrasadas },
+            examVolume: { cito: pepCitoCount + coltCitoCount, hpv: pepMolCount + coltMolCount, pendente: atrasadas },
             examTrend: emptyExamTrend,
             acompTrend: emptyAcompTrend
           });
           setCache(STATS_CACHE_KEY, {
             totalPacientes, coletasAtrasadas: atrasadas, examesEmDia: emDia, resultadosAlterados: alterados,
             coberturaPercent: totalPacientes > 0 ? Math.round((emDia / totalPacientes) * 100) : 0,
+            pepMol: pepMolCount, coltMol: coltMolCount, pepCito: pepCitoCount, coltCito: coltCitoCount,
             alertBreakdown: alerts, grupoBreakdown: groups,
-            examVolume: { cito: (alerts['PEP_CITO'] || 0) + (alerts['COLETA_CITO'] || 0), hpv: (alerts['PEP_MOLECULAR'] || 0) + (alerts['COLETA_MOLECULAR'] || 0), pendente: atrasadas }
+            examVolume: { cito: pepCitoCount + coltCitoCount, hpv: pepMolCount + coltMolCount, pendente: atrasadas }
           });
         } else {
           // CAP without UI filters: pure count-based queries (instant)
@@ -428,34 +448,34 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             setStats({ ...cached, examTrend: emptyExamTrend, grupoBreakdown: {}, acompTrend: emptyAcompTrend });
           }
 
-          try {
-            const countPromise = (field?: string) => {
+          const safeCount = async (field?: string, label?: string): Promise<number> => {
+            try {
               const f = field
                 ? (baseFilter ? `${baseFilter} && ${field}` : field)
                 : baseFilter || '';
-              return pb.collection('amarcap53_pacientes').getList(1, 1, {
+              const res = await pb.collection('amarcap53_pacientes').getList(1, 1, {
                 filter: f,
                 fields: 'id',
                 requestKey: null,
               });
-            };
+              return res.totalItems;
+            } catch (err: any) {
+              console.warn(`[count] ${label || field || 'total'} failed:`, err?.message || err);
+              return 0;
+            }
+          };
 
-            const [totalRes, pMolRes, cMolRes, pCitoRes, cCitoRes] = await Promise.all([
-              countPromise(),
-              countPromise('dna_hpv_pep != ""'),
-              countPromise('dna_hpv_gal != ""'),
-              countPromise('cito_pep != ""'),
-              countPromise('cito_lab != ""'),
-            ]);
-            if (cancelled) return;
+          const [totalPacientes, pepMol, coltMol, pepCito, coltCito] = await Promise.all([
+            safeCount(undefined, 'total'),
+            safeCount('dna_hpv_pep != ""', 'dna_hpv_pep'),
+            safeCount('dna_hpv_gal != ""', 'dna_hpv_gal'),
+            safeCount('cito_pep != ""', 'cito_pep'),
+            safeCount('cito_lab != ""', 'cito_lab'),
+          ]);
+          if (cancelled) return;
 
-            const totalPacientes = totalRes.totalItems;
-            const pepMol = pMolRes.totalItems;
-            const coltMol = cMolRes.totalItems;
-            const pepCito = pCitoRes.totalItems;
-            const coltCito = cCitoRes.totalItems;
-            const withExam = pepMol + coltMol + pepCito + coltCito;
-            const atrasadas = Math.max(totalPacientes - withExam, 0);
+          const withExam = pepMol + coltMol + pepCito + coltCito;
+          const atrasadas = Math.max(totalPacientes - withExam, 0);
 
             setStats({
               totalPacientes,
@@ -463,6 +483,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               examesEmDia: withExam,
               resultadosAlterados: withExam,
               coberturaPercent: totalPacientes > 0 ? Math.round((withExam / totalPacientes) * 100) : 0,
+              pepMol,
+              coltMol,
+              pepCito,
+              coltCito,
               alertBreakdown: {
                 NAO_IDENTIFICADO: atrasadas,
                 PEP_MOLECULAR: pepMol,
@@ -475,29 +499,20 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               examTrend: emptyExamTrend,
               acompTrend: emptyAcompTrend
             });
-            // Salva cache para proximo load
             setCache(STATS_CACHE_KEY, {
               totalPacientes,
               coletasAtrasadas: atrasadas,
               examesEmDia: withExam,
               resultadosAlterados: withExam,
               coberturaPercent: totalPacientes > 0 ? Math.round((withExam / totalPacientes) * 100) : 0,
+              pepMol,
+              coltMol,
+              pepCito,
+              coltCito,
               alertBreakdown: { NAO_IDENTIFICADO: atrasadas, PEP_MOLECULAR: pepMol, COLETA_MOLECULAR: coltMol, PEP_CITO: pepCito, COLETA_CITO: coltCito },
               examVolume: { cito: pepCito + coltCito, hpv: pepMol + coltMol, pendente: atrasadas }
             });
-          } catch (err) {
-            console.error('Count queries failed:', err);
-            if (!cancelled) {
-              setStats({
-                totalPacientes: 0, coletasAtrasadas: 0, examesEmDia: 0, resultadosAlterados: 0,
-                coberturaPercent: 0, alertBreakdown: {}, grupoBreakdown: {},
-                examVolume: { cito: 0, hpv: 0, pendente: 0 },
-                examTrend: emptyExamTrend, acompTrend: emptyAcompTrend
-              });
-            }
           }
-        }
-
         // Cache de acompanhamentos: renderiza instantâneo, busca em background
         const aCached = getCache(ACOMP_CACHE_KEY);
         if (aCached && !cancelled) {
@@ -795,88 +810,68 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           </div>
 
         {/* Grid de Estatísticas Principais */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 mb-16">
-            <StatCard 
-              title="Total Pacientes" 
-              value={stats.totalPacientes} 
-              icon={<Users className="w-6 h-6" />}
-              color="bg-blue-500"
-              description="Número total de pacientes cadastrados na base ativa sob sua responsabilidade."
-            />
-            <StatCard 
-              title="Busca Ativa" 
-              value={stats.coletasAtrasadas} 
-              icon={<Clock className="w-6 h-6" />}
-              color="bg-amber-500"
-              description="Pacientes sem registro de coleta ou resultado de exame de rastreamento. Necessitam busca ativa."
-            />
-            <StatCard 
-              title="Exames em Dia" 
-              value={`${stats.coberturaPercent}%`} 
-              icon={<CheckCircle2 className="w-6 h-6" />}
-              color="bg-emerald-500"
-              description="Percentual de pacientes com pelo menos um exame de rastreamento registrado (cito ou molecular)."
-            />
-            <StatCard 
-              title="CASOS COM RESULTADO" 
-              value={stats.resultadosAlterados} 
-              icon={<AlertTriangle className="w-6 h-6" />}
-              color="bg-rose-500"
-              description="Pacientes com resultado de teste molecular (DNA-HPV) ou citopatológico registrado."
-            />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-5 mb-16">
+            {[
+              { label: 'Total de Pacientes', value: stats.totalPacientes, showPercent: false, accent: 'from-blue-500 to-blue-600', ring: 'ring-blue-200' },
+              { label: 'Pacientes com registro de', subtitle: 'DNA-HPV (PEP)', value: stats.pepMol, showPercent: true, accent: 'from-indigo-500 to-indigo-600', ring: 'ring-indigo-200' },
+              { label: 'Pacientes com registro de', subtitle: 'DNA-HPV (GAL)', value: stats.coltMol, showPercent: true, accent: 'from-violet-500 to-violet-600', ring: 'ring-violet-200' },
+              { label: 'Pacientes com registro de', subtitle: 'CITO (LAB)', value: stats.coltCito, showPercent: true, accent: 'from-emerald-500 to-emerald-600', ring: 'ring-emerald-200' },
+              { label: 'Pacientes com registro de', subtitle: 'CITO (PEP)', value: stats.pepCito, showPercent: true, accent: 'from-amber-500 to-amber-600', ring: 'ring-amber-200' },
+            ].map((card, i) => {
+              const pct = card.showPercent && stats.totalPacientes > 0
+                ? Math.round((card.value / stats.totalPacientes) * 100)
+                : null;
+              return (
+                <div
+                  key={i}
+                  className="group relative bg-white rounded-2xl md:rounded-3xl p-5 md:p-6 shadow-[0_2px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_40px_rgba(0,0,0,0.08)] border border-slate-100 hover:border-slate-200 transition-all duration-500 flex flex-col justify-between min-h-[140px] md:min-h-[160px] overflow-hidden"
+                >
+                  {/* Gradient accent top bar */}
+                  <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${card.accent} opacity-60 group-hover:opacity-100 transition-opacity duration-500`} />
+
+                  {/* Label */}
+                  <div className="relative z-10">
+                    <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] leading-tight">
+                      {card.label}
+                    </p>
+                    {card.subtitle && (
+                      <p className="text-[11px] md:text-xs font-black text-slate-700 uppercase tracking-tight mt-1 leading-tight">
+                        {card.subtitle}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Value */}
+                  <div className="relative z-10 mt-auto pt-4">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl md:text-4xl font-black text-slate-800 tracking-tighter leading-none">
+                        {card.value.toLocaleString('pt-BR')}
+                      </span>
+                      {pct !== null && (
+                        <span className="text-xs md:text-sm font-black text-slate-400">
+                          {pct}%
+                        </span>
+                      )}
+                    </div>
+                    {/* Mini progress bar */}
+                    {card.showPercent && pct !== null && (
+                      <div className="mt-3 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full bg-gradient-to-r ${card.accent} rounded-full transition-all duration-1000 ease-out`}
+                          style={{ width: `${Math.max(pct, 2)}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Gráficos e Tabelas */}
 
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-            {/* Gráfico de Status de Rastreamento Real */}
-            <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl" />
-              <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-8 relative z-10 text-center sm:text-left">
-                <div className="flex flex-col items-center sm:items-start">
-                  <h3 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight flex items-center gap-3">
-                    <BadgeCheck className="w-6 h-6 text-emerald-500" />
-                    Status Clínico
-                  </h3>
-                  <p className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Nível de Rastreamento</p>
-                </div>
-              </div>
-
-              <div className="space-y-6 relative z-10">
-                <SimpleProgressBar 
-                  label="PEP Molecular" 
-                  value={stats.alertBreakdown['PEP_MOLECULAR'] || 0} 
-                  total={stats.totalPacientes} 
-                  color="bg-blue-600" 
-                />
-                <SimpleProgressBar 
-                  label="Coleta Molecular" 
-                  value={stats.alertBreakdown['COLETA_MOLECULAR'] || 0} 
-                  total={stats.totalPacientes} 
-                  color="bg-orange-500" 
-                />
-                <SimpleProgressBar 
-                  label="PEP Cito" 
-                  value={stats.alertBreakdown['PEP_CITO'] || 0} 
-                  total={stats.totalPacientes} 
-                  color="bg-emerald-600" 
-                />
-                <SimpleProgressBar 
-                  label="Coleta Cito" 
-                  value={stats.alertBreakdown['COLETA_CITO'] || 0} 
-                  total={stats.totalPacientes} 
-                  color="bg-yellow-500" 
-                />
-                <SimpleProgressBar 
-                  label="Pendente" 
-                  value={stats.alertBreakdown['NAO_IDENTIFICADO'] || 0} 
-                  total={stats.totalPacientes} 
-                  color="bg-red-500" 
-                />
-              </div>
-            </div>
-
             {/* Performance de Busca Ativa */}
             <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl" />
@@ -915,9 +910,108 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 />
               </div>
             </div>
+
+            {/* Status de Rastreamento - Doughnut */}
+            <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl" />
+              <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-8 relative z-10 gap-4 text-center sm:text-left">
+                <div className="flex flex-col items-center sm:items-start">
+                  <h3 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight flex items-center gap-3">
+                    <BadgeCheck className="w-6 h-6 text-indigo-500" />
+                    Status
+                  </h3>
+                  <p className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Distribuição de Rastreamento</p>
+                </div>
+                <div className="bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100 shadow-sm shrink-0">
+                  <span className="text-xl font-black text-indigo-600">{stats.totalPacientes.toLocaleString('pt-BR')}</span>
+                  <span className="text-[10px] font-bold text-indigo-400 uppercase ml-2">Total</span>
+                </div>
+              </div>
+
+              <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
+                {/* Doughnut */}
+                <div className="w-48 h-48 md:w-56 md:h-56 shrink-0">
+                  <Doughnut
+                    data={{
+                      labels: [
+                        'CONFIRMADO O REGISTRO DE RESULTADOS DO TESTE MOLECULAR DNA-HPV NO PEP',
+                        'IDENTIFICADO TESTE MOLECULAR DNA-HPV - (GAL/MEDIREC)',
+                        'IDENTIFICADO REGISTRO DE RESULTADO DE CITO NO PEP',
+                        'IDENTIFICADO COLETA DE CITO/PENDENTE DE REGISTRO DE RESULTADO NO PEP',
+                        'NÃO IDENTIFICADO COLETA OU RESULTADO DE EXAME DE RASTREAMENTO',
+                      ],
+                      datasets: [{
+                        data: [
+                          stats.alertBreakdown['PEP_MOLECULAR'] || 0,
+                          stats.alertBreakdown['COLETA_MOLECULAR'] || 0,
+                          stats.alertBreakdown['PEP_CITO'] || 0,
+                          stats.alertBreakdown['COLETA_CITO'] || 0,
+                          stats.alertBreakdown['NAO_IDENTIFICADO'] || 0,
+                        ],
+                        backgroundColor: [
+                          'rgba(79, 70, 229, 0.85)',
+                          'rgba(249, 115, 22, 0.85)',
+                          'rgba(16, 185, 129, 0.85)',
+                          'rgba(234, 179, 8, 0.85)',
+                          'rgba(239, 68, 68, 0.85)',
+                        ],
+                        borderWidth: 0,
+                        hoverOffset: 8,
+                      }],
+                    }}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      cutout: '62%',
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                          backgroundColor: '#1e293b',
+                          titleFont: { weight: 'bold', size: 12 },
+                          bodyFont: { size: 11 },
+                          padding: 12,
+                          cornerRadius: 12,
+                          callbacks: {
+                            label: (ctx) => {
+                              const total = ctx.dataset.data.reduce((a: number, b: number) => a + b, 0);
+                              const pct = total > 0 ? Math.round((ctx.raw as number / total) * 100) : 0;
+                              return ` ${ctx.label}: ${Number(ctx.raw).toLocaleString('pt-BR')} (${pct}%)`;
+                            },
+                          },
+                        },
+                      },
+                    }}
+                  />
+                </div>
+
+                {/* Legend */}
+                <div className="flex-1 space-y-3 w-full">
+                  {[
+                    { label: 'CONFIRMADO O REGISTRO DE RESULTADOS DO TESTE MOLECULAR DNA-HPV NO PEP', key: 'PEP_MOLECULAR', color: 'bg-indigo-500' },
+                    { label: 'IDENTIFICADO TESTE MOLECULAR DNA-HPV - (GAL/MEDIREC)', key: 'COLETA_MOLECULAR', color: 'bg-orange-500' },
+                    { label: 'IDENTIFICADO REGISTRO DE RESULTADO DE CITO NO PEP', key: 'PEP_CITO', color: 'bg-emerald-500' },
+                    { label: 'IDENTIFICADO COLETA DE CITO/PENDENTE DE REGISTRO DE RESULTADO NO PEP', key: 'COLETA_CITO', color: 'bg-yellow-500' },
+                    { label: 'NÃO IDENTIFICADO COLETA OU RESULTADO DE EXAME DE RASTREAMENTO', key: 'NAO_IDENTIFICADO', color: 'bg-red-500' },
+                  ].map(item => {
+                    const val = stats.alertBreakdown[item.key] || 0;
+                    const pct = stats.totalPacientes > 0 ? Math.round((val / stats.totalPacientes) * 100) : 0;
+                    return (
+                      <div key={item.key} className="flex items-start gap-3 group/item">
+                        <div className={`w-3 h-3 rounded-full ${item.color} shrink-0 ring-2 ring-white shadow-sm mt-0.5`} />
+                        <span className="text-[10px] md:text-[11px] font-black text-slate-500 uppercase tracking-wider flex-1 leading-tight group-hover/item:text-primary transition-colors">
+                          {item.label}
+                        </span>
+                        <div className="flex items-baseline gap-1.5 shrink-0">
+                          <span className="text-sm font-black text-slate-700 tabular-nums">{val.toLocaleString('pt-BR')}</span>
+                          <span className="text-[10px] font-black text-slate-400 tabular-nums">{pct}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
-
-
 
 
           <Footer />
