@@ -781,11 +781,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           }
         }
 
-        // Filtro de Busca (Nome ou CNS)
-        if (searchTerm) {
-          const safeSearch = searchTerm.replace(/"/g, '\\"');
-          filterParts.push(`(nome ~ "${safeSearch}" || cns ~ "${safeSearch}")`);
-        }
+        // Busca via client-side (filteredPacientes) — PocketBase ~ é accent-sensitive
 
         // Filtro de Grupo
         if (filterGrupo.length > 0) {
@@ -832,15 +828,25 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         const dnaHpvGalF = simNaoFilter('dna_hpv_gal', filterDnaHpvGal);
         if (dnaHpvGalF) filterParts.push(dnaHpvGalF);
 
+        // Busca server-side (129K registros — manter paginado)
+        if (searchTerm) {
+          const safeSearch = searchTerm.replace(/"/g, '\\"');
+          filterParts.push(`(nome ~ "${safeSearch}" || cns ~ "${safeSearch}")`);
+        }
+
         if (filterParts.length > 0) {
           options.filter = filterParts.join(' && ');
         }
-        
-        const resultList = await pb.collection('amarcap53_pacientes').getList(currentPage, pageSize, options);
+
+        // Sempre usar page 1 quando busca ativa (currentPage pode estar stale no closure)
+        const effectivePage = searchTerm ? 1 : currentPage;
+        const resultList = await pb.collection('amarcap53_pacientes').getList(effectivePage, pageSize, options);
+        const allRecords = resultList.items;
+
         if (cancelled) return;
-        
+
         // Busca contagem de acompanhamentos em lote (evita N+1)
-        const patientIds = resultList.items.map(r => r.id);
+        const patientIds = allRecords.map(r => r.id).filter(Boolean);
         const acompCounts = patientIds.length > 0
           ? await pb.collection('amarcap53_acompanhamentos').getFullList({
               filter: `(${patientIds.slice(0, 200).map(id => `paciente = "${id}"`).join(' || ')})`,
@@ -854,7 +860,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           countMap.set(r.paciente, (countMap.get(r.paciente) || 0) + 1);
         });
 
-        let pacientesFormatados = resultList.items.map(record => {
+        let pacientesFormatados = allRecords.map(record => {
           const count = countMap.get(record.id) || 0;
           const p: Paciente = {
             id: record.id,
@@ -878,6 +884,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           p.alertas = determinarAlerta(p);
           return p;
         });
+
 
         setPacientes(pacientesFormatados);
         setTotalItems(resultList.totalItems);

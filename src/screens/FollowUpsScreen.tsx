@@ -159,10 +159,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   // Registros filtrados pelo cliente (busca + filtros UI) — usado por stats E tabela
   const filteredRecords = useMemo(() => {
     return acompanhamentos.filter(acomp => {
-      const search = searchTerm.toLowerCase();
-      const patientName = (acomp.expand?.paciente?.nome || '').toLowerCase();
-      const cns = (acomp.expand?.paciente?.cns || '').toLowerCase();
-      const date = acomp.data_busca ? new Date(acomp.data_busca).toLocaleDateString('pt-BR').toLowerCase() : '';
+      const search = normalizeText(searchTerm);
+      const patientName = normalizeText(acomp.expand?.paciente?.nome || '');
+      const cns = normalizeText(acomp.expand?.paciente?.cns || '');
+      const date = acomp.data_busca ? normalizeText(new Date(acomp.data_busca).toLocaleDateString('pt-BR')) : '';
 
       const matchesSearch = !searchTerm || patientName.includes(search) || cns.includes(search) || date.includes(search);
       const matchesTipoBusca = matchesSelectFilter(acomp.tipo_busca, filterTipoBusca, TIPO_BUSCA_OPTIONS);
@@ -367,13 +367,16 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           acompFilters.push(`data_busca <= "${filterDataFim} 23:59:59"`);
         }
 
-        const records = await pb.collection('amarcap53_acompanhamentos').getFullList({
+        const fetchOpts: any = {
           sort: '-created',
           expand: 'paciente',
-          filter: acompFilters.join(' && '),
-          fields: 'id,created,updated,paciente,data_busca,tipo_busca,tipo_contato,situacao_pos_busca,entraves_identificados,entraves_informado_por,observacoes,profissional,expand',
-          requestKey: null
-        });
+          fields: 'id,created,updated,paciente,data_busca,tipo_busca,tipo_contato,situacao_pos_busca,entraves_identificados,entraves_informado_por,observacoes,profissional,expand.paciente.nome,expand.paciente.cns',
+          batch: 500,
+          requestKey: null,
+        };
+        const filterStr = acompFilters.join(' && ');
+        if (filterStr) fetchOpts.filter = filterStr;
+        const records = await pb.collection('amarcap53_acompanhamentos').getFullList(fetchOpts);
         setAcompanhamentos(records);
         setFUCache(records);
       } catch (error) {

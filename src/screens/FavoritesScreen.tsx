@@ -562,7 +562,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
   };
 
   const filteredPacientes = pacientes.filter(p => {
-    const matchesSearch = p.nome.toLowerCase().includes(searchTerm.toLowerCase()) || p.cns.includes(searchTerm);
+    const normSearch = normalizeText(searchTerm);
+    const matchesSearch = normalizeText(p.nome).includes(normSearch) || normalizeText(p.cns).includes(normSearch);
     const matchesGrupo = filterGrupo.length === 0 || filterGrupo.includes(p.grupo);
     
     // Regional filters (client-side for display filtering)

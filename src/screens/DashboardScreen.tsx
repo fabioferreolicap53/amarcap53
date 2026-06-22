@@ -824,14 +824,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               return (
                 <div
                   key={i}
-                  className="group relative bg-white rounded-2xl md:rounded-3xl p-5 md:p-6 shadow-[0_2px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_40px_rgba(0,0,0,0.08)] border border-slate-100 hover:border-slate-200 transition-all duration-500 flex flex-col justify-between min-h-[140px] md:min-h-[160px] overflow-hidden"
+                  className={`group relative bg-white rounded-2xl md:rounded-3xl p-5 md:p-6 shadow-[0_2px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_40px_rgba(0,0,0,0.08)] border border-slate-100 hover:border-slate-200 transition-all duration-500 flex flex-col justify-between min-h-[140px] md:min-h-[160px] overflow-hidden ${
+                    i === 0
+                      ? 'col-span-2 lg:col-span-1 sm:bg-gradient-to-br sm:from-blue-50 sm:to-indigo-50 sm:border-blue-200/60 sm:shadow-[0_4px_30px_rgba(59,130,246,0.12)] sm:hover:shadow-[0_8px_40px_rgba(59,130,246,0.18)] sm:hover:border-blue-300/60 sm:items-center sm:text-center lg:bg-white lg:border-slate-100 lg:shadow-[0_2px_20px_rgba(0,0,0,0.04)] lg:hover:shadow-[0_8px_40px_rgba(0,0,0,0.08)] lg:hover:border-slate-200 lg:items-stretch lg:text-left'
+                      : ''
+                  }`}
                 >
                   {/* Gradient accent top bar */}
                   <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${card.accent} opacity-60 group-hover:opacity-100 transition-opacity duration-500`} />
 
                   {/* Label */}
-                  <div className="relative z-10">
-                    <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] leading-tight">
+                  <div className={`relative z-10 ${i === 0 ? 'sm:text-center lg:text-left' : ''}`}>
+                    <p className={`text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] leading-tight ${i === 0 ? 'sm:text-blue-500/70 lg:text-slate-400' : ''}`}>
                       {card.label}
                     </p>
                     {card.subtitle && (
@@ -842,9 +846,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                   </div>
 
                   {/* Value */}
-                  <div className="relative z-10 mt-auto pt-4">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl md:text-4xl font-black text-slate-800 tracking-tighter leading-none">
+                  <div className={`relative z-10 mt-auto pt-4 ${i === 0 ? 'sm:text-center lg:text-left' : ''}`}>
+                    <div className={`flex items-baseline gap-2 ${i === 0 ? 'sm:justify-center lg:justify-start' : ''}`}>
+                      <span className={`font-black text-slate-800 tracking-tighter leading-none ${i === 0 ? 'text-4xl sm:text-5xl lg:text-4xl' : 'text-3xl md:text-4xl'}`}>
                         {card.value.toLocaleString('pt-BR')}
                       </span>
                       {pct !== null && (
