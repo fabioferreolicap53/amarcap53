@@ -6,25 +6,41 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-const DISMISS_KEY = 'pwa-banner-dismissed-at';
+const DISMISS_TS_KEY = 'pwa-banner-dismissed-at';
+const DISMISS_COUNT_KEY = 'pwa-banner-dismiss-count';
 const HIDE_DAYS = 3;
+const MAX_DISMISSES = 3;
 
 function getDismissedAt(): number | null {
   try {
-    const val = localStorage.getItem(DISMISS_KEY);
+    const val = localStorage.getItem(DISMISS_TS_KEY);
     return val ? parseInt(val, 10) || null : null;
   } catch { return null; }
 }
 
-function setDismissedAt() {
-  try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch {}
+function getDismissCount(): number {
+  try {
+    const val = localStorage.getItem(DISMISS_COUNT_KEY);
+    return val ? parseInt(val, 10) || 0 : 0;
+  } catch { return 0; }
 }
 
-function isHiddenByDismiss(): boolean {
+function recordDismiss() {
+  try {
+    localStorage.setItem(DISMISS_TS_KEY, String(Date.now()));
+    localStorage.setItem(DISMISS_COUNT_KEY, String(getDismissCount() + 1));
+  } catch {}
+}
+
+function shouldHideBanner(): { hide: boolean; permanent: boolean } {
+  const count = getDismissCount();
+  if (count >= MAX_DISMISSES) return { hide: true, permanent: true };
+
   const ts = getDismissedAt();
-  if (!ts) return false;
-  const elapsed = Date.now() - ts;
-  return elapsed < HIDE_DAYS * 24 * 60 * 60 * 1000;
+  if (ts && (Date.now() - ts) < HIDE_DAYS * 24 * 60 * 60 * 1000) {
+    return { hide: true, permanent: false };
+  }
+  return { hide: false, permanent: false };
 }
 
 // Checa síncrono — roda na inicialização do state, antes do primeiro render
@@ -37,8 +53,8 @@ function calcInitState(): { show: boolean; isIOS: boolean; standalone: boolean }
 
   if (standalone) return { show: false, isIOS, standalone: true };
 
-  // Fechado há menos de 3 dias → não mostrar
-  if (isHiddenByDismiss()) return { show: false, isIOS, standalone: false };
+  // Fechado pelo usuário (permanente ou temporário) → não mostrar
+  if (shouldHideBanner().hide) return { show: false, isIOS, standalone: false };
 
   // iOS: mostra sempre (não tem beforeinstallprompt)
   if (isIOS) return { show: true, isIOS, standalone: false };
@@ -66,7 +82,7 @@ export const InstallBanner: React.FC = () => {
     const handler = (e: Event) => {
       e.preventDefault();
       deferredRef.current = e as BeforeInstallPromptEvent;
-      setState((prev) => ({ ...prev, show: !isHiddenByDismiss() }));
+      setState((prev) => ({ ...prev, show: !shouldHideBanner().hide }));
     };
     window.addEventListener('beforeinstallprompt', handler);
 
@@ -80,7 +96,10 @@ export const InstallBanner: React.FC = () => {
     await promptEvent.prompt();
     const { outcome } = await promptEvent.userChoice;
     if (outcome === 'accepted') {
-      try { localStorage.removeItem(DISMISS_KEY); } catch {}
+      try {
+        localStorage.removeItem(DISMISS_TS_KEY);
+        localStorage.removeItem(DISMISS_COUNT_KEY);
+      } catch {}
       setState((prev) => ({ ...prev, show: false }));
     }
     deferredRef.current = null;
@@ -88,7 +107,7 @@ export const InstallBanner: React.FC = () => {
   };
 
   const handleClose = () => {
-    setDismissedAt();
+    recordDismiss();
     setState((prev) => ({ ...prev, show: false }));
   };
 
