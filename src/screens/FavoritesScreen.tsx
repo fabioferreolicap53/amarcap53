@@ -1014,7 +1014,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                             <span>DNA-HPV (PEP)</span>
                             <InfoTooltip content="Data de registro do resultado do teste molecular de DNA-HPV no PEP." />
                           </div>
-                          <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Registro)</span>
+                          <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data do registro do resultado</span>
                         </div>
                       </th>
                       {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
@@ -1038,7 +1038,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                             <span>Cito (Lab)</span>
                             <InfoTooltip content="Data de cadastro do resultado do exame citopatológico realizado no laboratório." />
                           </div>
-                          <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Cadastro)</span>
+                          <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data do cadastro</span>
                         </div>
                       </th>
                       <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px]">
@@ -1048,7 +1048,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                             <span>Cito (PEP)</span>
                           <InfoTooltip content="Data de coleta do exame citopatológico registrada no PEP." />
                         </div>
-                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Coleta)</span>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data da coleta dos resultados registrados</span>
                       </div>
                     </th>
                     <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px]">
@@ -1058,7 +1058,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                           <span>DNA-HPV (GAL)</span>
                           <InfoTooltip content="Data do resultado do teste molecular de DNA-HPV registrada no GAL." />
                         </div>
-                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data GAL)</span>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data da coleta</span>
                       </div>
                     </th>
                   </tr>

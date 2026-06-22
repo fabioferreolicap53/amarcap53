@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, HeartPulse, Calendar, BadgeCheck, TrendingUp, ClipboardList, PieChart, BarChart3, MapPin, LayoutDashboard, Filter, CheckCircle, AlertCircle, Building, X, UserCheck } from 'lucide-react';
-import { Bar, Doughnut } from 'react-chartjs-2';
+import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, HeartPulse, Calendar, BadgeCheck, TrendingUp, ClipboardList, PieChart, BarChart3, MapPin, LayoutDashboard, Filter, CheckCircle, AlertCircle, Building, X, UserCheck, TestTube2, CircleOff, Search, Activity } from 'lucide-react';
+import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -371,27 +371,28 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         const lastSixMonths = getLastSixMonths();
         const emptyAcompTrend = lastSixMonths.map(month => ({ month: month.label, total: 0 }));
         const emptyExamTrend = lastSixMonths.map(month => ({ month: month.label, cito: 0, hpv: 0 }));
-        // Regional breakdown — populated from global pacientes below
         let regionalUnidade: Record<string, number> = {};
         let regionalEquipe: Record<string, number> = {};
         let regionalMicroarea: Record<string, number> = {};
         let scopedPatientIds: string[] = [];
+        let loadedRecords: any[] = [];
+
         if (isScopeQuery) {
           // Non-CAP or CAP with UI filters: query limited scope
-          const records = await pb.collection('amarcap53_pacientes').getFullList({
-            filter: patientFilter,
+          loadedRecords = await pb.collection('amarcap53_pacientes').getFullList({
+            filter: patientFilter || undefined,
             batch: 500,
             requestKey: null,
             fields: 'id,dna_hpv_pep,dna_hpv_gal,cito_pep,cito_lab,grupo,unidade,equipe,microarea'
           });
           if (cancelled) return;
-          scopedPatientIds = records.map(p => p.id).filter(Boolean);
+          scopedPatientIds = loadedRecords.map(p => p.id).filter(Boolean);
 
-          const totalPacientes = records.length;
+          const totalPacientes = loadedRecords.length;
           const alerts: Record<string, number> = {};
           const groups: Record<string, number> = {};
 
-          records.forEach(p => {
+          loadedRecords.forEach(p => {
             let status: string;
             if (hasValue(p.dna_hpv_pep)) {
               status = 'PEP_MOLECULAR';
@@ -468,9 +469,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           const [totalPacientes, pepMol, coltMol, pepCito, coltCito] = await Promise.all([
             safeCount(undefined, 'total'),
             safeCount('dna_hpv_pep != ""', 'dna_hpv_pep'),
-            safeCount('dna_hpv_gal != ""', 'dna_hpv_gal'),
-            safeCount('cito_pep != ""', 'cito_pep'),
-            safeCount('cito_lab != ""', 'cito_lab'),
+            safeCount('dna_hpv_gal != "" && dna_hpv_pep = ""', 'dna_hpv_gal'),
+            safeCount('cito_pep != "" && dna_hpv_gal = "" && dna_hpv_pep = ""', 'cito_pep'),
+            safeCount('cito_lab != "" && cito_pep = "" && dna_hpv_gal = "" && dna_hpv_pep = ""', 'cito_lab'),
           ]);
           if (cancelled) return;
 
@@ -531,8 +532,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           const idFilter = idChunks.map(chunk => `(${chunk.map(id => `paciente = "${id}"`).join(' || ')})`).join(' || ');
           acompFilterParts.unshift(`(${idFilter})`);
         }
+        const acompFilterStr = acompFilterParts.join(' && ').trim();
         const acompRecords = await pb.collection('amarcap53_acompanhamentos').getFullList({
-          filter: acompFilterParts.join(' && '),
+          filter: acompFilterStr || undefined,
           sort: 'created',
           batch: 500,
           requestKey: null,
@@ -540,14 +542,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         });
         if (cancelled) return;
 
-        // Global regional breakdown from ALL pacientes (independent of scope/filters)
-        const globalPacientesForRegional = await pb.collection('amarcap53_pacientes').getFullList({
-          batch: 500,
-          requestKey: null,
-          fields: 'id,unidade,equipe,microarea'
-        });
-        if (cancelled) return;
-        globalPacientesForRegional.forEach(p => {
+        // Regional breakdown — use already-loaded records (skip extra 130K query)
+        const regionalSource = loadedRecords.length > 0 ? loadedRecords : [];
+        regionalSource.forEach((p: any) => {
           if (p.unidade) regionalUnidade[p.unidade] = (regionalUnidade[p.unidade] || 0) + 1;
           if (p.equipe) regionalEquipe[p.equipe] = (regionalEquipe[p.equipe] || 0) + 1;
           if (p.microarea !== undefined && p.microarea !== null && p.microarea !== '') {
@@ -655,8 +652,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             {/* Card Principal de Boas-vindas */}
             <div className="w-full bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-4 md:p-10 rounded-2xl md:rounded-[2.5rem] text-white relative overflow-hidden group shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 md:gap-10 text-center md:text-left">
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl group-hover:bg-white/10 transition-all duration-700"></div>
-              
-              <div className="relative z-10 flex-1">
+
+              <div className="relative z-10 flex-1 max-w-[80%]">
                 <div className="flex items-center justify-center md:justify-start gap-3 mb-4">
                   <div className="w-16 h-16 md:w-20 md:h-20 bg-white/10 backdrop-blur-md rounded-2xl md:rounded-3xl flex items-center justify-center ring-1 ring-white/20 shadow-inner">
                     <LayoutDashboard className="w-8 h-8 md:w-10 md:h-10 text-blue-300" />
@@ -666,6 +663,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 <p className="text-base md:text-lg text-white/70 font-medium leading-relaxed md:whitespace-nowrap mx-auto md:mx-0">
                   Olá, <span className="text-white font-black">{user?.name || 'Profissional'}</span>! Acompanhe o panorama atualizado do seu território.
                 </p>
+              </div>
+
+              {/* Total de Pacientes */}
+              <div className="relative z-10 -ml-[10%] flex flex-col items-center">
+                <span className="text-[10px] md:text-xs font-black text-white/40 uppercase tracking-[0.3em] mb-1">Total de Pacientes</span>
+                <span className="text-4xl md:text-5xl font-black text-white leading-none tracking-tighter tabular-nums">
+                  {stats.totalPacientes.toLocaleString('pt-BR')}
+                </span>
               </div>
 
               {/* Botão de Filtro */}
@@ -809,67 +814,118 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             )}
           </div>
 
-        {/* Grid de Estatísticas Principais */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-5 mb-16">
-            {[
-              { label: 'Total de Pacientes', value: stats.totalPacientes, showPercent: false, accent: 'from-blue-500 to-blue-600', ring: 'ring-blue-200' },
-              { label: 'Pacientes com registro de', subtitle: 'DNA-HPV (PEP)', value: stats.pepMol, showPercent: true, accent: 'from-indigo-500 to-indigo-600', ring: 'ring-indigo-200' },
-              { label: 'Pacientes com registro de', subtitle: 'DNA-HPV (GAL)', value: stats.coltMol, showPercent: true, accent: 'from-violet-500 to-violet-600', ring: 'ring-violet-200' },
-              { label: 'Pacientes com registro de', subtitle: 'CITO (LAB)', value: stats.coltCito, showPercent: true, accent: 'from-emerald-500 to-emerald-600', ring: 'ring-emerald-200' },
-              { label: 'Pacientes com registro de', subtitle: 'CITO (PEP)', value: stats.pepCito, showPercent: true, accent: 'from-amber-500 to-amber-600', ring: 'ring-amber-200' },
-            ].map((card, i) => {
-              const pct = card.showPercent && stats.totalPacientes > 0
-                ? Math.round((card.value / stats.totalPacientes) * 100)
-                : null;
-              return (
-                <div
-                  key={i}
-                  className={`group relative bg-white rounded-2xl md:rounded-3xl p-5 md:p-6 shadow-[0_2px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_40px_rgba(0,0,0,0.08)] border border-slate-100 hover:border-slate-200 transition-all duration-500 flex flex-col justify-between min-h-[140px] md:min-h-[160px] overflow-hidden ${
-                    i === 0
-                      ? 'col-span-2 lg:col-span-1 sm:bg-gradient-to-br sm:from-blue-50 sm:to-indigo-50 sm:border-blue-200/60 sm:shadow-[0_4px_30px_rgba(59,130,246,0.12)] sm:hover:shadow-[0_8px_40px_rgba(59,130,246,0.18)] sm:hover:border-blue-300/60 sm:items-center sm:text-center lg:bg-white lg:border-slate-100 lg:shadow-[0_2px_20px_rgba(0,0,0,0.04)] lg:hover:shadow-[0_8px_40px_rgba(0,0,0,0.08)] lg:hover:border-slate-200 lg:items-stretch lg:text-left'
-                      : ''
-                  }`}
-                >
-                  {/* Gradient accent top bar */}
-                  <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${card.accent} opacity-60 group-hover:opacity-100 transition-opacity duration-500`} />
+        {/* Grid de Estatísticas Principais - Rastreamento */}
+          <div className="mb-16">
 
-                  {/* Label */}
-                  <div className={`relative z-10 ${i === 0 ? 'sm:text-center lg:text-left' : ''}`}>
-                    <p className={`text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] leading-tight ${i === 0 ? 'sm:text-blue-500/70 lg:text-slate-400' : ''}`}>
-                      {card.label}
-                    </p>
-                    {card.subtitle && (
-                      <p className="text-[11px] md:text-xs font-black text-slate-700 uppercase tracking-tight mt-1 leading-tight">
-                        {card.subtitle}
-                      </p>
-                    )}
-                  </div>
+            {/* Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-5">
+              {[
+                { key: 'NAO_IDENTIFICADO', label: 'NÃO IDENTIFICADO COLETA OU RESULTADO DE EXAME DE RASTREAMENTO', value: stats.alertBreakdown['NAO_IDENTIFICADO'] || 0, objetivo: 'DIMINUIR', objetivoColor: 'text-rose-700 bg-rose-50 border-rose-200', barColor: 'bg-gradient-to-r from-rose-400 to-rose-600', dotColor: 'bg-rose-500', icon: CircleOff, glowColor: 'shadow-rose-500/20', ringColor: 'ring-rose-400/30', hoverBorder: 'hover:border-rose-300', iconBg: 'bg-rose-100', iconColor: 'text-rose-600' },
+                { key: 'COLETA_CITO', label: 'IDENTIFICADO COLETA DE CITO/PENDENTE DE REGISTRO DE RESULTADO NO PEP', value: stats.alertBreakdown['COLETA_CITO'] || 0, objetivo: 'ZERAR', objetivoColor: 'text-amber-700 bg-amber-50 border-amber-200', barColor: 'bg-gradient-to-r from-amber-400 to-amber-600', dotColor: 'bg-amber-500', icon: Clock, glowColor: 'shadow-amber-500/20', ringColor: 'ring-amber-400/30', hoverBorder: 'hover:border-amber-300', iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
+                { key: 'PEP_CITO', label: 'IDENTIFICADO REGISTRO DE RESULTADO DE CITO NO PEP', value: stats.alertBreakdown['PEP_CITO'] || 0, objetivo: 'MONITORAR', objetivoColor: 'text-emerald-700 bg-emerald-50 border-emerald-200', barColor: 'bg-gradient-to-r from-emerald-400 to-emerald-600', dotColor: 'bg-emerald-500', icon: CheckCircle, glowColor: 'shadow-emerald-500/20', ringColor: 'ring-emerald-400/30', hoverBorder: 'hover:border-emerald-300', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
+                { key: 'COLETA_MOLECULAR', label: 'IDENTIFICADO TESTE MOLECULAR DNA-HPV - (GAL/MEDIREC)', value: stats.alertBreakdown['COLETA_MOLECULAR'] || 0, objetivo: 'AUMENTAR', objetivoColor: 'text-emerald-700 bg-emerald-50 border-emerald-200', barColor: 'bg-gradient-to-r from-orange-400 to-orange-600', dotColor: 'bg-orange-500', icon: TestTube2, glowColor: 'shadow-orange-500/20', ringColor: 'ring-orange-400/30', hoverBorder: 'hover:border-orange-300', iconBg: 'bg-orange-100', iconColor: 'text-orange-600' },
+                { key: 'PEP_MOLECULAR', label: 'CONFIRMADO O REGISTRO DE RESULTADOS DO TESTE MOLECULAR DNA-HPV NO PEP', value: stats.alertBreakdown['PEP_MOLECULAR'] || 0, objetivo: 'AUMENTAR', objetivoColor: 'text-indigo-700 bg-indigo-50 border-indigo-200', barColor: 'bg-gradient-to-r from-indigo-400 to-indigo-600', dotColor: 'bg-indigo-500', icon: BadgeCheck, glowColor: 'shadow-indigo-500/20', ringColor: 'ring-indigo-400/30', hoverBorder: 'hover:border-indigo-300', iconBg: 'bg-indigo-100', iconColor: 'text-indigo-600' },
+              ].map((card) => {
+                const pct = stats.totalPacientes > 0 ? Math.round((card.value / stats.totalPacientes) * 100) : 0;
+                const isActiveSearch = card.key === 'NAO_IDENTIFICADO';
+                const buscaAtivaValor = isActiveSearch ? acompStats.total : 0;
+                const buscaAtivaPct = isActiveSearch && stats.totalPacientes > 0 ? Math.round((buscaAtivaValor / stats.totalPacientes) * 100) : 0;
+                const Icon = card.icon;
 
-                  {/* Value */}
-                  <div className={`relative z-10 mt-auto pt-4 ${i === 0 ? 'sm:text-center lg:text-left' : ''}`}>
-                    <div className={`flex items-baseline gap-2 ${i === 0 ? 'sm:justify-center lg:justify-start' : ''}`}>
-                      <span className={`font-black text-slate-800 tracking-tighter leading-none ${i === 0 ? 'text-4xl sm:text-5xl lg:text-4xl' : 'text-3xl md:text-4xl'}`}>
-                        {card.value.toLocaleString('pt-BR')}
-                      </span>
-                      {pct !== null && (
-                        <span className="text-xs md:text-sm font-black text-slate-400">
-                          {pct}%
-                        </span>
-                      )}
+                return (
+                  <div
+                    key={card.key}
+                    onClick={() => {
+                      localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterStatus: [card.key] }));
+                      setActiveTab('pacientes');
+                    }}
+                    className={`group bg-white rounded-3xl shadow-lg ${card.glowColor} hover:shadow-2xl hover:${card.glowColor} border border-slate-200/80 ${card.hoverBorder} transition-all duration-500 flex flex-col overflow-hidden cursor-pointer hover:scale-[1.03] hover:-translate-y-1`}
+                  >
+                    {/* Glow accent top bar */}
+                    <div className={`h-1.5 w-full ${card.barColor} opacity-80 group-hover:opacity-100 transition-opacity`} />
+
+                    {/* Icon header */}
+                    <div className="px-5 pt-5 pb-2 flex items-center gap-3">
+                      <div className={`w-11 h-11 rounded-xl ${card.iconBg} flex items-center justify-center ring-4 ${card.ringColor} shadow-md group-hover:scale-110 transition-transform duration-300`}>
+                        <Icon className={`w-5 h-5 ${card.iconColor}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] md:text-[11px] font-black text-slate-500 uppercase tracking-wide leading-tight group-hover:text-slate-700 transition-colors line-clamp-3">
+                          {card.label}
+                        </p>
+                      </div>
                     </div>
-                    {/* Mini progress bar */}
-                    {card.showPercent && pct !== null && (
-                      <div className="mt-3 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+
+                    <div className="px-5 pt-1 pb-5 flex-1 flex flex-col">
+                      {/* Objetivo badge */}
+                      <div className="mb-4">
+                        {card.objetivo ? (
+                          <span className={`inline-flex items-center gap-1 text-[9px] md:text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${card.objetivoColor}`}>
+                            <Activity className="w-3 h-3" />
+                            Objetivo: {card.objetivo}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[9px] md:text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-lg border text-slate-400 bg-slate-50 border-slate-200">
+                            Objetivo: -
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Valor Absoluto */}
+                      <div className="flex items-end justify-between gap-2 mb-1">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Absoluto</span>
+                        <span className="text-2xl md:text-3xl font-black text-slate-800 tabular-nums leading-none group-hover:scale-105 transition-transform origin-right">
+                          {card.value.toLocaleString('pt-BR')}
+                        </span>
+                      </div>
+
+                      {/* Percentual */}
+                      <div className="flex items-end justify-between gap-2 mb-3">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Percentual</span>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-lg font-black text-slate-700 tabular-nums">
+                            {pct}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Mini bar */}
+                      <div className="mt-auto h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
                         <div
-                          className={`h-full bg-gradient-to-r ${card.accent} rounded-full transition-all duration-1000 ease-out`}
-                          style={{ width: `${Math.max(pct, 2)}%` }}
+                          className={`h-full ${card.barColor} rounded-full transition-all duration-700 ease-out shadow-md`}
+                          style={{ width: `${Math.max(pct, 3)}%` }}
                         />
                       </div>
+                    </div>
+
+                    {/* Busca Ativa section (only NAO_IDENTIFICADO) */}
+                    {isActiveSearch && (
+                      <>
+                        <div className="mx-5 border-t border-dashed border-rose-200" />
+                        <div className="px-5 py-4 bg-gradient-to-b from-rose-50/80 to-white">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Search className="w-3.5 h-3.5 text-rose-500" />
+                            <p className="text-[10px] font-black text-rose-700 uppercase tracking-widest">Com Busca Ativa</p>
+                          </div>
+                          <div className="flex items-end justify-between gap-2 mb-1">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Absoluto</span>
+                            <span className="text-xl font-black text-slate-800 tabular-nums leading-none">
+                              {buscaAtivaValor.toLocaleString('pt-BR')}
+                            </span>
+                          </div>
+                          <div className="flex items-end justify-between gap-2">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Percentual</span>
+                            <span className="text-sm font-black text-slate-600 tabular-nums">
+                              {buscaAtivaPct}%
+                            </span>
+                          </div>
+                        </div>
+                      </>
                     )}
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
           {/* Gráficos e Tabelas */}
@@ -877,7 +933,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             {/* Performance de Busca Ativa */}
-            <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden">
+            <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden lg:col-span-2">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl" />
               <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-8 relative z-10 gap-4 text-center sm:text-left">
                 <div className="flex flex-col items-center sm:items-start">
@@ -915,106 +971,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               </div>
             </div>
 
-            {/* Status de Rastreamento - Doughnut */}
-            <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl" />
-              <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-8 relative z-10 gap-4 text-center sm:text-left">
-                <div className="flex flex-col items-center sm:items-start">
-                  <h3 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight flex items-center gap-3">
-                    <BadgeCheck className="w-6 h-6 text-indigo-500" />
-                    Status
-                  </h3>
-                  <p className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Distribuição de Rastreamento</p>
-                </div>
-                <div className="bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100 shadow-sm shrink-0">
-                  <span className="text-xl font-black text-indigo-600">{stats.totalPacientes.toLocaleString('pt-BR')}</span>
-                  <span className="text-[10px] font-bold text-indigo-400 uppercase ml-2">Total</span>
-                </div>
-              </div>
-
-              <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
-                {/* Doughnut */}
-                <div className="w-48 h-48 md:w-56 md:h-56 shrink-0">
-                  <Doughnut
-                    data={{
-                      labels: [
-                        'CONFIRMADO O REGISTRO DE RESULTADOS DO TESTE MOLECULAR DNA-HPV NO PEP',
-                        'IDENTIFICADO TESTE MOLECULAR DNA-HPV - (GAL/MEDIREC)',
-                        'IDENTIFICADO REGISTRO DE RESULTADO DE CITO NO PEP',
-                        'IDENTIFICADO COLETA DE CITO/PENDENTE DE REGISTRO DE RESULTADO NO PEP',
-                        'NÃO IDENTIFICADO COLETA OU RESULTADO DE EXAME DE RASTREAMENTO',
-                      ],
-                      datasets: [{
-                        data: [
-                          stats.alertBreakdown['PEP_MOLECULAR'] || 0,
-                          stats.alertBreakdown['COLETA_MOLECULAR'] || 0,
-                          stats.alertBreakdown['PEP_CITO'] || 0,
-                          stats.alertBreakdown['COLETA_CITO'] || 0,
-                          stats.alertBreakdown['NAO_IDENTIFICADO'] || 0,
-                        ],
-                        backgroundColor: [
-                          'rgba(79, 70, 229, 0.85)',
-                          'rgba(249, 115, 22, 0.85)',
-                          'rgba(16, 185, 129, 0.85)',
-                          'rgba(234, 179, 8, 0.85)',
-                          'rgba(239, 68, 68, 0.85)',
-                        ],
-                        borderWidth: 0,
-                        hoverOffset: 8,
-                      }],
-                    }}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      cutout: '62%',
-                      plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                          backgroundColor: '#1e293b',
-                          titleFont: { weight: 'bold', size: 12 },
-                          bodyFont: { size: 11 },
-                          padding: 12,
-                          cornerRadius: 12,
-                          callbacks: {
-                            label: (ctx) => {
-                              const total = ctx.dataset.data.reduce((a: number, b: number) => a + b, 0);
-                              const pct = total > 0 ? Math.round((ctx.raw as number / total) * 100) : 0;
-                              return ` ${ctx.label}: ${Number(ctx.raw).toLocaleString('pt-BR')} (${pct}%)`;
-                            },
-                          },
-                        },
-                      },
-                    }}
-                  />
-                </div>
-
-                {/* Legend */}
-                <div className="flex-1 space-y-3 w-full">
-                  {[
-                    { label: 'CONFIRMADO O REGISTRO DE RESULTADOS DO TESTE MOLECULAR DNA-HPV NO PEP', key: 'PEP_MOLECULAR', color: 'bg-indigo-500' },
-                    { label: 'IDENTIFICADO TESTE MOLECULAR DNA-HPV - (GAL/MEDIREC)', key: 'COLETA_MOLECULAR', color: 'bg-orange-500' },
-                    { label: 'IDENTIFICADO REGISTRO DE RESULTADO DE CITO NO PEP', key: 'PEP_CITO', color: 'bg-emerald-500' },
-                    { label: 'IDENTIFICADO COLETA DE CITO/PENDENTE DE REGISTRO DE RESULTADO NO PEP', key: 'COLETA_CITO', color: 'bg-yellow-500' },
-                    { label: 'NÃO IDENTIFICADO COLETA OU RESULTADO DE EXAME DE RASTREAMENTO', key: 'NAO_IDENTIFICADO', color: 'bg-red-500' },
-                  ].map(item => {
-                    const val = stats.alertBreakdown[item.key] || 0;
-                    const pct = stats.totalPacientes > 0 ? Math.round((val / stats.totalPacientes) * 100) : 0;
-                    return (
-                      <div key={item.key} className="flex items-start gap-3 group/item">
-                        <div className={`w-3 h-3 rounded-full ${item.color} shrink-0 ring-2 ring-white shadow-sm mt-0.5`} />
-                        <span className="text-[10px] md:text-[11px] font-black text-slate-500 uppercase tracking-wider flex-1 leading-tight group-hover/item:text-primary transition-colors">
-                          {item.label}
-                        </span>
-                        <div className="flex items-baseline gap-1.5 shrink-0">
-                          <span className="text-sm font-black text-slate-700 tabular-nums">{val.toLocaleString('pt-BR')}</span>
-                          <span className="text-[10px] font-black text-slate-400 tabular-nums">{pct}%</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
           </div>
 
 

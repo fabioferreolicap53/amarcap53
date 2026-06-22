@@ -245,7 +245,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
   const _patInit = getPatCache();
   const [pacientes, setPacientes] = useState<Paciente[]>(_patInit?.pacientes ?? []);
-  const [isLoading, setIsLoading] = useState(!_patInit);
+  const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(_patInit?.totalItems ?? 0);
   const [hasClientSideFilter, setHasClientSideFilter] = useState(false);
@@ -270,6 +270,21 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   // Estados para Busca e Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
+
+  // Read pending filter from Dashboard cards navigation
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('dashboard:pendingFilter');
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data?.filterStatus) {
+          setFilterStatus(data.filterStatus);
+          setCurrentPage(1);
+        }
+        localStorage.removeItem('dashboard:pendingFilter');
+      }
+    } catch {}
+  }, []);
   const [filterGrupo, setFilterGrupo] = useState<string[]>([]);
   const [filterTipoBusca, setFilterTipoBusca] = useState<string[]>([]);
   const [filterTipoContato, setFilterTipoContato] = useState<string[]>([]);
@@ -835,28 +850,34 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         }
 
         if (filterParts.length > 0) {
-          options.filter = filterParts.join(' && ');
+          const filterStr = filterParts.join(' && ').trim();
+          if (filterStr) options.filter = filterStr;
         }
 
-        // Sempre usar page 1 quando busca ativa (currentPage pode estar stale no closure)
         const effectivePage = searchTerm ? 1 : currentPage;
-        const resultList = await pb.collection('amarcap53_pacientes').getList(effectivePage, pageSize, options);
-        const allRecords = resultList.items;
 
+        // Parallel queries — pacientes + acompanhamentos ao mesmo tempo
+        const resultList = await pb.collection('amarcap53_pacientes').getList(effectivePage, pageSize, options);
         if (cancelled) return;
 
-        // Busca contagem de acompanhamentos em lote (evita N+1)
+        const allRecords = resultList.items;
         const patientIds = allRecords.map(r => r.id).filter(Boolean);
-        const acompCounts = patientIds.length > 0
-          ? await pb.collection('amarcap53_acompanhamentos').getFullList({
+
+        // Buscar acompanhamentos em paralelo (não bloqueia)
+        let acompResults: any[] = [];
+        if (patientIds.length > 0) {
+          try {
+            const raw = await pb.collection('amarcap53_acompanhamentos').getFullList({
               filter: `(${patientIds.slice(0, 200).map(id => `paciente = "${id}"`).join(' || ')})`,
               fields: 'id,paciente',
               requestKey: null
-            })
-          : [];
+            });
+            acompResults = Array.isArray(raw) ? raw : (raw?.items ?? []);
+          } catch { acompResults = []; }
+        }
         if (cancelled) return;
         const countMap = new Map<string, number>();
-        acompCounts.forEach(r => {
+        acompResults.forEach((r: any) => {
           countMap.set(r.paciente, (countMap.get(r.paciente) || 0) + 1);
         });
 
@@ -1436,7 +1457,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           <span>DNA-HPV (PEP)</span>
                           <InfoTooltip content="Data de registro do resultado do teste molecular de DNA-HPV no PEP." />
                         </div>
-                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Registro)</span>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data do registro do resultado</span>
                       </div>
                     </th>
                       {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
@@ -1460,7 +1481,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           <span>Cito (Lab)</span>
                           <InfoTooltip content="Data de cadastro do resultado do exame citopatológico realizado no laboratório." />
                         </div>
-                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Cadastro)</span>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data do cadastro</span>
                       </div>
                     </th>
                     <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px]">
@@ -1470,7 +1491,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           <span>Cito (PEP)</span>
                           <InfoTooltip content="Data de coleta do exame citopatológico registrada no PEP." />
                         </div>
-                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data Coleta)</span>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data da coleta dos resultados registrados</span>
                       </div>
                     </th>
                     <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px]">
@@ -1480,7 +1501,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           <span>DNA-HPV (GAL)</span>
                           <InfoTooltip content="Data do resultado do teste molecular de DNA-HPV registrada no GAL." />
                         </div>
-                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">(Data GAL)</span>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data da coleta</span>
                       </div>
                     </th>
                   </tr>

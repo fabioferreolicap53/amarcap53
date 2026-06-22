@@ -71,11 +71,11 @@ function AppContent() {
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
       <main className={`flex-1 flex flex-col h-screen overflow-hidden transition-all duration-300`}>
-        {activeTab === 'resumo' && <DashboardScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
-        {activeTab === 'pacientes' && <PatientsScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
-        {activeTab === 'favoritos' && <FavoritesScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
-        {activeTab === 'acompanhamento' && <FollowUpsScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
-        {activeTab === 'configuracoes' && <SettingsScreen activeTab={activeTab} setActiveTab={setActiveTab} />}
+        {activeTab === 'resumo' && <DashboardScreen key="resumo" activeTab={activeTab} setActiveTab={setActiveTab} />}
+        {activeTab === 'pacientes' && <PatientsScreen key="pacientes" activeTab={activeTab} setActiveTab={setActiveTab} />}
+        {activeTab === 'favoritos' && <FavoritesScreen key="favoritos" activeTab={activeTab} setActiveTab={setActiveTab} />}
+        {activeTab === 'acompanhamento' && <FollowUpsScreen key="acompanhamento" activeTab={activeTab} setActiveTab={setActiveTab} />}
+        {activeTab === 'configuracoes' && <SettingsScreen key="configuracoes" activeTab={activeTab} setActiveTab={setActiveTab} />}
       </main>
       <InstallBanner />
     </div>
