@@ -6,17 +6,25 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-const DISMISS_KEY = 'pwa-banner-dismiss-count';
+const DISMISS_KEY = 'pwa-banner-dismissed-at';
+const HIDE_DAYS = 3;
 
-function getDismissCount(): number {
+function getDismissedAt(): number | null {
   try {
     const val = localStorage.getItem(DISMISS_KEY);
-    return val ? parseInt(val, 10) || 0 : 0;
-  } catch { return 0; }
+    return val ? parseInt(val, 10) || null : null;
+  } catch { return null; }
 }
 
-function setDismissCount(n: number) {
-  try { localStorage.setItem(DISMISS_KEY, String(n)); } catch {}
+function setDismissedAt() {
+  try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch {}
+}
+
+function isHiddenByDismiss(): boolean {
+  const ts = getDismissedAt();
+  if (!ts) return false;
+  const elapsed = Date.now() - ts;
+  return elapsed < HIDE_DAYS * 24 * 60 * 60 * 1000;
 }
 
 // Checa síncrono — roda na inicialização do state, antes do primeiro render
@@ -29,10 +37,8 @@ function calcInitState(): { show: boolean; isIOS: boolean; standalone: boolean }
 
   if (standalone) return { show: false, isIOS, standalone: true };
 
-  // Após 3 dispensas consecutivas, nunca mais mostra
-  if (getDismissCount() >= 3) {
-    return { show: false, isIOS, standalone: false };
-  }
+  // Fechado há menos de 3 dias → não mostrar
+  if (isHiddenByDismiss()) return { show: false, isIOS, standalone: false };
 
   // iOS: mostra sempre (não tem beforeinstallprompt)
   if (isIOS) return { show: true, isIOS, standalone: false };
@@ -60,7 +66,7 @@ export const InstallBanner: React.FC = () => {
     const handler = (e: Event) => {
       e.preventDefault();
       deferredRef.current = e as BeforeInstallPromptEvent;
-      setState((prev) => ({ ...prev, show: getDismissCount() < 3 }));
+      setState((prev) => ({ ...prev, show: !isHiddenByDismiss() }));
     };
     window.addEventListener('beforeinstallprompt', handler);
 
@@ -74,7 +80,7 @@ export const InstallBanner: React.FC = () => {
     await promptEvent.prompt();
     const { outcome } = await promptEvent.userChoice;
     if (outcome === 'accepted') {
-      setDismissCount(0); // reset contador se instalou
+      try { localStorage.removeItem(DISMISS_KEY); } catch {}
       setState((prev) => ({ ...prev, show: false }));
     }
     deferredRef.current = null;
@@ -82,8 +88,7 @@ export const InstallBanner: React.FC = () => {
   };
 
   const handleClose = () => {
-    const newCount = getDismissCount() + 1;
-    setDismissCount(newCount);
+    setDismissedAt();
     setState((prev) => ({ ...prev, show: false }));
   };
 
