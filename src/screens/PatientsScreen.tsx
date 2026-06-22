@@ -270,6 +270,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   // Estados para Busca e Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
+  const [filterBuscaAtiva, setFilterBuscaAtiva] = useState<boolean | null>(null);
 
   // Read pending filter from Dashboard cards navigation
   useEffect(() => {
@@ -279,6 +280,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         const data = JSON.parse(raw);
         if (data?.filterStatus) {
           setFilterStatus(data.filterStatus);
+          if (data.buscaAtiva !== undefined) setFilterBuscaAtiva(data.buscaAtiva);
           setCurrentPage(1);
         }
         localStorage.removeItem('dashboard:pendingFilter');
@@ -856,6 +858,35 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
         const effectivePage = searchTerm ? 1 : currentPage;
 
+        // Filtrar por busca ativa (pacientes COM ou SEM acompanhamento)
+        if (filterBuscaAtiva !== null) {
+          try {
+            const allAcomp = await pb.collection('amarcap53_acompanhamentos').getFullList({
+              fields: 'paciente',
+              requestKey: null,
+              batch: 500,
+            });
+            const acompPacIds = [...new Set(allAcomp.map((a: any) => a.paciente).filter(Boolean))];
+            if (acompPacIds.length > 0) {
+              if (filterBuscaAtiva === true) {
+                // COM acompanhamento
+                const idFilter = acompPacIds.map(id => `id = "${id}"`).join(' || ');
+                filterParts.push(`(${idFilter})`);
+              } else {
+                // SEM acompanhamento — negar ids
+                const idFilter = acompPacIds.map(id => `id != "${id}"`).join(' && ');
+                filterParts.push(`(${idFilter})`);
+              }
+            } else if (filterBuscaAtiva === true) {
+              // Nenhum acompanhamento → resultado vazio
+              filterParts.push('id = "__none__"');
+            }
+            // Rebuild filter
+            const finalFilter = filterParts.join(' && ').trim();
+            if (finalFilter) options.filter = finalFilter;
+          } catch { /* ignora erro */ }
+        }
+
         // Parallel queries — pacientes + acompanhamentos ao mesmo tempo
         const resultList = await pb.collection('amarcap53_pacientes').getList(effectivePage, pageSize, options);
         if (cancelled) return;
@@ -867,7 +898,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         let acompResults: any[] = [];
         if (patientIds.length > 0) {
           try {
-            const raw = await pb.collection('amarcap53_acompanhamentos').getFullList({
+            const raw: any = await pb.collection('amarcap53_acompanhamentos').getFullList({
               filter: `(${patientIds.slice(0, 200).map(id => `paciente = "${id}"`).join(' || ')})`,
               fields: 'id,paciente',
               requestKey: null

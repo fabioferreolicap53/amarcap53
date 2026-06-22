@@ -862,11 +862,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                         {card.objetivo ? (
                           <span className={`inline-flex items-center gap-1 text-[9px] md:text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${card.objetivoColor}`}>
                             <Activity className="w-3 h-3" />
-                            Objetivo: {card.objetivo}
+                            Meta: {card.objetivo}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[9px] md:text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-lg border text-slate-400 bg-slate-50 border-slate-200">
-                            Objetivo: -
+                            Meta: -
                           </span>
                         )}
                       </div>
@@ -899,29 +899,62 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     </div>
 
                     {/* Busca Ativa section (only NAO_IDENTIFICADO) */}
-                    {isActiveSearch && (
-                      <>
-                        <div className="mx-5 border-t border-dashed border-rose-200" />
-                        <div className="px-5 py-4 bg-gradient-to-b from-rose-50/80 to-white">
-                          <div className="flex items-center gap-2 mb-3">
-                            <Search className="w-3.5 h-3.5 text-rose-500" />
-                            <p className="text-[10px] font-black text-rose-700 uppercase tracking-widest">Com Busca Ativa</p>
+                    {isActiveSearch && (() => {
+                      const semBuscaValor = card.value - buscaAtivaValor;
+                      const semBuscaPct = stats.totalPacientes > 0 ? Math.round((semBuscaValor / stats.totalPacientes) * 100) : 0;
+                      return (
+                        <>
+                          <div className="mx-5 border-t border-dashed border-slate-200" />
+                          <div className="px-5 py-4 grid grid-cols-2 gap-2.5">
+                            {/* Com Busca Ativa — verde */}
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterStatus: [card.key], buscaAtiva: true }));
+                                setActiveTab('pacientes');
+                              }}
+                              className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-2xl p-3 border border-emerald-200/60 shadow-sm cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all duration-300 hover:scale-[1.03]"
+                            >
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm shadow-emerald-500/30">
+                                  <Search className="w-2 h-2 text-white" />
+                                </div>
+                                <p className="text-[7px] md:text-[8px] font-black text-emerald-700 uppercase tracking-widest leading-none">Com Busca</p>
+                              </div>
+                              <div className="flex items-end justify-between">
+                                <span className="text-sm font-black text-emerald-800 tabular-nums leading-none">
+                                  {buscaAtivaValor.toLocaleString('pt-BR')}
+                                </span>
+                                <span className="text-[10px] font-black text-emerald-600 tabular-nums">{buscaAtivaPct}%</span>
+                              </div>
+                            </div>
+
+                            {/* Sem Busca Ativa — rose */}
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterStatus: [card.key], buscaAtiva: false }));
+                                setActiveTab('pacientes');
+                              }}
+                              className="bg-gradient-to-br from-rose-50 to-rose-100/50 rounded-2xl p-3 border border-rose-200/60 shadow-sm cursor-pointer hover:shadow-md hover:border-rose-300 transition-all duration-300 hover:scale-[1.03]"
+                            >
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <div className="w-4 h-4 rounded-full bg-rose-500 flex items-center justify-center shadow-sm shadow-rose-500/30">
+                                  <CircleOff className="w-2 h-2 text-white" />
+                                </div>
+                                <p className="text-[7px] md:text-[8px] font-black text-rose-700 uppercase tracking-widest leading-none">Sem Busca</p>
+                              </div>
+                              <div className="flex items-end justify-between">
+                                <span className="text-sm font-black text-rose-800 tabular-nums leading-none">
+                                  {semBuscaValor.toLocaleString('pt-BR')}
+                                </span>
+                                <span className="text-[10px] font-black text-rose-600 tabular-nums">{semBuscaPct}%</span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-end justify-between gap-2 mb-1">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Absoluto</span>
-                            <span className="text-xl font-black text-slate-800 tabular-nums leading-none">
-                              {buscaAtivaValor.toLocaleString('pt-BR')}
-                            </span>
-                          </div>
-                          <div className="flex items-end justify-between gap-2">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Percentual</span>
-                            <span className="text-sm font-black text-slate-600 tabular-nums">
-                              {buscaAtivaPct}%
-                            </span>
-                          </div>
-                        </div>
-                      </>
-                    )}
+                        </>
+                      );
+                    })()}
                   </div>
                 );
               })}
