@@ -666,7 +666,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               </div>
 
               {/* Total de Pacientes */}
-              <div className="relative z-10 -ml-[10%] flex flex-col items-center">
+              <div className="relative z-10 md:-ml-[10%] flex flex-col items-center">
                 <span className="text-[10px] md:text-xs font-black text-white/40 uppercase tracking-[0.3em] mb-1">Total de Pacientes</span>
                 <span className="text-4xl md:text-5xl font-black text-white leading-none tracking-tighter tabular-nums">
                   {stats.totalPacientes.toLocaleString('pt-BR')}
