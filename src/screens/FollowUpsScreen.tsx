@@ -943,6 +943,12 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                         <span>Desfecho / Tipo</span>
                       </div>
                     </th>
+                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5">
+                      <div className="flex flex-col items-center gap-1">
+                        <MessageSquare className="w-4 h-4 text-blue-400/60" />
+                        <span>Observações</span>
+                      </div>
+                    </th>
                     <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center">
                       <div className="flex flex-col items-center gap-1">
                         <RotateCcw className="w-4 h-4 text-blue-400/60" />
@@ -954,7 +960,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                 <tbody className="divide-y divide-outline-variant/5">
                   {filteredRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-20 text-center">
+                      <td colSpan={6} className="px-6 py-20 text-center">
                         <div className="flex flex-col items-center opacity-30">
                           <ClipboardList className="w-16 h-16 mb-4" />
                           <p className="text-sm font-black uppercase tracking-widest">Nenhum registro encontrado</p>
@@ -1017,6 +1023,17 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                                 <span className="text-[8px] font-bold text-slate-400 uppercase">
                                   {acomp.tipo_busca || '--'}
                                 </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 text-center align-middle">
+                              <div className="max-w-[200px] mx-auto" title={acomp.observacoes || ''}>
+                                {acomp.observacoes ? (
+                                  <p className="text-[10px] md:text-[11px] font-medium italic text-slate-500/80 leading-relaxed text-center line-clamp-2 tracking-wide">
+                                    {acomp.observacoes.length > 144 ? `${acomp.observacoes.substring(0, 144)}...` : acomp.observacoes}
+                                  </p>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">--</span>
+                                )}
                               </div>
                             </td>
                             <td className="px-6 py-6 text-center">
