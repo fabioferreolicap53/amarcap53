@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, HeartPulse, Calendar, BadgeCheck, TrendingUp, ClipboardList, PieChart, BarChart3, MapPin, LayoutDashboard, Filter, CheckCircle, AlertCircle, Building, X, UserCheck, TestTube2, CircleOff, Search, Activity } from 'lucide-react';
+import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, HeartPulse, Calendar, BadgeCheck, TrendingUp, ClipboardList, PieChart, BarChart3, MapPin, LayoutDashboard, Filter, CheckCircle, AlertCircle, Building, X, UserCheck, TestTube2, CircleOff, Search, Activity, Info, MousePointerClick, ArrowRightCircle } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -269,6 +269,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const [filterEquipe, setFilterEquipe] = useState<string[]>([]);
   const [filterMicroarea, setFilterMicroarea] = useState<string[]>([]);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [selectedGrupo, setSelectedGrupo] = useState<string | null>(null);
+  const grupoContainerRef = useRef<HTMLDivElement>(null);
+  const loadedRecordsRef = useRef<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const _aInit = getCache(ACOMP_CACHE_KEY);
@@ -287,6 +290,93 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
   const formatEnumLabel = (value?: string) => value || '';
   const hasValue = (value: any) => value !== undefined && value !== null && value !== '' && value !== '--';
+
+  // Verifica se paciente tem atraso: cito_pep vazio OU cito_pep com data <= hoje - 3 anos
+  const hasCitoPepAtraso = (p: any): boolean => {
+    if (!p.cito_pep || p.cito_pep === '--' || p.cito_pep === '') return true;
+    const d = new Date(p.cito_pep);
+    if (isNaN(d.getTime())) return true;
+    const tresAnosAtras = new Date();
+    tresAnosAtras.setFullYear(tresAnosAtras.getFullYear() - 3);
+    return d <= tresAnosAtras;
+  };
+
+  // Filtra stats por grupo selecionado
+  const getFilteredStats = (grupo: string | null) => {
+    if (!grupo) return stats;
+    const records = loadedRecordsRef.current;
+    if (records.length === 0) return stats;
+    // Filtrar só registros do grupo, aplicar regra de atraso se aplicável
+    const filtered = records.filter((p: any) => p.grupo === grupo);
+    const total = filtered.length;
+    const alerts: Record<string, number> = {};
+    filtered.forEach((p: any) => {
+      let status: string;
+      if (hasValue(p.dna_hpv_pep)) status = 'PEP_MOLECULAR';
+      else if (hasValue(p.dna_hpv_gal)) status = 'COLETA_MOLECULAR';
+      else if (hasValue(p.cito_pep)) status = 'PEP_CITO';
+      else if (hasValue(p.cito_lab)) status = 'COLETA_CITO';
+      else status = 'NAO_IDENTIFICADO';
+      alerts[status] = (alerts[status] || 0) + 1;
+    });
+    const pepMol = alerts['PEP_MOLECULAR'] || 0;
+    const coltMol = alerts['COLETA_MOLECULAR'] || 0;
+    const pepCito = alerts['PEP_CITO'] || 0;
+    const coltCito = alerts['COLETA_CITO'] || 0;
+    const atrasadas = alerts['NAO_IDENTIFICADO'] || 0;
+    const emDia = total - atrasadas;
+    return {
+      ...stats,
+      totalPacientes: total,
+      coletasAtrasadas: atrasadas,
+      examesEmDia: Math.max(emDia, 0),
+      resultadosAlterados: pepMol + coltMol + pepCito + coltCito,
+      coberturaPercent: total > 0 ? Math.round((Math.max(emDia, 0) / total) * 100) : 0,
+      pepMol, coltMol, pepCito, coltCito,
+      alertBreakdown: alerts,
+    };
+  };
+  const displayStats = getFilteredStats(selectedGrupo);
+
+  // Lógica de dois cliques nos cards de grupo
+  const handleGrupoClick = async (grupo: string) => {
+    if (selectedGrupo === grupo) {
+      // Segundo clique → navegar para Pacientes
+      localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterGrupo: [grupo] }));
+      setActiveTab('pacientes');
+      return;
+    }
+    // Primeiro clique: buscar registros deste grupo se ainda não carregados
+    const existing = loadedRecordsRef.current;
+    const hasGrupo = existing.some((r: any) => r.grupo === grupo);
+    if (!hasGrupo) {
+      try {
+        const records = await pb.collection('amarcap53_pacientes').getFullList({
+          batch: 500,
+          requestKey: null,
+          fields: 'id,dna_hpv_pep,dna_hpv_gal,cito_pep,cito_lab,grupo',
+          filter: `grupo = "${grupo}"`,
+        });
+        // Merge com registros existentes (não substituir)
+        loadedRecordsRef.current = [...existing, ...records];
+      } catch (err) {
+        console.warn('[grupo] load records error:', err);
+      }
+    }
+    setSelectedGrupo(grupo);
+  };
+
+  // Click fora do container de grupos → cancela seleção
+  useEffect(() => {
+    if (!selectedGrupo) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (grupoContainerRef.current && !grupoContainerRef.current.contains(e.target as Node)) {
+        setSelectedGrupo(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [selectedGrupo]);
 
   const toValidDate = (value: any) => {
     if (!hasValue(value)) return null;
@@ -386,6 +476,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             fields: 'id,dna_hpv_pep,dna_hpv_gal,cito_pep,cito_lab,grupo,unidade,equipe,microarea'
           });
           if (cancelled) return;
+          loadedRecordsRef.current = loadedRecords;
           scopedPatientIds = loadedRecords.map(p => p.id).filter(Boolean);
 
           const totalPacientes = loadedRecords.length;
@@ -446,7 +537,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           // Mostra cache imediatamente (instantaneo)
           const cached = getCache(STATS_CACHE_KEY);
           if (cached) {
-            setStats({ ...cached, examTrend: emptyExamTrend, grupoBreakdown: {}, acompTrend: emptyAcompTrend });
+            setStats({ ...cached, examTrend: emptyExamTrend, acompTrend: emptyAcompTrend });
           }
 
           const safeCount = async (field?: string, label?: string): Promise<number> => {
@@ -475,6 +566,29 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           ]);
           if (cancelled) return;
 
+          // Descobrir grupos únicos e contar cada um
+          const groups: Record<string, number> = {};
+          try {
+            // Pegar 500 registros com campo 'grupo' pra descobrir todos os grupos únicos
+            const sample = await pb.collection('amarcap53_pacientes').getList(1, 500, {
+              fields: 'grupo',
+              requestKey: null,
+              filter: baseFilter || undefined,
+            });
+            if (!cancelled) {
+              const uniqueGrupos = [...new Set(sample.items.map((r: any) => r.grupo).filter(Boolean))];
+              // Contar registros de cada grupo via safeCount (rápido, sem full scan)
+              const countPromises = uniqueGrupos.map(async (g) => {
+                if (g === '--' || g === 'NÃO INFORMADO') return;
+                const cnt = await safeCount(`grupo = "${g}"`, `grupo_${g}`);
+                if (cnt > 0 && !cancelled) groups[g] = cnt;
+              });
+              await Promise.all(countPromises);
+            }
+          } catch (err) {
+            console.warn('[grupo] discover error:', err);
+          }
+
           const withExam = pepMol + coltMol + pepCito + coltCito;
           const atrasadas = Math.max(totalPacientes - withExam, 0);
 
@@ -495,7 +609,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 PEP_CITO: pepCito,
                 COLETA_CITO: coltCito
               },
-              grupoBreakdown: {},
+              grupoBreakdown: groups,
               examVolume: { cito: pepCito + coltCito, hpv: pepMol + coltMol, pendente: atrasadas },
               examTrend: emptyExamTrend,
               acompTrend: emptyAcompTrend
@@ -511,6 +625,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               pepCito,
               coltCito,
               alertBreakdown: { NAO_IDENTIFICADO: atrasadas, PEP_MOLECULAR: pepMol, COLETA_MOLECULAR: coltMol, PEP_CITO: pepCito, COLETA_CITO: coltCito },
+              grupoBreakdown: groups,
               examVolume: { cito: pepCito + coltCito, hpv: pepMol + coltMol, pendente: atrasadas }
             });
           }
@@ -669,7 +784,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               <div className="relative z-10 md:-ml-[10%] flex flex-col items-center">
                 <span className="text-[10px] md:text-xs font-black text-white/40 uppercase tracking-[0.3em] mb-1">Total de Pacientes</span>
                 <span className="text-4xl md:text-5xl font-black text-white leading-none tracking-tighter tabular-nums">
-                  {stats.totalPacientes.toLocaleString('pt-BR')}
+                  {displayStats.totalPacientes.toLocaleString('pt-BR')}
                 </span>
               </div>
 
@@ -814,22 +929,194 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             )}
           </div>
 
+        {/* SELECIONE O GRUPO PRIORITÁRIO */}
+          {stats.grupoBreakdown && Object.keys(stats.grupoBreakdown).length > 0 && (() => {
+            const PRIORITY_GROUPS = [
+              { num: '1º', titulo: 'Mulheres de 30 a 49 anos', desc: 'com atraso no rastreamento com o exame citopatológico (mais de 3 anos) ou que nunca o realizaram', pattern: /30.*49/i, color: 'violet', gradient: 'from-violet-600 to-violet-400', bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', ring: 'ring-violet-400/30', glow: 'shadow-violet-500/25', hoverGlow: 'hover:shadow-violet-500/40', hoverBorder: 'hover:border-violet-400', numBg: 'bg-violet-600', numText: 'text-white', iconColor: 'text-violet-500' },
+              { num: '2º', titulo: 'Mulheres de 50 a 64 anos', desc: 'com atraso no rastreamento com o exame citopatológico (mais de 3 anos) ou que nunca o realizaram', pattern: /50.*6[0-4]|6[0-4].*50|50.*65(?![0-9])|50.*65$/i, color: 'fuchsia', gradient: 'from-fuchsia-600 to-fuchsia-400', bg: 'bg-fuchsia-50', border: 'border-fuchsia-200', text: 'text-fuchsia-700', ring: 'ring-fuchsia-400/30', glow: 'shadow-fuchsia-500/25', hoverGlow: 'hover:shadow-fuchsia-500/40', hoverBorder: 'hover:border-fuchsia-400', numBg: 'bg-fuchsia-600', numText: 'text-white', iconColor: 'text-fuchsia-500' },
+              { num: '3º', titulo: 'Mulheres de 30 a 49 anos', desc: 'independente da história anterior de rastreamento com exame citopatológico', pattern: /64>|65>/i, color: 'blue', gradient: 'from-blue-600 to-blue-400', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', ring: 'ring-blue-400/30', glow: 'shadow-blue-500/25', hoverGlow: 'hover:shadow-blue-500/40', hoverBorder: 'hover:border-blue-400', numBg: 'bg-blue-600', numText: 'text-white', iconColor: 'text-blue-500' },
+              { num: '4º', titulo: 'Mulheres de 25 a 29 anos', desc: 'que nunca fizeram o exame citopatológico', pattern: /25.*29|29.*25/i, color: 'emerald', gradient: 'from-emerald-600 to-emerald-400', bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', ring: 'ring-emerald-400/30', glow: 'shadow-emerald-500/25', hoverGlow: 'hover:shadow-emerald-500/40', hoverBorder: 'hover:border-emerald-400', numBg: 'bg-emerald-600', numText: 'text-white', iconColor: 'text-emerald-500' },
+            ];
+            const EXTRA_COLORS = ['indigo', 'slate', 'cyan', 'amber', 'teal', 'pink', 'rose', 'orange'];
+            const extraColorMap: Record<string, { gradient: string; bg: string; border: string; text: string; ring: string; glow: string; hoverGlow: string; hoverBorder: string; numBg: string; numText: string; iconColor: string }> = {
+              indigo: { gradient: 'from-indigo-600 to-indigo-400', bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700', ring: 'ring-indigo-400/30', glow: 'shadow-indigo-500/25', hoverGlow: 'hover:shadow-indigo-500/40', hoverBorder: 'hover:border-indigo-400', numBg: 'bg-indigo-600', numText: 'text-white', iconColor: 'text-indigo-500' },
+              slate: { gradient: 'from-slate-600 to-slate-400', bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-700', ring: 'ring-slate-400/30', glow: 'shadow-slate-500/25', hoverGlow: 'hover:shadow-slate-500/40', hoverBorder: 'hover:border-slate-400', numBg: 'bg-slate-600', numText: 'text-white', iconColor: 'text-slate-500' },
+              cyan: { gradient: 'from-cyan-600 to-cyan-400', bg: 'bg-cyan-50', border: 'border-cyan-200', text: 'text-cyan-700', ring: 'ring-cyan-400/30', glow: 'shadow-cyan-500/25', hoverGlow: 'hover:shadow-cyan-500/40', hoverBorder: 'hover:border-cyan-400', numBg: 'bg-cyan-600', numText: 'text-white', iconColor: 'text-cyan-500' },
+              amber: { gradient: 'from-amber-600 to-amber-400', bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', ring: 'ring-amber-400/30', glow: 'shadow-amber-500/25', hoverGlow: 'hover:shadow-amber-500/40', hoverBorder: 'hover:border-amber-400', numBg: 'bg-amber-600', numText: 'text-white', iconColor: 'text-amber-500' },
+              teal: { gradient: 'from-teal-600 to-teal-400', bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-700', ring: 'ring-teal-400/30', glow: 'shadow-teal-500/25', hoverGlow: 'hover:shadow-teal-500/40', hoverBorder: 'hover:border-teal-400', numBg: 'bg-teal-600', numText: 'text-white', iconColor: 'text-teal-500' },
+              pink: { gradient: 'from-pink-600 to-pink-400', bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-700', ring: 'ring-pink-400/30', glow: 'shadow-pink-500/25', hoverGlow: 'hover:shadow-pink-500/40', hoverBorder: 'hover:border-pink-400', numBg: 'bg-pink-600', numText: 'text-white', iconColor: 'text-pink-500' },
+              rose: { gradient: 'from-rose-600 to-rose-400', bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', ring: 'ring-rose-400/30', glow: 'shadow-rose-500/25', hoverGlow: 'hover:shadow-rose-500/40', hoverBorder: 'hover:border-rose-400', numBg: 'bg-rose-600', numText: 'text-white', iconColor: 'text-rose-500' },
+              orange: { gradient: 'from-orange-600 to-orange-400', bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', ring: 'ring-orange-400/30', glow: 'shadow-orange-500/25', hoverGlow: 'hover:shadow-orange-500/40', hoverBorder: 'hover:border-orange-400', numBg: 'bg-orange-600', numText: 'text-white', iconColor: 'text-orange-500' },
+            };
+
+            const allGroups = Object.entries(stats.grupoBreakdown).filter(([k]) => k !== 'NÃO INFORMADO' && k !== '--') as [string, number][];
+            const sortedKeys = allGroups.sort((a, b) => b[1] - a[1]).map(([k]) => k);
+
+            // Match DB groups to priority definitions
+            const matched: { grupo: string; count: number; priority: typeof PRIORITY_GROUPS[0]; prioIdx: number }[] = [];
+            const unmatched: { grupo: string; count: number }[] = [];
+
+            sortedKeys.forEach(grupo => {
+              const prioIdx = PRIORITY_GROUPS.findIndex(p => p.pattern.test(grupo));
+              if (prioIdx >= 0) {
+                matched.push({ grupo, count: stats.grupoBreakdown[grupo], priority: PRIORITY_GROUPS[prioIdx], prioIdx });
+              } else {
+                unmatched.push({ grupo, count: stats.grupoBreakdown[grupo] });
+              }
+            });
+            matched.sort((a, b) => a.prioIdx - b.prioIdx);
+
+            const totalPct = (v: number) => stats.totalPacientes > 0 ? Math.round((v / stats.totalPacientes) * 100) : 0;
+
+            return (
+              <div ref={grupoContainerRef} className="mb-8 md:mb-12">
+                <div className="text-center mb-8">
+                  <h2 className="text-xs md:text-sm font-black text-primary/40 uppercase tracking-[0.25em]">Selecione o Grupo Prioritário</h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+                  {/* Priority matched cards */}
+                  {matched.map((item) => {
+                    const c = item.priority;
+                    const pct = totalPct(item.count);
+                    const isSelected = selectedGrupo === item.grupo;
+                    return (
+                      <div
+                        key={item.grupo}
+                        onClick={() => handleGrupoClick(item.grupo)}
+                        className={`group relative bg-white rounded-2xl border-2 ${isSelected ? `${c.border} ring-4 ${c.ring} shadow-xl` : `${c.border} ${c.hoverBorder} shadow-lg ${c.glow} ${c.hoverGlow}`} hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 transition-all duration-500 cursor-pointer overflow-hidden`}
+                      >
+                        <div className={`h-1 w-full bg-gradient-to-r ${c.gradient} ${isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'} transition-opacity`} />
+                        <div className="p-5 md:p-6 flex flex-col gap-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className={`inline-flex items-center justify-center w-9 h-9 rounded-xl ${isSelected ? `${c.numBg} animate-pulse` : c.numBg} ${c.numText} text-xs font-black shadow-md ring-2 ${c.ring}`}>
+                                  {c.num}
+                                </span>
+                                <span className={`text-[7px] font-black ${c.text} uppercase tracking-widest leading-none opacity-60`}>Grupo</span>
+                              </div>
+                              <div className={`w-7 h-7 rounded-lg ${c.bg} flex items-center justify-center ring-1 ${c.ring}`}>
+                                <Users className={`w-4 h-4 ${c.iconColor}`} />
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-lg md:text-xl font-black text-slate-800 tabular-nums">{item.count.toLocaleString('pt-BR')}</span>
+                              <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">{pct}%</span>
+                            </div>
+                          </div>
+                          <h3 className={`text-sm md:text-base font-black ${c.text} uppercase tracking-wide leading-snug`}>{c.titulo}</h3>
+                          <p className="text-[10px] md:text-[11px] font-medium text-slate-500 leading-relaxed">{c.desc}</p>
+                          <div className="mt-1 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full bg-gradient-to-r ${c.gradient} rounded-full transition-all duration-700`} style={{ width: `${Math.max(pct, 3)}%` }} />
+                          </div>
+                          {/* Indicador de ação quando selecionado */}
+                          {isSelected && (
+                            <div className={`relative flex items-center gap-2 px-4 py-3 rounded-xl ${c.bg} border ${c.border} mt-1 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300 overflow-hidden`}>
+                              <div className={`absolute inset-0 bg-gradient-to-r ${c.gradient} opacity-[0.06]`} />
+                              <div className="relative flex items-center gap-2">
+                                <div className={`w-6 h-6 rounded-lg ${c.numBg} flex items-center justify-center shadow-md animate-pulse`}>
+                                  <MousePointerClick className="w-3 h-3 text-white" />
+                                </div>
+                                <span className={`text-[9px] font-black ${c.text} uppercase tracking-wide leading-tight`}>
+                                  Resumo filtrado. <span className={`underline decoration-2 underline-offset-2 decoration-current/30`}>Clique novamente</span> para ver a listagem nominal.
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${c.gradient} ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'} transition-opacity duration-500`} />
+                      </div>
+                    );
+                  })}
+
+                  {/* Extra unmatched groups */}
+                  {unmatched.map((item, idx) => {
+                    const colorName = EXTRA_COLORS[idx % EXTRA_COLORS.length];
+                    const c = extraColorMap[colorName];
+                    const pct = totalPct(item.count);
+                    const num = matched.length + idx + 1;
+                    const isSelected = selectedGrupo === item.grupo;
+                    return (
+                      <div
+                        key={item.grupo}
+                        onClick={() => handleGrupoClick(item.grupo)}
+                        className={`group relative bg-white rounded-2xl border-2 ${isSelected ? `${c.border} ring-4 ${c.ring} shadow-xl` : `${c.border} ${c.hoverBorder} shadow-lg ${c.glow} ${c.hoverGlow}`} hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 transition-all duration-500 cursor-pointer overflow-hidden`}
+                      >
+                        <div className={`h-1 w-full bg-gradient-to-r ${c.gradient} ${isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'} transition-opacity`} />
+                        <div className="p-5 md:p-6 flex flex-col gap-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className={`inline-flex items-center justify-center w-9 h-9 rounded-xl ${isSelected ? `${c.numBg} animate-pulse` : c.numBg} ${c.numText} text-[10px] font-black shadow-md ring-2 ${c.ring}`}>
+                                  {num}º
+                                </span>
+                                <span className={`text-[7px] font-black ${c.text} uppercase tracking-widest leading-none opacity-60`}>Grupo</span>
+                              </div>
+                              <div className={`w-7 h-7 rounded-lg ${c.bg} flex items-center justify-center ring-1 ${c.ring}`}>
+                                <Users className={`w-4 h-4 ${c.iconColor}`} />
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-lg md:text-xl font-black text-slate-800 tabular-nums">{item.count.toLocaleString('pt-BR')}</span>
+                              <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">{pct}%</span>
+                            </div>
+                          </div>
+                          <h3 className={`text-sm md:text-base font-black ${c.text} uppercase tracking-wide leading-snug truncate`} title={item.grupo}>Mulheres de {item.grupo}</h3>
+                          <div className="mt-1 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full bg-gradient-to-r ${c.gradient} rounded-full transition-all duration-700`} style={{ width: `${Math.max(pct, 3)}%` }} />
+                          </div>
+                          {/* Indicador de ação quando selecionado */}
+                          {isSelected && (
+                            <div className={`relative flex items-center gap-2 px-4 py-3 rounded-xl ${c.bg} border ${c.border} mt-1 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300 overflow-hidden`}>
+                              <div className={`absolute inset-0 bg-gradient-to-r ${c.gradient} opacity-[0.06]`} />
+                              <div className="relative flex items-center gap-2">
+                                <div className={`w-6 h-6 rounded-lg ${c.numBg} flex items-center justify-center shadow-md animate-pulse`}>
+                                  <MousePointerClick className="w-3 h-3 text-white" />
+                                </div>
+                                <span className={`text-[9px] font-black ${c.text} uppercase tracking-wide leading-tight`}>
+                                  Resumo filtrado. <span className={`underline decoration-2 underline-offset-2 decoration-current/30`}>Clique novamente</span> para ver a listagem nominal.
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${c.gradient} ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'} transition-opacity duration-500`} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Indicador de grupo ativo (barra sutil) */}
+          {selectedGrupo && (
+            <div className="flex items-center justify-center gap-2 -mt-4 mb-4">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/5 border border-primary/10 text-[9px] font-black text-primary/50 uppercase tracking-widest">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                Resumo filtrado por: {selectedGrupo}
+              </span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+            </div>
+          )}
+
         {/* Grid de Estatísticas Principais - Rastreamento */}
           <div className="mb-16">
 
             {/* Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-5">
               {[
-                { key: 'NAO_IDENTIFICADO', label: 'NÃO IDENTIFICADO COLETA OU RESULTADO DE EXAME DE RASTREAMENTO', value: stats.alertBreakdown['NAO_IDENTIFICADO'] || 0, objetivo: 'DIMINUIR', objetivoColor: 'text-rose-700 bg-rose-50 border-rose-200', barColor: 'bg-gradient-to-r from-rose-400 to-rose-600', dotColor: 'bg-rose-500', icon: CircleOff, glowColor: 'shadow-rose-500/20', ringColor: 'ring-rose-400/30', hoverBorder: 'hover:border-rose-300', iconBg: 'bg-rose-100', iconColor: 'text-rose-600' },
-                { key: 'COLETA_CITO', label: 'IDENTIFICADO COLETA DE CITO/PENDENTE DE REGISTRO DE RESULTADO NO PEP', value: stats.alertBreakdown['COLETA_CITO'] || 0, objetivo: 'ZERAR', objetivoColor: 'text-amber-700 bg-amber-50 border-amber-200', barColor: 'bg-gradient-to-r from-amber-400 to-amber-600', dotColor: 'bg-amber-500', icon: Clock, glowColor: 'shadow-amber-500/20', ringColor: 'ring-amber-400/30', hoverBorder: 'hover:border-amber-300', iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
-                { key: 'PEP_CITO', label: 'IDENTIFICADO REGISTRO DE RESULTADO DE CITO NO PEP', value: stats.alertBreakdown['PEP_CITO'] || 0, objetivo: 'MONITORAR', objetivoColor: 'text-emerald-700 bg-emerald-50 border-emerald-200', barColor: 'bg-gradient-to-r from-emerald-400 to-emerald-600', dotColor: 'bg-emerald-500', icon: CheckCircle, glowColor: 'shadow-emerald-500/20', ringColor: 'ring-emerald-400/30', hoverBorder: 'hover:border-emerald-300', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
-                { key: 'COLETA_MOLECULAR', label: 'IDENTIFICADO TESTE MOLECULAR DNA-HPV - (GAL/MEDIREC)', value: stats.alertBreakdown['COLETA_MOLECULAR'] || 0, objetivo: 'AUMENTAR', objetivoColor: 'text-[#9a4b20] bg-[#fb9a61]/10 border-[#fb9a61]/40', barColor: 'bg-gradient-to-r from-[#fb9a61] to-[#e87530]', dotColor: 'bg-[#fb9a61]', icon: TestTube2, glowColor: 'shadow-[#fb9a61]/20', ringColor: 'ring-[#fb9a61]/30', hoverBorder: 'hover:border-[#fb9a61]/50', iconBg: 'bg-[#fb9a61]/15', iconColor: 'text-[#e87530]' },
-                { key: 'PEP_MOLECULAR', label: 'CONFIRMADO O REGISTRO DE RESULTADOS DO TESTE MOLECULAR DNA-HPV NO PEP', value: stats.alertBreakdown['PEP_MOLECULAR'] || 0, objetivo: 'AUMENTAR', objetivoColor: 'text-blue-700 bg-blue-50 border-blue-200', barColor: 'bg-gradient-to-r from-blue-400 to-blue-600', dotColor: 'bg-blue-500', icon: BadgeCheck, glowColor: 'shadow-blue-500/20', ringColor: 'ring-blue-400/30', hoverBorder: 'hover:border-blue-300', iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
+                { key: 'NAO_IDENTIFICADO', label: 'NÃO IDENTIFICADO COLETA OU RESULTADO DE EXAME DE RASTREAMENTO', value: displayStats.alertBreakdown['NAO_IDENTIFICADO'] || 0, objetivo: 'DIMINUIR', objetivoColor: 'text-rose-700 bg-rose-50 border-rose-200', barColor: 'bg-gradient-to-r from-rose-400 to-rose-600', dotColor: 'bg-rose-500', icon: CircleOff, glowColor: 'shadow-rose-500/20', ringColor: 'ring-rose-400/30', hoverBorder: 'hover:border-rose-300', iconBg: 'bg-rose-100', iconColor: 'text-rose-600' },
+                { key: 'COLETA_CITO', label: 'IDENTIFICADO COLETA DE CITO/PENDENTE DE REGISTRO DE RESULTADO NO PEP', value: displayStats.alertBreakdown['COLETA_CITO'] || 0, objetivo: 'ZERAR', objetivoColor: 'text-amber-700 bg-amber-50 border-amber-200', barColor: 'bg-gradient-to-r from-amber-400 to-amber-600', dotColor: 'bg-amber-500', icon: Clock, glowColor: 'shadow-amber-500/20', ringColor: 'ring-amber-400/30', hoverBorder: 'hover:border-amber-300', iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
+                { key: 'PEP_CITO', label: 'IDENTIFICADO REGISTRO DE RESULTADO DE CITO NO PEP', value: displayStats.alertBreakdown['PEP_CITO'] || 0, objetivo: 'MONITORAR', objetivoColor: 'text-emerald-700 bg-emerald-50 border-emerald-200', barColor: 'bg-gradient-to-r from-emerald-400 to-emerald-600', dotColor: 'bg-emerald-500', icon: CheckCircle, glowColor: 'shadow-emerald-500/20', ringColor: 'ring-emerald-400/30', hoverBorder: 'hover:border-emerald-300', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
+                { key: 'COLETA_MOLECULAR', label: 'IDENTIFICADO TESTE MOLECULAR DNA-HPV - (GAL/MEDIREC)', value: displayStats.alertBreakdown['COLETA_MOLECULAR'] || 0, objetivo: 'AUMENTAR', objetivoColor: 'text-[#9a4b20] bg-[#fb9a61]/10 border-[#fb9a61]/40', barColor: 'bg-gradient-to-r from-[#fb9a61] to-[#e87530]', dotColor: 'bg-[#fb9a61]', icon: TestTube2, glowColor: 'shadow-[#fb9a61]/20', ringColor: 'ring-[#fb9a61]/30', hoverBorder: 'hover:border-[#fb9a61]/50', iconBg: 'bg-[#fb9a61]/15', iconColor: 'text-[#e87530]' },
+                { key: 'PEP_MOLECULAR', label: 'CONFIRMADO O REGISTRO DE RESULTADOS DO TESTE MOLECULAR DNA-HPV NO PEP', value: displayStats.alertBreakdown['PEP_MOLECULAR'] || 0, objetivo: 'AUMENTAR', objetivoColor: 'text-blue-700 bg-blue-50 border-blue-200', barColor: 'bg-gradient-to-r from-blue-400 to-blue-600', dotColor: 'bg-blue-500', icon: BadgeCheck, glowColor: 'shadow-blue-500/20', ringColor: 'ring-blue-400/30', hoverBorder: 'hover:border-blue-300', iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
               ].map((card) => {
-                const pct = stats.totalPacientes > 0 ? Math.round((card.value / stats.totalPacientes) * 100) : 0;
+                const pct = displayStats.totalPacientes > 0 ? Math.round((card.value / displayStats.totalPacientes) * 100) : 0;
                 const isActiveSearch = card.key === 'NAO_IDENTIFICADO';
                 const buscaAtivaValor = isActiveSearch ? acompStats.total : 0;
-                const buscaAtivaPct = isActiveSearch && stats.totalPacientes > 0 ? Math.round((buscaAtivaValor / stats.totalPacientes) * 100) : 0;
+                const buscaAtivaPct = isActiveSearch && displayStats.totalPacientes > 0 ? Math.round((buscaAtivaValor / displayStats.totalPacientes) * 100) : 0;
                 const Icon = card.icon;
 
                 return (
@@ -901,7 +1188,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     {/* Busca Ativa section (only NAO_IDENTIFICADO) */}
                     {isActiveSearch && (() => {
                       const semBuscaValor = card.value - buscaAtivaValor;
-                      const semBuscaPct = stats.totalPacientes > 0 ? Math.round((semBuscaValor / stats.totalPacientes) * 100) : 0;
+                      const semBuscaPct = displayStats.totalPacientes > 0 ? Math.round((semBuscaValor / displayStats.totalPacientes) * 100) : 0;
                       return (
                         <>
                           <div className="mx-5 border-t border-dashed border-slate-200" />

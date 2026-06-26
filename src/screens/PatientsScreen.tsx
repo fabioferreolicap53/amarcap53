@@ -283,6 +283,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           if (data.buscaAtiva !== undefined) setFilterBuscaAtiva(data.buscaAtiva);
           setCurrentPage(1);
         }
+        if (data?.filterGrupo) {
+          setFilterGrupo(data.filterGrupo);
+          setCurrentPage(1);
+        }
         localStorage.removeItem('dashboard:pendingFilter');
       }
     } catch {}
