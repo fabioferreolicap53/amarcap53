@@ -110,6 +110,15 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
   // Estados para Busca e Filtros
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Filtro por paciente vindo do long press (PatientsScreen/FavoritesScreen)
+  const [filterPacienteId, setFilterPacienteId] = useState<string | null>(() => {
+    try {
+      const id = localStorage.getItem('followups:pacienteFilter');
+      if (id) localStorage.removeItem('followups:pacienteFilter');
+      return id;
+    } catch { return null; }
+  });
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [filterTipoBusca, setFilterTipoBusca] = useState<string[]>([]);
@@ -333,6 +342,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         const [regionPatientIds, simNaoPatientIds] = await Promise.all([regionPromise, simNaoPromise]);
 
         const acompFilters = [];
+        // Filtro por paciente específico (vindo do long press)
+        if (filterPacienteId) {
+          acompFilters.push(`paciente = "${filterPacienteId}"`);
+        }
         const regionIdFilter = buildIdFilter(regionPatientIds);
         if (regionIdFilter) acompFilters.push(regionIdFilter);
 
@@ -389,7 +402,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
     fetchAcompanhamentos();
     return () => { cancelled = true; };
-  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, filterUnidade, filterEquipe, filterMicroarea, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal]);
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, filterUnidade, filterEquipe, filterMicroarea, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal, filterPacienteId]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este registro?')) {
@@ -626,6 +639,30 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       
       <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 no-scrollbar">
         <LoadingOverlay visible={isLoading} message="Sincronizando registros..." />
+
+        {/* Barra de filtro de paciente específico (vindo do long press) */}
+        {filterPacienteId && !isLoading && (
+          <div className="mb-6 animate-in fade-in duration-300">
+            <div className="relative bg-gradient-to-br from-[#001b3d] to-[#002b5c] px-5 py-3 rounded-2xl shadow-md border border-white/5 overflow-hidden">
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMiI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMS41Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-40" />
+              <div className="relative z-10 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                  <span className="text-[9px] font-black text-blue-300/60 uppercase tracking-widest">
+                    Acompanhamentos do paciente
+                  </span>
+                </div>
+                <button
+                  onClick={() => setFilterPacienteId(null)}
+                  className="text-[9px] font-black text-blue-300/60 hover:text-white uppercase tracking-widest transition-colors cursor-pointer"
+                >
+                  Limpar filtro
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="max-w-[1600px] mx-auto">
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">

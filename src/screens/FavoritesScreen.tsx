@@ -4,6 +4,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck } from 'lucide-react';
+import { AcompButton } from '../components/AcompButton';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
@@ -1095,17 +1096,16 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                             >
                               <Eye className="w-3.5 h-3.5" /> Detalhes
                             </button>
-                            <button 
-                              onClick={() => handleOpenModal(paciente)}
-                              className="h-10 w-24 bg-[#001b3d] text-white rounded-lg text-[8px] md:text-[9px] font-black uppercase tracking-tight shadow-md transition-all flex items-center justify-center gap-2 relative"
-                            >
-                              <ClipboardList className="w-3.5 h-3.5 text-blue-300" /> Acomp.
-                              {paciente.total_acompanhamentos !== undefined && paciente.total_acompanhamentos > 0 && (
-                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-5 px-1 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-full border-2 border-[#001b3d] shadow-md z-10">
-                                  {paciente.total_acompanhamentos}
-                                </span>
-                              )}
-                            </button>
+                            <AcompButton
+                              paciente={paciente}
+                              onOpenModal={() => handleOpenModal(paciente)}
+                              onLongPress={() => {
+                                if (paciente.total_acompanhamentos && paciente.total_acompanhamentos > 0) {
+                                  localStorage.setItem('followups:pacienteFilter', paciente.id);
+                                  setActiveTab('acompanhamento');
+                                }
+                              }}
+                            />
                           </div>
                         </td>
                         <td className="px-4 py-6 text-center">

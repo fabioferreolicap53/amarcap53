@@ -20,6 +20,7 @@ import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
+import { useDebounce } from '../hooks/useDebounce';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 import { getCanonicalValue } from '../constants/followUpOptions';
 
@@ -268,6 +269,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const [filterUnidade, setFilterUnidade] = useState<string[]>([]);
   const [filterEquipe, setFilterEquipe] = useState<string[]>([]);
   const [filterMicroarea, setFilterMicroarea] = useState<string[]>([]);
+  // Debounce filtros regionais (MultiSelect) — evitam request a cada clique
+  const debouncedFilterUnidade = useDebounce(filterUnidade, 300);
+  const debouncedFilterEquipe = useDebounce(filterEquipe, 300);
+  const debouncedFilterMicroarea = useDebounce(filterMicroarea, 300);
+  // Datas também têm debounce (evita request ao digitar data manualmente)
+  const debouncedFilterDataInicio = useDebounce(filterDataInicio, 500);
+  const debouncedFilterDataFim = useDebounce(filterDataFim, 500);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [selectedGrupo, setSelectedGrupo] = useState<string | null>(null);
   const grupoContainerRef = useRef<HTMLDivElement>(null);
@@ -304,11 +312,33 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   // Filtra stats por grupo selecionado
   const getFilteredStats = (grupo: string | null) => {
     if (!grupo) return stats;
-    const records = loadedRecordsRef.current;
-    if (records.length === 0) return stats;
-    // Filtrar só registros do grupo, aplicar regra de atraso se aplicável
-    const filtered = records.filter((p: any) => p.grupo === grupo);
+    const match = loadedRecordsRef.current.find((r: any) => r.grupo === grupo);
+    if (!match) return stats;
+    // Dado agregado (safeCount) — usa direto
+    if ('total' in match) {
+      const { total, pepMol, coltMol, pepCito, coltCito, atrasadas } = match;
+      const emDia = Math.max(total - atrasadas, 0);
+      return {
+        ...stats,
+        totalPacientes: total,
+        coletasAtrasadas: atrasadas,
+        examesEmDia: emDia,
+        resultadosAlterados: pepMol + coltMol + pepCito + coltCito,
+        coberturaPercent: total > 0 ? Math.round((emDia / total) * 100) : 0,
+        pepMol, coltMol, pepCito, coltCito,
+        alertBreakdown: {
+          PEP_MOLECULAR: pepMol,
+          COLETA_MOLECULAR: coltMol,
+          PEP_CITO: pepCito,
+          COLETA_CITO: coltCito,
+          NAO_IDENTIFICADO: atrasadas,
+        },
+      };
+    }
+    // Dados completos (do fetch principal isScopeQuery) — filtra registros
+    const filtered = loadedRecordsRef.current.filter((p: any) => p.grupo === grupo);
     const total = filtered.length;
+    if (total === 0) return stats;
     const alerts: Record<string, number> = {};
     filtered.forEach((p: any) => {
       let status: string;
@@ -324,47 +354,33 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     const pepCito = alerts['PEP_CITO'] || 0;
     const coltCito = alerts['COLETA_CITO'] || 0;
     const atrasadas = alerts['NAO_IDENTIFICADO'] || 0;
-    const emDia = total - atrasadas;
+    const emDia = Math.max(total - atrasadas, 0);
     return {
       ...stats,
       totalPacientes: total,
       coletasAtrasadas: atrasadas,
-      examesEmDia: Math.max(emDia, 0),
+      examesEmDia: emDia,
       resultadosAlterados: pepMol + coltMol + pepCito + coltCito,
-      coberturaPercent: total > 0 ? Math.round((Math.max(emDia, 0) / total) * 100) : 0,
+      coberturaPercent: total > 0 ? Math.round((emDia / total) * 100) : 0,
       pepMol, coltMol, pepCito, coltCito,
       alertBreakdown: alerts,
     };
   };
-  const displayStats = getFilteredStats(selectedGrupo);
+  const displayStats = stats;
 
   // Lógica de dois cliques nos cards de grupo
-  const handleGrupoClick = async (grupo: string) => {
-    if (selectedGrupo === grupo) {
-      // Segundo clique → navegar para Pacientes
-      localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterGrupo: [grupo] }));
-      setActiveTab('pacientes');
-      return;
-    }
-    // Primeiro clique: buscar registros deste grupo se ainda não carregados
-    const existing = loadedRecordsRef.current;
-    const hasGrupo = existing.some((r: any) => r.grupo === grupo);
-    if (!hasGrupo) {
-      try {
-        const records = await pb.collection('amarcap53_pacientes').getFullList({
-          batch: 500,
-          requestKey: null,
-          fields: 'id,dna_hpv_pep,dna_hpv_gal,cito_pep,cito_lab,grupo',
-          filter: `grupo = "${grupo}"`,
-        });
-        // Merge com registros existentes (não substituir)
-        loadedRecordsRef.current = [...existing, ...records];
-      } catch (err) {
-        console.warn('[grupo] load records error:', err);
+  const handleGrupoClick = (grupo: string, titulo?: string, desc?: string, num?: string) => {
+      if (selectedGrupo === grupo) {
+        // Deriva titulo a partir do nome do grupo se não fornecido
+        const tituloFinal = titulo || `Mulheres de ${grupo} anos`;
+        // Segundo clique → navegar para Pacientes com filtro + descrição completa
+        localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterGrupo: [grupo], grupoNum: num || '', grupoTitulo: tituloFinal, grupoDescricao: desc || '' }));
+        setActiveTab('pacientes');
+        return;
       }
-    }
-    setSelectedGrupo(grupo);
-  };
+      // Primeiro clique: só seleciona o card (sem filtro, sem fetch)
+      setSelectedGrupo(grupo);
+    };
 
   // Click fora do container de grupos → cancela seleção
   useEffect(() => {
@@ -749,7 +765,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
     fetchStats();
     return () => { cancelled = true; };
-  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea]);
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, debouncedFilterDataInicio, debouncedFilterDataFim, debouncedFilterUnidade, debouncedFilterEquipe, debouncedFilterMicroarea]);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-surface">
@@ -949,12 +965,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               orange: { gradient: 'from-orange-600 to-orange-400', bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', ring: 'ring-orange-400/30', glow: 'shadow-orange-500/25', hoverGlow: 'hover:shadow-orange-500/40', hoverBorder: 'hover:border-orange-400', numBg: 'bg-orange-600', numText: 'text-white', iconColor: 'text-orange-500' },
             };
 
-            const allGroups = Object.entries(stats.grupoBreakdown).filter(([k]) => k !== 'NÃO INFORMADO' && k !== '--') as [string, number][];
-            const sortedKeys = allGroups.sort((a, b) => b[1] - a[1]).map(([k]) => k);
+            const allGroups = Object.entries(stats.grupoBreakdown)
+              .filter(([k]) => k !== 'NÃO INFORMADO' && k !== '--')
+              .map(([k, v]) => ({ grupo: k, count: v, titulo: `Mulheres de ${k} anos` }));
+            const sortedKeys = allGroups.sort((a, b) => b.count - a.count).map(g => g.grupo);
 
             // Match DB groups to priority definitions
-            const matched: { grupo: string; count: number; priority: typeof PRIORITY_GROUPS[0]; prioIdx: number }[] = [];
-            const unmatched: { grupo: string; count: number }[] = [];
+            const matched: { grupo: string; count: number; titulo: string; priority: typeof PRIORITY_GROUPS[0]; prioIdx: number }[] = [];
+            const unmatched: { grupo: string; count: number; titulo: string }[] = [];
 
             sortedKeys.forEach(grupo => {
               const prioIdx = PRIORITY_GROUPS.findIndex(p => p.pattern.test(grupo));
@@ -982,7 +1000,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     return (
                       <div
                         key={item.grupo}
-                        onClick={() => handleGrupoClick(item.grupo)}
+                        onClick={() => handleGrupoClick(item.grupo, item.titulo, item.desc, item.num)}
                         className={`group relative bg-white rounded-2xl border-2 ${isSelected ? `${c.border} ring-4 ${c.ring} shadow-xl` : `${c.border} ${c.hoverBorder} shadow-lg ${c.glow} ${c.hoverGlow}`} hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 transition-all duration-500 cursor-pointer overflow-hidden`}
                       >
                         <div className={`h-1 w-full bg-gradient-to-r ${c.gradient} ${isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'} transition-opacity`} />
@@ -1018,7 +1036,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                                   <MousePointerClick className="w-3 h-3 text-white" />
                                 </div>
                                 <span className={`text-[9px] font-black ${c.text} uppercase tracking-wide leading-tight`}>
-                                  Resumo filtrado. <span className={`underline decoration-2 underline-offset-2 decoration-current/30`}>Clique novamente</span> para ver a listagem nominal.
+                                  <span className={`underline decoration-2 underline-offset-2 decoration-current/30`}>Clique novamente</span> para ver a listagem nominal.
                                 </span>
                               </div>
                             </div>
@@ -1028,7 +1046,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                       </div>
                     );
                   })}
-
                   {/* Extra unmatched groups */}
                   {unmatched.map((item, idx) => {
                     const colorName = EXTRA_COLORS[idx % EXTRA_COLORS.length];
@@ -1039,7 +1056,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     return (
                       <div
                         key={item.grupo}
-                        onClick={() => handleGrupoClick(item.grupo)}
+                        onClick={() => handleGrupoClick(item.grupo, item.titulo, item.desc, item.num)}
                         className={`group relative bg-white rounded-2xl border-2 ${isSelected ? `${c.border} ring-4 ${c.ring} shadow-xl` : `${c.border} ${c.hoverBorder} shadow-lg ${c.glow} ${c.hoverGlow}`} hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 transition-all duration-500 cursor-pointer overflow-hidden`}
                       >
                         <div className={`h-1 w-full bg-gradient-to-r ${c.gradient} ${isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'} transition-opacity`} />
@@ -1065,7 +1082,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                           <div className="mt-1 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                             <div className={`h-full bg-gradient-to-r ${c.gradient} rounded-full transition-all duration-700`} style={{ width: `${Math.max(pct, 3)}%` }} />
                           </div>
-                          {/* Indicador de ação quando selecionado */}
+                          {/* Indicador de ação quando selecionado — extras */}
                           {isSelected && (
                             <div className={`relative flex items-center gap-2 px-4 py-3 rounded-xl ${c.bg} border ${c.border} mt-1 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300 overflow-hidden`}>
                               <div className={`absolute inset-0 bg-gradient-to-r ${c.gradient} opacity-[0.06]`} />
@@ -1074,7 +1091,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                                   <MousePointerClick className="w-3 h-3 text-white" />
                                 </div>
                                 <span className={`text-[9px] font-black ${c.text} uppercase tracking-wide leading-tight`}>
-                                  Resumo filtrado. <span className={`underline decoration-2 underline-offset-2 decoration-current/30`}>Clique novamente</span> para ver a listagem nominal.
+                                  <span className={`underline decoration-2 underline-offset-2 decoration-current/30`}>Clique novamente</span> para ver a listagem nominal.
                                 </span>
                               </div>
                             </div>
@@ -1089,29 +1106,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             );
           })()}
 
-          {/* Indicador de grupo ativo (barra sutil) */}
-          {selectedGrupo && (
-            <div className="flex items-center justify-center gap-2 -mt-4 mb-4">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/5 border border-primary/10 text-[9px] font-black text-primary/50 uppercase tracking-widest">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                Resumo filtrado por: {selectedGrupo}
-              </span>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
-            </div>
-          )}
-
-        {/* Grid de Estatísticas Principais - Rastreamento */}
+          {/* Grid de Estatísticas Principais - Rastreamento */}
           <div className="mb-16">
 
             {/* Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-5">
               {[
-                { key: 'NAO_IDENTIFICADO', label: 'NÃO IDENTIFICADO COLETA OU RESULTADO DE EXAME DE RASTREAMENTO', value: displayStats.alertBreakdown['NAO_IDENTIFICADO'] || 0, objetivo: 'DIMINUIR', objetivoColor: 'text-rose-700 bg-rose-50 border-rose-200', barColor: 'bg-gradient-to-r from-rose-400 to-rose-600', dotColor: 'bg-rose-500', icon: CircleOff, glowColor: 'shadow-rose-500/20', ringColor: 'ring-rose-400/30', hoverBorder: 'hover:border-rose-300', iconBg: 'bg-rose-100', iconColor: 'text-rose-600' },
-                { key: 'COLETA_CITO', label: 'IDENTIFICADO COLETA DE CITO/PENDENTE DE REGISTRO DE RESULTADO NO PEP', value: displayStats.alertBreakdown['COLETA_CITO'] || 0, objetivo: 'ZERAR', objetivoColor: 'text-amber-700 bg-amber-50 border-amber-200', barColor: 'bg-gradient-to-r from-amber-400 to-amber-600', dotColor: 'bg-amber-500', icon: Clock, glowColor: 'shadow-amber-500/20', ringColor: 'ring-amber-400/30', hoverBorder: 'hover:border-amber-300', iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
-                { key: 'PEP_CITO', label: 'IDENTIFICADO REGISTRO DE RESULTADO DE CITO NO PEP', value: displayStats.alertBreakdown['PEP_CITO'] || 0, objetivo: 'MONITORAR', objetivoColor: 'text-emerald-700 bg-emerald-50 border-emerald-200', barColor: 'bg-gradient-to-r from-emerald-400 to-emerald-600', dotColor: 'bg-emerald-500', icon: CheckCircle, glowColor: 'shadow-emerald-500/20', ringColor: 'ring-emerald-400/30', hoverBorder: 'hover:border-emerald-300', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
-                { key: 'COLETA_MOLECULAR', label: 'IDENTIFICADO TESTE MOLECULAR DNA-HPV - (GAL/MEDIREC)', value: displayStats.alertBreakdown['COLETA_MOLECULAR'] || 0, objetivo: 'AUMENTAR', objetivoColor: 'text-[#9a4b20] bg-[#fb9a61]/10 border-[#fb9a61]/40', barColor: 'bg-gradient-to-r from-[#fb9a61] to-[#e87530]', dotColor: 'bg-[#fb9a61]', icon: TestTube2, glowColor: 'shadow-[#fb9a61]/20', ringColor: 'ring-[#fb9a61]/30', hoverBorder: 'hover:border-[#fb9a61]/50', iconBg: 'bg-[#fb9a61]/15', iconColor: 'text-[#e87530]' },
-                { key: 'PEP_MOLECULAR', label: 'CONFIRMADO O REGISTRO DE RESULTADOS DO TESTE MOLECULAR DNA-HPV NO PEP', value: displayStats.alertBreakdown['PEP_MOLECULAR'] || 0, objetivo: 'AUMENTAR', objetivoColor: 'text-blue-700 bg-blue-50 border-blue-200', barColor: 'bg-gradient-to-r from-blue-400 to-blue-600', dotColor: 'bg-blue-500', icon: BadgeCheck, glowColor: 'shadow-blue-500/20', ringColor: 'ring-blue-400/30', hoverBorder: 'hover:border-blue-300', iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
+                { key: 'NAO_IDENTIFICADO', label: 'NÃO IDENTIFICADO COLETA OU RESULTADO DE EXAME DE RASTREAMENTO', descricao: 'Pacientes que nunca realizaram ou não possuem registro de exame de rastreamento citopatológico', value: displayStats.alertBreakdown['NAO_IDENTIFICADO'] || 0, objetivo: 'DIMINUIR', objetivoColor: 'text-rose-700 bg-rose-50 border-rose-200', barColor: 'bg-gradient-to-r from-rose-400 to-rose-600', dotColor: 'bg-rose-500', icon: CircleOff, glowColor: 'shadow-rose-500/20', ringColor: 'ring-rose-400/30', hoverBorder: 'hover:border-rose-300', iconBg: 'bg-rose-100', iconColor: 'text-rose-600' },
+                { key: 'COLETA_CITO', label: 'IDENTIFICADO COLETA DE CITO/PENDENTE DE REGISTRO DE RESULTADO NO PEP', descricao: 'Coleta realizada mas resultado ainda não registrado no sistema PEP', value: displayStats.alertBreakdown['COLETA_CITO'] || 0, objetivo: 'ZERAR', objetivoColor: 'text-amber-700 bg-amber-50 border-amber-200', barColor: 'bg-gradient-to-r from-amber-400 to-amber-600', dotColor: 'bg-amber-500', icon: Clock, glowColor: 'shadow-amber-500/20', ringColor: 'ring-amber-400/30', hoverBorder: 'hover:border-amber-300', iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
+                { key: 'PEP_CITO', label: 'IDENTIFICADO REGISTRO DE RESULTADO DE CITO NO PEP', descricao: 'Resultado de exame citopatológico já registrado e disponível no PEP', value: displayStats.alertBreakdown['PEP_CITO'] || 0, objetivo: 'MONITORAR', objetivoColor: 'text-emerald-700 bg-emerald-50 border-emerald-200', barColor: 'bg-gradient-to-r from-emerald-400 to-emerald-600', dotColor: 'bg-emerald-500', icon: CheckCircle, glowColor: 'shadow-emerald-500/20', ringColor: 'ring-emerald-400/30', hoverBorder: 'hover:border-emerald-300', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
+                { key: 'COLETA_MOLECULAR', label: 'IDENTIFICADO TESTE MOLECULAR DNA-HPV - (GAL/MEDIREC)', descricao: 'Coleta de material para teste molecular DNA-HPV realizada via GAL/MEDIREC', value: displayStats.alertBreakdown['COLETA_MOLECULAR'] || 0, objetivo: 'AUMENTAR', objetivoColor: 'text-[#9a4b20] bg-[#fb9a61]/10 border-[#fb9a61]/40', barColor: 'bg-gradient-to-r from-[#fb9a61] to-[#e87530]', dotColor: 'bg-[#fb9a61]', icon: TestTube2, glowColor: 'shadow-[#fb9a61]/20', ringColor: 'ring-[#fb9a61]/30', hoverBorder: 'hover:border-[#fb9a61]/50', iconBg: 'bg-[#fb9a61]/15', iconColor: 'text-[#e87530]' },
+                { key: 'PEP_MOLECULAR', label: 'CONFIRMADO O REGISTRO DE RESULTADOS DO TESTE MOLECULAR DNA-HPV NO PEP', descricao: 'Resultado do teste molecular DNA-HPV confirmado e registrado no PEP', value: displayStats.alertBreakdown['PEP_MOLECULAR'] || 0, objetivo: 'AUMENTAR', objetivoColor: 'text-blue-700 bg-blue-50 border-blue-200', barColor: 'bg-gradient-to-r from-blue-400 to-blue-600', dotColor: 'bg-blue-500', icon: BadgeCheck, glowColor: 'shadow-blue-500/20', ringColor: 'ring-blue-400/30', hoverBorder: 'hover:border-blue-300', iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
               ].map((card) => {
                 const pct = displayStats.totalPacientes > 0 ? Math.round((card.value / displayStats.totalPacientes) * 100) : 0;
                 const isActiveSearch = card.key === 'NAO_IDENTIFICADO';
@@ -1123,7 +1128,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                   <div
                     key={card.key}
                     onClick={() => {
-                      localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterStatus: [card.key] }));
+                      localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterStatus: [card.key], grupoTitulo: card.label || '', grupoDescricao: card.descricao || '' }));
                       setActiveTab('pacientes');
                     }}
                     className={`group bg-white rounded-3xl shadow-lg ${card.glowColor} hover:shadow-2xl hover:${card.glowColor} border border-slate-200/80 ${card.hoverBorder} transition-all duration-500 flex flex-col overflow-hidden cursor-pointer hover:scale-[1.03] hover:-translate-y-1`}
@@ -1197,7 +1202,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                             <div
                               onClick={(e) => {
                                 e.stopPropagation();
-                                localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterStatus: [card.key], buscaAtiva: true }));
+                                localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterStatus: [card.key], buscaAtiva: true, grupoTitulo: card.label || '', grupoDescricao: card.descricao || '' }));
                                 setActiveTab('pacientes');
                               }}
                               className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-2xl p-3 border border-emerald-200/60 shadow-sm cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all duration-300 hover:scale-[1.03]"
@@ -1220,7 +1225,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                             <div
                               onClick={(e) => {
                                 e.stopPropagation();
-                                localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterStatus: [card.key], buscaAtiva: false }));
+                                localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterStatus: [card.key], buscaAtiva: false, grupoTitulo: card.label || '', grupoDescricao: card.descricao || '' }));
                                 setActiveTab('pacientes');
                               }}
                               className="bg-gradient-to-br from-rose-50 to-rose-100/50 rounded-2xl p-3 border border-rose-200/60 shadow-sm cursor-pointer hover:shadow-md hover:border-rose-300 transition-all duration-300 hover:scale-[1.03]"

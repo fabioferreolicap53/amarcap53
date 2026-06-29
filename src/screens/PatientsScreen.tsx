@@ -3,13 +3,16 @@ import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck, Upload } from 'lucide-react';
+import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck, Upload, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import Papa from 'papaparse';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { MultiSelect } from '../components/MultiSelect';
 import { SingleSelect } from '../components/SingleSelect';
+import { useDebounce } from '../hooks/useDebounce';
+import { useLongPress } from '../hooks/useLongPress';
+import { AcompButton } from '../components/AcompButton';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 import {
   TIPO_BUSCA_OPTIONS,
@@ -244,10 +247,17 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   };
 
   const _patInit = getPatCache();
-  const [pacientes, setPacientes] = useState<Paciente[]>(_patInit?.pacientes ?? []);
+  // Se veio do Dashboard com pending filter, ignora cache — tabela começa vazia
+  const _pfHasFilter = (() => {
+    try {
+      const raw = localStorage.getItem('dashboard:pendingFilter');
+      return !!raw;
+    } catch { return false; }
+  })();
+  const [pacientes, setPacientes] = useState<Paciente[]>(_pfHasFilter ? [] : (_patInit?.pacientes ?? []));
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(_patInit?.totalItems ?? 0);
+  const [totalItems, setTotalItems] = useState(_pfHasFilter ? 0 : (_patInit?.totalItems ?? 0));
   const [hasClientSideFilter, setHasClientSideFilter] = useState(false);
   const pageSize = 10;
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -269,29 +279,58 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
   // Estados para Busca e Filtros
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 400); // 400ms após última tecla
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const [filterBuscaAtiva, setFilterBuscaAtiva] = useState<boolean | null>(null);
+  const [filterGrupo, setFilterGrupo] = useState<string[]>([]);
 
-  // Read pending filter from Dashboard cards navigation
-  useEffect(() => {
+  // PendingFilter do Dashboard
+  const [pfData, setPfData] = useState<any>(() => {
     try {
       const raw = localStorage.getItem('dashboard:pendingFilter');
       if (raw) {
-        const data = JSON.parse(raw);
-        if (data?.filterStatus) {
-          setFilterStatus(data.filterStatus);
-          if (data.buscaAtiva !== undefined) setFilterBuscaAtiva(data.buscaAtiva);
-          setCurrentPage(1);
-        }
-        if (data?.filterGrupo) {
-          setFilterGrupo(data.filterGrupo);
-          setCurrentPage(1);
-        }
         localStorage.removeItem('dashboard:pendingFilter');
+        return JSON.parse(raw);
       }
     } catch {}
-  }, []);
-  const [filterGrupo, setFilterGrupo] = useState<string[]>([]);
+    return null;
+  });
+
+  // Relê quando activeTab muda pra 'pacientes' (componente pode re-renderizar sem remontar)
+  const prevTabRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevTabRef.current === activeTab) return;
+    prevTabRef.current = activeTab;
+    if (activeTab === 'pacientes') {
+      try {
+        const raw = localStorage.getItem('dashboard:pendingFilter');
+        if (raw) {
+          setPfData(JSON.parse(raw));
+          localStorage.removeItem('dashboard:pendingFilter');
+        }
+      } catch {}
+    } else {
+      setPfData(null);
+    }
+  }, [activeTab]);
+
+  // Deriva titulo/descricao a partir do nome do grupo (regex flexível)
+  const GRUPO_PATTERNS: { pattern: RegExp; num: string; titulo: string; desc: string }[] = [
+    { pattern: /30.*49|49.*30/i, num: '1º', titulo: 'Mulheres de 30 a 49 anos', desc: 'com atraso no rastreamento com o exame citopatológico (mais de 3 anos) ou que nunca o realizaram' },
+    { pattern: /50.*6[0-4]|6[0-4].*50/i, num: '2º', titulo: 'Mulheres de 50 a 64 anos', desc: 'com atraso no rastreamento com o exame citopatológico (mais de 3 anos) ou que nunca o realizaram' },
+    { pattern: /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i, num: '3º', titulo: 'Mulheres de 65+ anos', desc: 'independente da história anterior de rastreamento com exame citopatológico' },
+    { pattern: /25.*29|29.*25/i, num: '4º', titulo: 'Mulheres de 25 a 29 anos', desc: 'que nunca fizeram o exame citopatológico' },
+  ];
+
+  const pendingGrupo = pfData?.filterGrupo?.[0] || '';
+  const infoDoGrupo = pendingGrupo ? GRUPO_PATTERNS.find(p => p.pattern.test(pendingGrupo)) || null : null;
+
+  // Usa dados do pfData se disponíveis, senão deriva do nome do grupo
+  const pendingLabel = pendingGrupo || (pfData?.filterStatus?.[0] && ALERT_CONFIGS[pfData.filterStatus[0]]?.label) || '';
+  const pendingGrupoNum = pfData?.grupoNum || infoDoGrupo?.num || '';
+  const pendingGrupoTitulo = pfData?.grupoTitulo || infoDoGrupo?.titulo || (pendingGrupo ? `Mulheres de ${pendingGrupo} anos` : '');
+  const pendingGrupoDescricao = pfData?.grupoDescricao || infoDoGrupo?.desc || '';
+
   const [filterTipoBusca, setFilterTipoBusca] = useState<string[]>([]);
   const [filterTipoContato, setFilterTipoContato] = useState<string[]>([]);
   const [filterSituacao, setFilterSituacao] = useState<string[]>([]);
@@ -449,6 +488,23 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+
+  // Aplica filtros pendentes do Dashboard (roda quando activeTab muda pra 'pacientes')
+  const [filtersReady, setFiltersReady] = useState(true);
+  useEffect(() => {
+    if (!pfData) return;
+    if (pfData.filterStatus) {
+      setFilterStatus(pfData.filterStatus);
+      if (pfData.buscaAtiva !== undefined) setFilterBuscaAtiva(pfData.buscaAtiva);
+    }
+    if (pfData.filterGrupo) {
+      setFilterGrupo(pfData.filterGrupo);
+    }
+    setCurrentPage(1);
+    localStorage.removeItem('dashboard:pendingFilter');
+    setFiltersReady(false);
+    requestAnimationFrame(() => setFiltersReady(true));
+  }, [activeTab]);
 
   const handleOpenDetails = (paciente: Paciente) => {
     setPatientDetails(paciente);
@@ -667,10 +723,15 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     setCurrentPage(1);
   }, [searchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal]);
 
+  // Versão do fetch — previne race condition (fetch antigo não fecha loading)
+  const fetchVersionRef = useRef(0);
+
   useEffect(() => {
     let cancelled = false;
     const fetchPacientes = async () => {
       if (!user) return;
+      if (!filtersReady) return; // espera filtros serem aplicados
+      const version = ++fetchVersionRef.current;
       try {
         setIsLoading(true);
         const options: any = { sort: 'nome' };
@@ -942,19 +1003,23 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         });
 
 
+        if (cancelled) return; // fetch antigo — ignora dados
         setPacientes(pacientesFormatados);
         setTotalItems(resultList.totalItems);
         setPatCache({ pacientes: pacientesFormatados, totalItems: resultList.totalItems });
       } catch (error) {
         console.error("Erro ao buscar pacientes:", error);
       } finally {
-        setIsLoading(false);
+        // Só fecha loading se este fetch for o mais recente
+        if (!cancelled && fetchVersionRef.current === version) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchPacientes();
     return () => { cancelled = true; };
-  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, searchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal]);
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, debouncedSearchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal, filtersReady]);
 
   // CSV Import handlers
   const convertDateToISO = (value: string): string => {
@@ -1462,6 +1527,95 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             )}
           </div>
 
+          {/* Banner premium: filtragem do Dashboard */}
+          {pendingLabel && isLoading && (
+            <div className="relative bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-8 md:p-10 rounded-3xl shadow-2xl mb-8 overflow-hidden">
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMS41Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-60" />
+              <div className="absolute -top-16 -right-16 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl" />
+              <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-violet-500/10 rounded-full blur-3xl" />
+              <div className="relative z-10 flex flex-col items-center gap-5 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center ring-1 ring-white/20 shadow-inner">
+                  <Loader2 className="w-8 h-8 text-white animate-spin" strokeWidth={2.5} />
+                </div>
+                <div>
+                  <h3 className="text-white text-lg md:text-xl font-black tracking-tight uppercase mb-2">
+                    Carregando pacientes
+                  </h3>
+                  {pendingGrupoTitulo && (
+                    <p className="text-blue-300 text-sm md:text-base font-bold uppercase tracking-wide mb-1 max-w-[600px]">
+                      {pendingGrupoTitulo}
+                    </p>
+                  )}
+                  {pendingGrupoDescricao && (
+                    <p className="text-blue-200/60 text-[11px] md:text-xs font-medium tracking-wide mb-1 max-w-[600px] italic">
+                      {pendingGrupoDescricao}
+                    </p>
+                  )}
+                  {!pendingGrupoTitulo && (
+                    <p className="text-blue-300 text-xs md:text-sm font-bold uppercase tracking-wide mb-1 max-w-[600px]">
+                      {pendingLabel}
+                    </p>
+                  )}
+                  <p className="text-white/50 text-[10px] md:text-[11px] font-medium tracking-wide mt-2">
+                    Aplicando filtros de rastreamento aguarde um momento...
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse [animation-delay:200ms]" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse [animation-delay:400ms]" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Badge: filtro ativo — exibição completa (pós carregamento) */}
+          {!isLoading && pendingLabel && (
+            <div className="mb-5 animate-in fade-in duration-300">
+              <div className="relative bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-4 md:p-5 rounded-2xl shadow-lg border border-white/5 overflow-hidden">
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMiI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMS41Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-40" />
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl" />
+                <div className="relative z-10 flex flex-col gap-3">
+                  {/* Linha 1: badge + numero grupo */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                      <span className="text-[9px] font-black text-blue-300/60 uppercase tracking-widest">
+                        Filtro ativo
+                      </span>
+                    </div>
+                    {pendingGrupoNum && (
+                      <>
+                        <div className="w-px h-4 bg-white/10" />
+                        <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-lg bg-blue-500/20 border border-blue-400/30 text-[10px] font-black text-blue-300 uppercase tracking-wide">
+                          {pendingGrupoNum}º Grupo
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {/* Linha 2: titulo do grupo */}
+                  {pendingGrupoTitulo && (
+                    <p className="text-blue-200 text-sm md:text-base font-black uppercase tracking-wide leading-snug">
+                      {pendingGrupoTitulo}
+                    </p>
+                  )}
+                  {/* Linha 3: descricao detalhada */}
+                  {pendingGrupoDescricao && (
+                    <p className="text-blue-300/50 text-[11px] md:text-xs font-medium tracking-wide leading-relaxed">
+                      {pendingGrupoDescricao}
+                    </p>
+                  )}
+                  {/* Fallback: só pendingLabel (status cards) */}
+                  {!pendingGrupoTitulo && (
+                    <p className="text-blue-200 text-xs md:text-sm font-bold uppercase tracking-wide">
+                      {pendingLabel}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-[0px_20px_50px_rgba(0,0,0,0.06)] border border-outline-variant/15 relative">
             <div className="w-full overflow-x-auto custom-scrollbar-horizontal">
               <table className="w-full text-center border-collapse">
@@ -1605,19 +1759,16 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                               <span>Detalhes</span>
                             </button>
 
-                            <button 
-                              onClick={() => handleOpenModal(paciente)}
-                              className="h-10 w-24 bg-[#001b3d] hover:bg-[#002b5c] text-white rounded-lg text-[8px] md:text-[9px] font-black uppercase tracking-tight shadow-md shadow-blue-900/15 transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 border border-white/10 hover:shadow-lg hover:shadow-blue-900/20 hover:-translate-y-0.5 relative"
-                              title="Acompanhamento"
-                            >
-                              <ClipboardList className="w-3.5 h-3.5 text-blue-300" />
-                              <span>Acomp.</span>
-                              {paciente.total_acompanhamentos !== undefined && paciente.total_acompanhamentos > 0 && (
-                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-5 px-1 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-full border-2 border-[#001b3d] shadow-md z-10">
-                                  {paciente.total_acompanhamentos}
-                                </span>
-                              )}
-                            </button>
+                            <AcompButton
+                              paciente={paciente}
+                              onOpenModal={() => handleOpenModal(paciente)}
+                              onLongPress={() => {
+                                if (paciente.total_acompanhamentos && paciente.total_acompanhamentos > 0) {
+                                  localStorage.setItem('followups:pacienteFilter', paciente.id);
+                                  setActiveTab('acompanhamento');
+                                }
+                              }}
+                            />
                           </div>
                         </td>
 
