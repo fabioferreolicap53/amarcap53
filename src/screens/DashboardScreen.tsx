@@ -230,7 +230,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const { user, isAdmin } = useAuth();
 
   // Cache localStorage (evita full table scan repetido)
-  const STATS_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+  const STATS_CACHE_TTL = 30 * 60 * 1000; // 30 minutos (evita flash ao recarregar)
   const getCache = (key: string) => {
     try {
       const raw = localStorage.getItem(key);
@@ -246,8 +246,25 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const STATS_CACHE_KEY = `dash_stats_cache_${user?.id}`;
   const ACOMP_CACHE_KEY = `dash_acomp_cache_${user?.id}`;
 
-  const _sInit = getCache(STATS_CACHE_KEY);
-  const [stats, setStats] = useState(_sInit ?? {
+  // Inicializa estados do cache de forma síncrona (sem useEffect)
+  const _ac = user?.id ? getCache(ACOMP_CACHE_KEY) : null;
+  const _sc = user?.id ? getCache(STATS_CACHE_KEY) : null;
+
+  // Se cache expirou, usa valores antigos do localStorage como fallback
+  const _acOld = _ac ?? (() => { try { const raw = localStorage.getItem(ACOMP_CACHE_KEY); return raw ? JSON.parse(raw)?.data ?? null : null; } catch { return null; } })();
+  const _scOld = _sc ?? (() => { try { const raw = localStorage.getItem(STATS_CACHE_KEY); return raw ? JSON.parse(raw)?.data ?? null : null; } catch { return null; } })();
+
+  // Migração: descarta cache antigo (chaves de filteredGroupCounts mudaram de padrão para nome real)
+  const CACHE_VERSION_KEY = 'dash_cache_version';
+  const CURRENT_CACHE_VERSION = 3;
+  const storedVersion = (() => { try { return Number(localStorage.getItem(CACHE_VERSION_KEY)) || 0; } catch { return 0; } })();
+  if (storedVersion < CURRENT_CACHE_VERSION) {
+    localStorage.setItem(CACHE_VERSION_KEY, String(CURRENT_CACHE_VERSION));
+    if (_acOld) _acOld.filteredGroupCounts = {};
+    if (_ac) _ac.filteredGroupCounts = {};
+  }
+
+  const [stats, setStats] = useState(_scOld ?? _sc ?? {
     totalPacientes: 0,
     coletasAtrasadas: 0,
     examesEmDia: 0,
@@ -261,7 +278,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     grupoBreakdown: {} as Record<string, number>,
     examVolume: { cito: 0, hpv: 0, pendente: 0 },
     examTrend: [] as { month: string; cito: number; hpv: number }[],
-    acompTrend: [] as { month: string; total: number }[]
+    acompTrend: [] as { month: string; total: number }[],
+    comBuscaMap: {} as Record<string, number>
   });
 
   const [filterDataInicio, setFilterDataInicio] = useState('');
@@ -278,12 +296,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const debouncedFilterDataFim = useDebounce(filterDataFim, 500);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [selectedGrupo, setSelectedGrupo] = useState<string | null>(null);
+  const [filterBuscaAtiva, setFilterBuscaAtiva] = useState<boolean | undefined>(undefined);
+  const [grupoDataInicio, setGrupoDataInicio] = useState('');
+  const [grupoDataFim, setGrupoDataFim] = useState('');
+  const [grupoBuscaStats, setGrupoBuscaStats] = useState<{ comBusca: number; semBusca: number } | null>(null);
+  const [isLoadingPrioCounts, setIsLoadingPrioCounts] = useState(true);
   const grupoContainerRef = useRef<HTMLDivElement>(null);
   const loadedRecordsRef = useRef<any[]>([]);
+  const comBuscaMapRef = useRef<Record<string, number>>(_acOld?.comBuscaMap ?? {});
+  const [filteredComBuscaMap, setFilteredComBuscaMap] = useState<Record<string, number>>(_acOld?.filteredComBuscaMap ?? {});
+  const grupoBreakdownRef = useRef<Record<string, number>>(_scOld?.grupoBreakdown ?? {});
+  const [filteredGroupCounts, setFilteredGroupCounts] = useState<Record<string, number>>(_acOld?.filteredGroupCounts ?? {});
   const [isLoading, setIsLoading] = useState(true);
-
-  const _aInit = getCache(ACOMP_CACHE_KEY);
-  const [acompStats, setAcompStats] = useState(_aInit?.acompStats ?? {
+  const [acompStats, setAcompStats] = useState(_acOld?.acompStats ?? {
     total: 0,
     sucesso: 0,
     contatos: 0,
@@ -369,30 +394,205 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const displayStats = stats;
 
   // Lógica de dois cliques nos cards de grupo
-  const handleGrupoClick = (grupo: string, titulo?: string, desc?: string, num?: string) => {
-      if (selectedGrupo === grupo) {
-        // Deriva titulo a partir do nome do grupo se não fornecido
-        const tituloFinal = titulo || `Mulheres de ${grupo} anos`;
-        // Segundo clique → navegar para Pacientes com filtro + descrição completa
-        localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterGrupo: [grupo], grupoNum: num || '', grupoTitulo: tituloFinal, grupoDescricao: desc || '' }));
-        setActiveTab('pacientes');
-        return;
-      }
-      // Primeiro clique: só seleciona o card (sem filtro, sem fetch)
+  const handleGrupoClick = (grupo: string) => {
+      if (selectedGrupo === grupo) { setSelectedGrupo(null); return; }
       setSelectedGrupo(grupo);
+      setFilterBuscaAtiva(undefined);
+      setGrupoBuscaStats(null);
     };
+
+  // Debounce datas do card de grupo
+  const debouncedGrupoDataInicio = useDebounce(grupoDataInicio, 500);
+  const debouncedGrupoDataFim = useDebounce(grupoDataFim, 500);
+
+  // Stats de busca por grupo: instantâneo via refs, ou query leve com datas
+  const hasOneDateOnly = (debouncedGrupoDataInicio && !debouncedGrupoDataFim) || (!debouncedGrupoDataInicio && debouncedGrupoDataFim);
+  useEffect(() => {
+    if (!selectedGrupo) { setGrupoBuscaStats(null); return; }
+
+    // APENAS 1 campo data preenchido → espera (skeleton)
+    if (hasOneDateOnly) {
+      setGrupoBuscaStats(null);
+      return;
+    }
+
+    // SEM datas custom → skeleton por 400ms, depois dados instantâneos
+    if (!debouncedGrupoDataInicio && !debouncedGrupoDataFim) {
+      const timer = setTimeout(() => {
+        const totalGrupo = filteredGroupCounts?.[selectedGrupo] ?? (grupoBreakdownRef.current?.[selectedGrupo] || 0);
+        const comBusca = filteredComBuscaMap[selectedGrupo] ?? (comBuscaMapRef.current?.[selectedGrupo] || 0);
+        setGrupoBuscaStats({ comBusca, semBusca: Math.max(totalGrupo - comBusca, 0) });
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+
+    // COM datas custom → busca robusta: 1) todos acompanhamentos 2) cruza com pacientes do grupo
+    let cancelled = false;
+    setGrupoBuscaStats(null); // mantém skeleton
+    const fetchWithDates = async () => {
+      try {
+        const dInicio = debouncedGrupoDataInicio || '';
+        const dFim = debouncedGrupoDataFim || '';
+
+        // Helper: extrair YYYY-MM-DD de qualquer formato
+        const toISODate = (val: string): string => {
+          if (!val) return '';
+          const m = val.match(/^(\d{4}-\d{2}-\d{2})/);
+          return m ? m[1] : '';
+        };
+
+        // Helper: verificar se paciente pertence ao grupo etário
+        // NOTA: para "com busca", NÃO verificamos cito — o paciente FOI acompanhado,
+        // independently de ter cito preenchido (pode ter sido preenchido DEPOIS da busca)
+        const isInGrupo = (pac: any): boolean => {
+          return pac.grupo === selectedGrupo;
+        };
+
+        // Helper: busca paginada robusta (igual paginatedFetch do fetchStats)
+        const paginatedFetch = async (collection: string, fields: string, filter?: string): Promise<any[]> => {
+          const results: any[] = [];
+          let page = 1;
+          const perPage = 500;
+          let hasMore = true;
+          while (hasMore && !cancelled) {
+            try {
+              const opts: any = { page, perPage, fields, requestKey: null, batch: perPage };
+              if (filter) opts.filter = filter;
+              const result = await pb.collection(collection).getList(page, perPage, opts);
+              results.push(...result.items);
+              hasMore = page < result.totalPages;
+              page++;
+            } catch { hasMore = false; }
+          }
+          return results;
+        };
+
+        // 1. Buscar TODOS acompanhamentos (~5K, leve)
+        const allAcomp = await paginatedFetch('amarcap53_acompanhamentos', 'paciente,data_busca');
+        if (cancelled) return;
+
+        // 2. Filtrar por data no intervalo + extrair IDs únicos
+        const pacIdsNoPeriodo = new Set<string>();
+        for (const r of allAcomp) {
+          if (!r.paciente) continue;
+          const dataBusca = toISODate(r.data_busca || '');
+          if (dInicio && dataBusca < dInicio) continue;
+          if (dFim && dataBusca > dFim) continue;
+          pacIdsNoPeriodo.add(r.paciente);
+        }
+
+        if (pacIdsNoPeriodo.size === 0) {
+          if (!cancelled) {
+            // Total COM filtro cito: consistente com a contagem exibida no card
+            const totalGrupo = filteredGroupCounts?.[selectedGrupo] ?? (grupoBreakdownRef.current?.[selectedGrupo] || 0);
+            setGrupoBuscaStats({ comBusca: 0, semBusca: totalGrupo });
+          }
+          return;
+        }
+
+        // 3. IDs únicos de pacientes com acompanhamento no período
+        const pacIdsComBusca = [...pacIdsNoPeriodo];
+
+        // 4. Buscar esses pacientes em batch para verificar grupo + cito
+        const pacMap = new Map<string, any>();
+        const batchSize = 200;
+        for (let i = 0; i < pacIdsComBusca.length && !cancelled; i += batchSize) {
+          const chunk = pacIdsComBusca.slice(i, i + batchSize);
+          const idFilter = `(${chunk.map(id => `id = "${id}"`).join(' || ')})`;
+          try {
+            const pacs = await paginatedFetch('amarcap53_pacientes', 'id,grupo,cito_pep,cito_lab', idFilter);
+            pacs.forEach(p => pacMap.set(p.id, p));
+          } catch { /* skip batch */ }
+        }
+        if (cancelled) return;
+
+        // 5. Filtrar: só pacientes do grupo (com regras de cito)
+        const comBuscaSet = new Set<string>();
+        for (const pacId of pacIdsComBusca) {
+          const pac = pacMap.get(pacId);
+          if (!pac || !isInGrupo(pac)) continue;
+          comBuscaSet.add(pacId);
+        }
+
+        // 6. Total do grupo COM filtro cito (consistente com a contagem exibida no card)
+        const totalGrupo = filteredGroupCounts?.[selectedGrupo] ?? (grupoBreakdownRef.current?.[selectedGrupo] || 0);
+        if (!cancelled) setGrupoBuscaStats({ comBusca: comBuscaSet.size, semBusca: totalGrupo - comBuscaSet.size });
+      } catch { if (!cancelled) setGrupoBuscaStats(null); }
+    };
+    fetchWithDates();
+    return () => { cancelled = true; };
+  }, [selectedGrupo, debouncedGrupoDataInicio, debouncedGrupoDataFim, stats, filteredGroupCounts, filteredComBuscaMap]);
 
   // Click fora do container de grupos → cancela seleção
   useEffect(() => {
     if (!selectedGrupo) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (grupoContainerRef.current && !grupoContainerRef.current.contains(e.target as Node)) {
-        setSelectedGrupo(null);
-      }
+      const target = e.target as HTMLElement;
+      // Ignora clicks na portal do datepicker
+      if (target.closest('.datepicker-portal-content')) return;
+      // Ignora clicks dentro do container de grupos (cards, inputs, botões)
+      if (grupoContainerRef.current && grupoContainerRef.current.contains(target)) return;
+      // Ignora clicks em qualquer input/button/label/svg (datepickers, ícones, etc)
+      if (target.closest('input, button, label, svg, [role="button"]')) return;
+      setSelectedGrupo(null);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [selectedGrupo]);
+
+  // Queries leves: popula grupoBreakdown + filteredGroupCounts RAPIDAMENTE (3 queries ~100ms cada)
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+
+    // Filtro base por role (mesmo lógico do fetchStats)
+    const fp: string[] = [];
+    if (!isAdmin) {
+      if (user.role === 'unidade') fp.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
+      else if (user.role === 'equipe') fp.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%'), e: normalizeText(user.equipe).replace(/\s+/g, '%') }));
+      else if (user.role === 'microarea') {
+        fp.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%'), e: normalizeText(user.equipe).replace(/\s+/g, '%') }));
+        fp.push(`microarea = ${Number(user.microarea)}`);
+      }
+    }
+    const bf = fp.length > 0 ? fp.join(' && ') : '';
+
+    const prio = [
+      { g: '30-49', cf: 'cito_pep = ""' },
+      { g: '50-64', cf: 'cito_pep = ""' },
+      { g: '25-29', cf: 'cito_pep = "" && cito_lab = ""' },
+    ];
+
+    (async () => {
+      // 1 query leve: descobre nomes reais dos grupos (500 registros, campo reduzido)
+      const groupNames = new Set<string>();
+      try {
+        const sample = await pb.collection('amarcap53_pacientes').getList(1, 500, {
+          filter: bf || undefined, fields: 'grupo', requestKey: null,
+        });
+        sample.items.forEach((r: any) => { if (r.grupo) groupNames.add(r.grupo); });
+      } catch { return; }
+      if (cancelled) return;
+
+      // Para cada grupo prioritário, conta filtrado (em paralelo) usando nome REAL
+      const counts: Record<string, number> = {};
+      await Promise.all([...groupNames].map(async (g) => {
+        const matchedPrio = prio.find(p => new RegExp(p.g.replace('-', '.*'), 'i').test(g));
+        if (!matchedPrio) return;
+        try {
+          const fF = bf ? `${bf} && grupo = "${g}" && ${matchedPrio.cf}` : `grupo = "${g}" && ${matchedPrio.cf}`;
+          const rF = await pb.collection('amarcap53_pacientes').getList(1, 1, { filter: fF, fields: 'id', requestKey: null });
+          counts[g] = rF.totalItems;
+        } catch { /* ignora */ }
+      }));
+      if (!cancelled) {
+        if (Object.keys(counts).length > 0) setFilteredGroupCounts(counts);
+        setIsLoadingPrioCounts(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin]);
 
   const toValidDate = (value: any) => {
     if (!hasValue(value)) return null;
@@ -483,14 +683,28 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         let scopedPatientIds: string[] = [];
         let loadedRecords: any[] = [];
 
+        // Helper: paginated fetch genérico
+        const paginatedFetch = async (collection: string, fields: string, filter?: string, extraOpts?: any): Promise<any[]> => {
+          const results: any[] = [];
+          let page = 1;
+          const perPage = 500;
+          let hasMore = true;
+          while (hasMore && !cancelled) {
+            try {
+              const opts: any = { page, perPage, fields, requestKey: null, batch: perPage, ...extraOpts };
+              if (filter) opts.filter = filter;
+              const result = await pb.collection(collection).getList(page, perPage, opts);
+              results.push(...result.items);
+              hasMore = page < result.totalPages;
+              page++;
+            } catch { hasMore = false; }
+          }
+          return results;
+        };
+
         if (isScopeQuery) {
-          // Non-CAP or CAP with UI filters: query limited scope
-          loadedRecords = await pb.collection('amarcap53_pacientes').getFullList({
-            filter: patientFilter || undefined,
-            batch: 500,
-            requestKey: null,
-            fields: 'id,dna_hpv_pep,dna_hpv_gal,cito_pep,cito_lab,grupo,unidade,equipe,microarea'
-          });
+          // Non-CAP or CAP with UI filters: paginated fetch (evita getFullList com 130K)
+          loadedRecords = await paginatedFetch('amarcap53_pacientes', 'id,dna_hpv_pep,dna_hpv_gal,cito_pep,cito_lab,grupo,unidade,equipe,microarea', patientFilter || undefined);
           if (cancelled) return;
           loadedRecordsRef.current = loadedRecords;
           scopedPatientIds = loadedRecords.map(p => p.id).filter(Boolean);
@@ -523,8 +737,27 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           const atrasadas = alerts['NAO_IDENTIFICADO'] || 0;
           const alterados = pepMolCount + coltMolCount + pepCitoCount + coltCitoCount;
           const emDia = Math.max(totalPacientes - atrasadas, 0);
+          grupoBreakdownRef.current = groups;
 
-          setStats({
+          // Calcula contagens filtradas por grupo prioritário (scoped: usa loadedRecords)
+          const filteredCounts: Record<string, number> = {};
+          loadedRecords.forEach((p: any) => {
+            const g = p.grupo || 'NÃO INFORMADO';
+            const hasCito = !!(p.cito_pep && String(p.cito_pep).trim());
+            const hasCitoLab = !!(p.cito_lab && String(p.cito_lab).trim());
+            const is3049 = /30.*49/i.test(g);
+            const is5064 = /50.*6[0-4]|6[0-4].*50/i.test(g);
+            const is2529 = /25.*29|29.*25/i.test(g);
+            if ((is3049 || is5064) && !hasCito) {
+              filteredCounts[g] = (filteredCounts[g] || 0) + 1;
+            } else if (is2529 && !hasCito && !hasCitoLab) {
+              filteredCounts[g] = (filteredCounts[g] || 0) + 1;
+            }
+          });
+          setFilteredGroupCounts(filteredCounts);
+
+          setStats(prev => ({
+            ...prev,
             totalPacientes,
             coletasAtrasadas: atrasadas,
             examesEmDia: emDia,
@@ -539,7 +772,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             examVolume: { cito: pepCitoCount + coltCitoCount, hpv: pepMolCount + coltMolCount, pendente: atrasadas },
             examTrend: emptyExamTrend,
             acompTrend: emptyAcompTrend
-          });
+          }));
           setCache(STATS_CACHE_KEY, {
             totalPacientes, coletasAtrasadas: atrasadas, examesEmDia: emDia, resultadosAlterados: alterados,
             coberturaPercent: totalPacientes > 0 ? Math.round((emDia / totalPacientes) * 100) : 0,
@@ -553,7 +786,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           // Mostra cache imediatamente (instantaneo)
           const cached = getCache(STATS_CACHE_KEY);
           if (cached) {
-            setStats({ ...cached, examTrend: emptyExamTrend, acompTrend: emptyAcompTrend });
+            setStats(prev => ({ ...prev, ...cached, examTrend: emptyExamTrend, acompTrend: emptyAcompTrend }));
           }
 
           const safeCount = async (field?: string, label?: string): Promise<number> => {
@@ -607,8 +840,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
           const withExam = pepMol + coltMol + pepCito + coltCito;
           const atrasadas = Math.max(totalPacientes - withExam, 0);
+          grupoBreakdownRef.current = groups;
 
-            setStats({
+            setStats(prev => ({
+              ...prev,
               totalPacientes,
               coletasAtrasadas: atrasadas,
               examesEmDia: withExam,
@@ -629,7 +864,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               examVolume: { cito: pepCito + coltCito, hpv: pepMol + coltMol, pendente: atrasadas },
               examTrend: emptyExamTrend,
               acompTrend: emptyAcompTrend
-            });
+            }));
             setCache(STATS_CACHE_KEY, {
               totalPacientes,
               coletasAtrasadas: atrasadas,
@@ -652,25 +887,100 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
         }
 
-        // Acompanhamentos (separate, non-blocking for initial render)
-        // Use scoped patient IDs from the pacientes query (role + UI filters) to avoid unreliable paciente.unidade filter syntax
+        // Acompanhamentos
+        let acompRecords: any[] = [];
+
         if (scopedPatientIds.length > 0) {
-          const chunkSize = 200;
-          const idChunks: string[][] = [];
-          for (let i = 0; i < scopedPatientIds.length; i += chunkSize) {
-            idChunks.push(scopedPatientIds.slice(i, i + chunkSize));
+          // Com escopo: busca todos acompanhamentos paginados e filtra por IDs do scope no client
+          const scopedSet = new Set(scopedPatientIds);
+          const baseFilter = acompFilterParts.join(' && ').trim();
+          try {
+            const allAcomp = await paginatedFetch('amarcap53_acompanhamentos', 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created,paciente', baseFilter || undefined);
+            // Filtra no client: só registros de pacientes dentro do scope
+            acompRecords = allAcomp.filter((r: any) => scopedSet.has(r.paciente));
+          } catch { /* fallback vazio */ }
+        } else if (!cancelled) {
+          // Admin sem filtros: busca acompanhamentos → IDs únicos → busca só esses pacientes (eficiente)
+          try {
+            // 1. Busca todos acompanhamentos (~5K, leve)
+            const baseFilter = acompFilterParts.join(' && ').trim();
+            acompRecords = await paginatedFetch('amarcap53_acompanhamentos', 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created,paciente', baseFilter || undefined);
+            if (cancelled) return;
+
+            // 2. Extrai IDs únicos dos pacientes com acompanhamento (~2K)
+            const comBuscaPacIds = [...new Set(acompRecords.map((r: any) => r.paciente).filter(Boolean))];
+
+            // 3. Busca APENAS esses pacientes com id+grupo (~2K registros, não 130K)
+            if (comBuscaPacIds.length > 0) {
+              const comBuscaMap: Record<string, number> = {};
+              const filteredComBusca: Record<string, number> = {};
+              const batchSize = 200;
+              for (let i = 0; i < comBuscaPacIds.length && !cancelled; i += batchSize) {
+                const chunkIds = comBuscaPacIds.slice(i, i + batchSize);
+                const idFilter = `(${chunkIds.map(id => `id = "${id}"`).join(' || ')})`;
+                try {
+                  const pacs = await pb.collection('amarcap53_pacientes').getFullList({
+                    filter: idFilter,
+                    fields: 'id,grupo,cito_pep,cito_lab',
+                    batch: 500,
+                    requestKey: null,
+                  });
+                  pacs.forEach((p: any) => {
+                    if (p.grupo) {
+                      comBuscaMap[p.grupo] = (comBuscaMap[p.grupo] || 0) + 1;
+                      // filteredComBusca: pacientes com acompanhamento E que atendem filtro cito
+                      const hasCito = !!(p.cito_pep && String(p.cito_pep).trim());
+                      const hasCitoLab = !!(p.cito_lab && String(p.cito_lab).trim());
+                      const isP3049 = /30.*49/i.test(p.grupo);
+                      const isP5064 = /50.*6[0-4]|6[0-4].*50/i.test(p.grupo);
+                      const isP2529 = /25.*29|29.*25/i.test(p.grupo);
+                      if ((isP3049 || isP5064) && !hasCito) {
+                        filteredComBusca[p.grupo] = (filteredComBusca[p.grupo] || 0) + 1;
+                      } else if (isP2529 && !hasCito && !hasCitoLab) {
+                        filteredComBusca[p.grupo] = (filteredComBusca[p.grupo] || 0) + 1;
+                      }
+                    }
+                  });
+                } catch { /* batch falha, continua */ }
+              }
+              comBuscaMapRef.current = comBuscaMap;
+              setFilteredComBuscaMap(filteredComBusca);
+
+              // Calcula filteredGroupCounts: 3 queries leves (1 cada por grupo)
+              let filteredCounts: Record<string, number> = {};
+              try {
+                const prioGroupNames = Object.keys(grupoBreakdownRef.current);
+                const prioFilters: Array<{ re: RegExp; citoFilter: string }> = [
+                  { re: /30.*49/i, citoFilter: 'cito_pep = ""' },
+                  { re: /50.*6[0-4]|6[0-4].*50/i, citoFilter: 'cito_pep = ""' },
+                  { re: /25.*29|29.*25/i, citoFilter: 'cito_pep = "" && cito_lab = ""' },
+                ];
+                const countPromises = prioGroupNames.map(async (g) => {
+                  const prio = prioFilters.find(p => p.re.test(g));
+                  if (!prio) return;
+                  try {
+                    const res = await pb.collection('amarcap53_pacientes').getList(1, 1, {
+                      filter: `grupo = "${g}" && ${prio.citoFilter}`,
+                      fields: 'id',
+                      requestKey: null,
+                    });
+                    filteredCounts[g] = res.totalItems;
+                  } catch { filteredCounts[g] = 0; }
+                });
+                await Promise.all(countPromises);
+                setFilteredGroupCounts(filteredCounts);
+              } catch { /* fallback vazio */ }
+
+              if (!cancelled) {
+                setStats(prev => ({ ...prev, comBuscaMap }));
+                const existingCache = getCache(ACOMP_CACHE_KEY) || {};
+                setCache(ACOMP_CACHE_KEY, { ...existingCache, comBuscaMap, filteredComBuscaMap: filteredComBusca, filteredGroupCounts: filteredCounts });
+              }
+            }
+          } catch (e) {
+            if (!cancelled) console.warn('[admin comBuscaMap] failed:', e);
           }
-          const idFilter = idChunks.map(chunk => `(${chunk.map(id => `paciente = "${id}"`).join(' || ')})`).join(' || ');
-          acompFilterParts.unshift(`(${idFilter})`);
         }
-        const acompFilterStr = acompFilterParts.join(' && ').trim();
-        const acompRecords = await pb.collection('amarcap53_acompanhamentos').getFullList({
-          filter: acompFilterStr || undefined,
-          sort: 'created',
-          batch: 500,
-          requestKey: null,
-          fields: 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created,paciente'
-        });
         if (cancelled) return;
 
         // Regional breakdown — use already-loaded records (skip extra 130K query)
@@ -684,76 +994,117 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           }
         });
 
-        // Process Acompanhamentos
-        const aStats = {
-          total: acompRecords.length,
-          sucesso: acompRecords.filter(r => {
-            const val = String(r.situacao_pos_busca || '').toLowerCase();
-            return val && val.includes('agendamento');
-          }).length,
-          contatos: acompRecords.filter(r => {
-            const val = String(r.tipo_contato || '').toLowerCase();
-            return val && !val.includes('não houve contato');
-          }).length,
-          tipoBusca: {} as Record<string, number>,
-          situacao: {} as Record<string, number>,
-          entraves: {} as Record<string, number>,
-          unidadeBreakdown: regionalUnidade,
-          equipeBreakdown: regionalEquipe,
-          microareaBreakdown: regionalMicroarea
-        };
+        // Só processa stats/acompTrend/comBuscaMap se tiver acompRecords de verdade
+        if (scopedPatientIds.length > 0 || loadedRecords.length > 0 || acompRecords.length > 0) {
+          // Process Acompanhamentos
+          const aStats = {
+            total: acompRecords.length,
+            sucesso: acompRecords.filter(r => {
+              const val = String(r.situacao_pos_busca || '').toLowerCase();
+              return val && val.includes('agendamento');
+            }).length,
+            contatos: acompRecords.filter(r => {
+              const val = String(r.tipo_contato || '').toLowerCase();
+              return val && !val.includes('não houve contato');
+            }).length,
+            tipoBusca: {} as Record<string, number>,
+            situacao: {} as Record<string, number>,
+            entraves: {} as Record<string, number>,
+            unidadeBreakdown: regionalUnidade,
+            equipeBreakdown: regionalEquipe,
+            microareaBreakdown: regionalMicroarea
+          };
 
-        const acompTrendMap2 = Object.fromEntries(lastSixMonths.map(month => [month.key, 0])) as Record<string, number>;
-        const trendComContato = Object.fromEntries(lastSixMonths.map(month => [month.key, 0])) as Record<string, number>;
-        const trendSemContato = Object.fromEntries(lastSixMonths.map(month => [month.key, 0])) as Record<string, number>;
-        acompRecords.forEach(r => {
-          const metodo = getAcompanhamentoMetodo(r);
-          if (metodo) aStats.tipoBusca[metodo] = (aStats.tipoBusca[metodo] || 0) + 1;
+          const acompTrendMap2 = Object.fromEntries(lastSixMonths.map(month => [month.key, 0])) as Record<string, number>;
+          const trendComContato = Object.fromEntries(lastSixMonths.map(month => [month.key, 0])) as Record<string, number>;
+          const trendSemContato = Object.fromEntries(lastSixMonths.map(month => [month.key, 0])) as Record<string, number>;
+          acompRecords.forEach(r => {
+            const metodo = getAcompanhamentoMetodo(r);
+            if (metodo) aStats.tipoBusca[metodo] = (aStats.tipoBusca[metodo] || 0) + 1;
 
-          const canonicalSituacao = getCanonicalValue('situacao_pos_busca', r.situacao_pos_busca || '');
-          if (canonicalSituacao) {
-            aStats.situacao[canonicalSituacao] = (aStats.situacao[canonicalSituacao] || 0) + 1;
-          }
+            const canonicalSituacao = getCanonicalValue('situacao_pos_busca', r.situacao_pos_busca || '');
+            if (canonicalSituacao) {
+              aStats.situacao[canonicalSituacao] = (aStats.situacao[canonicalSituacao] || 0) + 1;
+            }
 
-          const entravesList = Array.isArray(r.entraves_identificados)
-            ? r.entraves_identificados
-            : r.entraves_identificados ? [r.entraves_identificados] : [];
-          entravesList.forEach(val => {
-            const cleanVal = val.replace(/^\d+\s*-\s*/, '');
-            if (cleanVal) {
-              aStats.entraves[cleanVal] = (aStats.entraves[cleanVal] || 0) + 1;
+            const entravesList = Array.isArray(r.entraves_identificados)
+              ? r.entraves_identificados
+              : r.entraves_identificados ? [r.entraves_identificados] : [];
+            entravesList.forEach(val => {
+              const cleanVal = val.replace(/^\d+\s*-\s*/, '');
+              if (cleanVal) {
+                aStats.entraves[cleanVal] = (aStats.entraves[cleanVal] || 0) + 1;
+              }
+            });
+
+            const date = toValidDate(r.data_busca) || toValidDate(r.created);
+            if (!date) return;
+            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            if (key in acompTrendMap2) acompTrendMap2[key] = (acompTrendMap2[key] || 0) + 1;
+
+            const valContato = String(r.tipo_contato || '').toLowerCase();
+            const temContato = valContato && !valContato.includes('não houve contato');
+            if (key in trendComContato) {
+              if (temContato) trendComContato[key]++;
+              else trendSemContato[key]++;
             }
           });
 
-          const date = toValidDate(r.data_busca) || toValidDate(r.created);
-          if (!date) return;
-          const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-          if (key in acompTrendMap2) acompTrendMap2[key] = (acompTrendMap2[key] || 0) + 1;
+          const acompTrendFinal = lastSixMonths.map(month => ({ month: month.label, total: acompTrendMap2[month.key] || 0 }));
+          const examTrendFinal = lastSixMonths.map(month => ({ month: month.label, cito: trendComContato[month.key] || 0, hpv: trendSemContato[month.key] || 0 }));
 
-          // Exam trend from acompanhamentos: com contato / sem contato
-          const valContato = String(r.tipo_contato || '').toLowerCase();
-          const temContato = valContato && !valContato.includes('não houve contato');
-          if (key in trendComContato) {
-            if (temContato) trendComContato[key]++;
-            else trendSemContato[key]++;
+          // Calcula comBuscaMap: contagem de pacientes COM acompanhamento por grupo (só pra scoped, admin já calculou)
+          let scopedFilteredComBusca: Record<string, number> = {};
+          let scopedFilteredGroupCounts: Record<string, number> = {};
+          if (loadedRecords.length > 0) {
+            const pacComBusca = new Set(acompRecords.map((r: any) => r.paciente).filter(Boolean));
+            const comBuscaMap: Record<string, number> = {};
+            const filteredComBusca: Record<string, number> = {};
+            loadedRecords.forEach((p: any) => {
+              if (p.grupo && pacComBusca.has(p.id)) {
+                comBuscaMap[p.grupo] = (comBuscaMap[p.grupo] || 0) + 1;
+                // filteredComBusca: com acompanhamento E que atende filtro cito
+                const hasCito = !!(p.cito_pep && String(p.cito_pep).trim());
+                const hasCitoLab = !!(p.cito_lab && String(p.cito_lab).trim());
+                const isP3049 = /30.*49/i.test(p.grupo);
+                const isP5064 = /50.*6[0-4]|6[0-4].*50/i.test(p.grupo);
+                const isP2529 = /25.*29|29.*25/i.test(p.grupo);
+                if ((isP3049 || isP5064) && !hasCito) {
+                  filteredComBusca[p.grupo] = (filteredComBusca[p.grupo] || 0) + 1;
+                } else if (isP2529 && !hasCito && !hasCitoLab) {
+                  filteredComBusca[p.grupo] = (filteredComBusca[p.grupo] || 0) + 1;
+                }
+              }
+            });
+            comBuscaMapRef.current = comBuscaMap;
+            setFilteredComBuscaMap(filteredComBusca);
+            scopedFilteredComBusca = filteredComBusca;
+
+            // Calcula filteredGroupCounts a partir de loadedRecords (sem queries extras)
+            const filteredGroupCountsLocal: Record<string, number> = {};
+            loadedRecords.forEach((p: any) => {
+              if (p.grupo) {
+                const hasCito = !!(p.cito_pep && String(p.cito_pep).trim());
+                const hasCitoLab = !!(p.cito_lab && String(p.cito_lab).trim());
+                const isP3049 = /30.*49/i.test(p.grupo);
+                const isP5064 = /50.*6[0-4]|6[0-4].*50/i.test(p.grupo);
+                const isP2529 = /25.*29|29.*25/i.test(p.grupo);
+                if ((isP3049 || isP5064) && !hasCito) {
+                  filteredGroupCountsLocal[p.grupo] = (filteredGroupCountsLocal[p.grupo] || 0) + 1;
+                } else if (isP2529 && !hasCito && !hasCitoLab) {
+                  filteredGroupCountsLocal[p.grupo] = (filteredGroupCountsLocal[p.grupo] || 0) + 1;
+                }
+              }
+            });
+            setFilteredGroupCounts(filteredGroupCountsLocal);
+            scopedFilteredGroupCounts = filteredGroupCountsLocal;
           }
-        });
 
-        // Update stats with trend data
-        const acompTrendFinal = lastSixMonths.map(month => ({ month: month.label, total: acompTrendMap2[month.key] || 0 }));
-        const examTrendFinal = lastSixMonths.map(month => ({ month: month.label, cito: trendComContato[month.key] || 0, hpv: trendSemContato[month.key] || 0 }));
-
-        if (!cancelled) {
-          setStats(prev => ({
-            ...prev,
-            examTrend: examTrendFinal,
-            acompTrend: acompTrendFinal
-          }));
-          setAcompStats(aStats);
-          // Salva cache de acompanhamentos
-          setCache(ACOMP_CACHE_KEY, {
-            acompStats: aStats,
-          });
+          if (!cancelled) {
+            setStats(prev => ({ ...prev, examTrend: examTrendFinal, acompTrend: acompTrendFinal, comBuscaMap: comBuscaMapRef.current }));
+            setAcompStats(aStats);
+            setCache(ACOMP_CACHE_KEY, { acompStats: aStats, comBuscaMap: comBuscaMapRef.current, filteredComBuscaMap: scopedFilteredComBusca, filteredGroupCounts: scopedFilteredGroupCounts });
+          }
         }
       } catch (error: any) {
         if (error?.isAbort) return;
@@ -946,7 +1297,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           </div>
 
         {/* SELECIONE O GRUPO PRIORITÁRIO */}
-          {stats.grupoBreakdown && Object.keys(stats.grupoBreakdown).length > 0 && (() => {
+          {(() => {
+            const gb = Object.keys(grupoBreakdownRef.current).length > 0 ? grupoBreakdownRef.current : stats.grupoBreakdown;
+            if (!gb || Object.keys(gb).length === 0) return null;
             const PRIORITY_GROUPS = [
               { num: '1º', titulo: 'Mulheres de 30 a 49 anos', desc: 'com atraso no rastreamento com o exame citopatológico (mais de 3 anos) ou que nunca o realizaram', pattern: /30.*49/i, color: 'violet', gradient: 'from-violet-600 to-violet-400', bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', ring: 'ring-violet-400/30', glow: 'shadow-violet-500/25', hoverGlow: 'hover:shadow-violet-500/40', hoverBorder: 'hover:border-violet-400', numBg: 'bg-violet-600', numText: 'text-white', iconColor: 'text-violet-500' },
               { num: '2º', titulo: 'Mulheres de 50 a 64 anos', desc: 'com atraso no rastreamento com o exame citopatológico (mais de 3 anos) ou que nunca o realizaram', pattern: /50.*6[0-4]|6[0-4].*50|50.*65(?![0-9])|50.*65$/i, color: 'fuchsia', gradient: 'from-fuchsia-600 to-fuchsia-400', bg: 'bg-fuchsia-50', border: 'border-fuchsia-200', text: 'text-fuchsia-700', ring: 'ring-fuchsia-400/30', glow: 'shadow-fuchsia-500/25', hoverGlow: 'hover:shadow-fuchsia-500/40', hoverBorder: 'hover:border-fuchsia-400', numBg: 'bg-fuchsia-600', numText: 'text-white', iconColor: 'text-fuchsia-500' },
@@ -965,21 +1318,25 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               orange: { gradient: 'from-orange-600 to-orange-400', bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', ring: 'ring-orange-400/30', glow: 'shadow-orange-500/25', hoverGlow: 'hover:shadow-orange-500/40', hoverBorder: 'hover:border-orange-400', numBg: 'bg-orange-600', numText: 'text-white', iconColor: 'text-orange-500' },
             };
 
-            const allGroups = Object.entries(stats.grupoBreakdown)
+            const allGroups = Object.entries(gb)
               .filter(([k]) => k !== 'NÃO INFORMADO' && k !== '--')
-              .map(([k, v]) => ({ grupo: k, count: v, titulo: `Mulheres de ${k} anos` }));
+              .map(([k, v]) => ({ grupo: k, count: Number(v) || 0, titulo: `Mulheres de ${k} anos` }));
             const sortedKeys = allGroups.sort((a, b) => b.count - a.count).map(g => g.grupo);
 
             // Match DB groups to priority definitions
-            const matched: { grupo: string; count: number; titulo: string; priority: typeof PRIORITY_GROUPS[0]; prioIdx: number }[] = [];
-            const unmatched: { grupo: string; count: number; titulo: string }[] = [];
+            const matched: { grupo: string; count: number; titulo: string; desc: string; num: string; priority: typeof PRIORITY_GROUPS[0]; prioIdx: number }[] = [];
+            const unmatched: { grupo: string; count: number; titulo: string; num: string }[] = [];
 
             sortedKeys.forEach(grupo => {
               const prioIdx = PRIORITY_GROUPS.findIndex(p => p.pattern.test(grupo));
+              const grpObj = allGroups.find(g => g.grupo === grupo)!;
               if (prioIdx >= 0) {
-                matched.push({ grupo, count: stats.grupoBreakdown[grupo], priority: PRIORITY_GROUPS[prioIdx], prioIdx });
+                const pg = PRIORITY_GROUPS[prioIdx];
+                const isPrioGroup = /30.*49|50.*6[0-4]|6[0-4].*50|25.*29|29.*25/i.test(grupo);
+                const filteredCount = isPrioGroup ? (filteredGroupCounts?.[grupo] ?? grpObj.count) : grpObj.count;
+                matched.push({ grupo, count: filteredCount, titulo: grpObj.titulo, desc: pg.desc, num: pg.num, priority: pg, prioIdx });
               } else {
-                unmatched.push({ grupo, count: stats.grupoBreakdown[grupo] });
+                unmatched.push({ grupo, count: grpObj.count, titulo: grpObj.titulo, num: `${matched.length + unmatched.length + 1}º` });
               }
             });
             matched.sort((a, b) => a.prioIdx - b.prioIdx);
@@ -1000,8 +1357,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     return (
                       <div
                         key={item.grupo}
-                        onClick={() => handleGrupoClick(item.grupo, item.titulo, item.desc, item.num)}
-                        className={`group relative bg-white rounded-2xl border-2 ${isSelected ? `${c.border} ring-4 ${c.ring} shadow-xl` : `${c.border} ${c.hoverBorder} shadow-lg ${c.glow} ${c.hoverGlow}`} hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 transition-all duration-500 cursor-pointer overflow-hidden`}
+                        onClick={() => handleGrupoClick(item.grupo)}
+                        className={`group relative bg-white rounded-2xl border-2 ${isSelected ? `${c.border} ring-4 ${c.ring} shadow-xl` : `${c.border} ${c.hoverBorder} shadow-lg ${c.glow} ${c.hoverGlow}`} hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 transition-all duration-500 cursor-pointer ${isSelected ? '' : 'overflow-hidden'}`}
                       >
                         <div className={`h-1 w-full bg-gradient-to-r ${c.gradient} ${isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'} transition-opacity`} />
                         <div className="p-5 md:p-6 flex flex-col gap-3">
@@ -1018,27 +1375,173 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                               </div>
                             </div>
                             <div className="text-right">
-                              <span className="text-lg md:text-xl font-black text-slate-800 tabular-nums">{item.count.toLocaleString('pt-BR')}</span>
-                              <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">{pct}%</span>
+                              {isLoadingPrioCounts ? (
+                                <span className="skeleton-scan inline-block h-6 w-16 shadow-sm" />
+                              ) : (
+                                <span className="text-lg md:text-xl font-black text-slate-800 tabular-nums animate-fade-in">{item.count.toLocaleString('pt-BR')}</span>
+                              )}
+                              {isLoadingPrioCounts ? (
+                                <span className="skeleton-scan inline-block h-2.5 w-8 mt-0.5 shadow-xs" />
+                              ) : (
+                                <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest animate-fade-in">{pct}%</span>
+                              )}
                             </div>
                           </div>
-                          <h3 className={`text-sm md:text-base font-black ${c.text} uppercase tracking-wide leading-snug`}>{c.titulo}</h3>
+                          <h3
+                            onClick={(e) => { e.stopPropagation(); handleGrupoClick(item.grupo); }}
+                            className={`text-sm md:text-base font-black ${c.text} uppercase tracking-wide leading-snug cursor-pointer`}
+                          >{c.titulo}</h3>
                           <p className="text-[10px] md:text-[11px] font-medium text-slate-500 leading-relaxed">{c.desc}</p>
                           <div className="mt-1 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                             <div className={`h-full bg-gradient-to-r ${c.gradient} rounded-full transition-all duration-700`} style={{ width: `${Math.max(pct, 3)}%` }} />
                           </div>
-                          {/* Indicador de ação quando selecionado */}
+                          {/* Conteúdo expandido quando selecionado */}
                           {isSelected && (
-                            <div className={`relative flex items-center gap-2 px-4 py-3 rounded-xl ${c.bg} border ${c.border} mt-1 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300 overflow-hidden`}>
-                              <div className={`absolute inset-0 bg-gradient-to-r ${c.gradient} opacity-[0.06]`} />
-                              <div className="relative flex items-center gap-2">
-                                <div className={`w-6 h-6 rounded-lg ${c.numBg} flex items-center justify-center shadow-md animate-pulse`}>
-                                  <MousePointerClick className="w-3 h-3 text-white" />
+                            <div className={`relative flex flex-col gap-3 mt-1 animate-fade-in-up`} onClick={(e) => e.stopPropagation()}>
+                              {/* Datas */}
+                              <div className="flex gap-2" onMouseDown={(e) => e.stopPropagation()}>
+                                <div className="flex-1">
+                                  <label className={`text-[7px] font-black ${c.text} uppercase tracking-widest mb-1 block`}>Data Inicial</label>
+                                  <DatePickerPTBR placeholder="Início" value={grupoDataInicio} onChange={setGrupoDataInicio} />
                                 </div>
-                                <span className={`text-[9px] font-black ${c.text} uppercase tracking-wide leading-tight`}>
-                                  <span className={`underline decoration-2 underline-offset-2 decoration-current/30`}>Clique novamente</span> para ver a listagem nominal.
-                                </span>
+                                <div className="flex-1">
+                                  <label className={`text-[7px] font-black ${c.text} uppercase tracking-widest mb-1 block`}>Data Final</label>
+                                  <DatePickerPTBR placeholder="Fim" value={grupoDataFim} onChange={setGrupoDataFim} />
+                                </div>
                               </div>
+                              {/* Contadores Sem Busca / Com Busca */}
+                              {hasOneDateOnly && selectedGrupo ? (
+                                <div className="flex items-center justify-center gap-2 py-4 rounded-xl border-2 border-dashed border-amber-300/80 bg-amber-50/50" onMouseDown={(e) => e.stopPropagation()}>
+                                  <Calendar className="w-4 h-4 text-amber-500" />
+                                  <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest">Preencha ambos os campos de data</span>
+                                </div>
+                              ) : (isLoadingPrioCounts || !grupoBuscaStats) && selectedGrupo ? (
+                                <div className="grid grid-cols-2 gap-2" onMouseDown={(e) => e.stopPropagation()}>
+                                  <div className="rounded-xl p-3 border-2 border-rose-200/80 shadow-sm shadow-rose-100/40">
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                      <span className="skeleton-scan skeleton-scan-rose w-3.5 h-3.5 !rounded-full shadow-sm" />
+                                      <span className="skeleton-scan skeleton-scan-rose h-2 w-12 !rounded-sm" />
+                                    </div>
+                                    <div className="flex items-end justify-between">
+                                      <span className="skeleton-scan skeleton-scan-rose h-4 w-10 shadow-sm" />
+                                      <span className="skeleton-scan skeleton-scan-rose h-2 w-6 !rounded-sm shadow-xs" />
+                                    </div>
+                                  </div>
+                                  <div className="rounded-xl p-3 border-2 border-emerald-200/80 shadow-sm shadow-emerald-100/40">
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                      <span className="skeleton-scan skeleton-scan-emerald w-3.5 h-3.5 !rounded-full shadow-sm" />
+                                      <span className="skeleton-scan skeleton-scan-emerald h-2 w-12 !rounded-sm" />
+                                    </div>
+                                    <div className="flex items-end justify-between">
+                                      <span className="skeleton-scan skeleton-scan-emerald h-4 w-10 shadow-sm" />
+                                      <span className="skeleton-scan skeleton-scan-emerald h-2 w-6 !rounded-sm shadow-xs" />
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : grupoBuscaStats ? (
+                                <div className="grid grid-cols-2 gap-2" onMouseDown={(e) => e.stopPropagation()}>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setFilterBuscaAtiva(prev => (prev === false ? undefined : false));
+                                    }}
+                                    className={`rounded-xl p-3 border-2 shadow-sm transition-all duration-300 cursor-pointer text-left group/btn ${
+                                      filterBuscaAtiva === false
+                                        ? 'bg-gradient-to-br from-rose-100 to-rose-200/80 border-rose-400 shadow-md shadow-rose-200/50 ring-2 ring-rose-300/50 scale-[1.03]'
+                                        : 'bg-gradient-to-br from-rose-50 to-rose-100/50 border-rose-200/60 hover:border-rose-300 hover:shadow-md hover:shadow-rose-100/50 hover:scale-[1.02]'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 ${
+                                        filterBuscaAtiva === false ? 'bg-rose-600 shadow-rose-500/40 scale-110' : 'bg-rose-500 shadow-rose-500/30'
+                                      }`}>
+                                        <CircleOff className="w-2 h-2 text-white" />
+                                      </div>
+                                      <p className={`text-[7px] font-black uppercase tracking-widest leading-none transition-colors ${
+                                        filterBuscaAtiva === false ? 'text-rose-800' : 'text-rose-700'
+                                      }`}>Sem Busca</p>
+                                    </div>
+                                    <div className="flex items-end justify-between">
+                                      <span className={`text-sm font-black tabular-nums leading-none transition-colors ${
+                                        filterBuscaAtiva === false ? 'text-rose-900' : 'text-rose-800'
+                                      }`}>{grupoBuscaStats.semBusca.toLocaleString('pt-BR')}</span>
+                                      <span className="text-[9px] font-black text-rose-600 tabular-nums">{item.count > 0 ? Math.round((grupoBuscaStats.semBusca / item.count) * 100) : 0}%</span>
+                                    </div>
+                                    {filterBuscaAtiva === false && (
+                                      <div className="mt-2 h-0.5 w-full bg-rose-400 rounded-full" />
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setFilterBuscaAtiva(prev => (prev === true ? undefined : true));
+                                    }}
+                                    className={`rounded-xl p-3 border-2 shadow-sm transition-all duration-300 cursor-pointer text-left group/btn ${
+                                      filterBuscaAtiva === true
+                                        ? 'bg-gradient-to-br from-emerald-100 to-emerald-200/80 border-emerald-400 shadow-md shadow-emerald-200/50 ring-2 ring-emerald-300/50 scale-[1.03]'
+                                        : 'bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200/60 hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100/50 hover:scale-[1.02]'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 ${
+                                        filterBuscaAtiva === true ? 'bg-emerald-600 shadow-emerald-500/40 scale-110' : 'bg-emerald-500 shadow-emerald-500/30'
+                                      }`}>
+                                        <Search className="w-2 h-2 text-white" />
+                                      </div>
+                                      <p className={`text-[7px] font-black uppercase tracking-widest leading-none transition-colors ${
+                                        filterBuscaAtiva === true ? 'text-emerald-800' : 'text-emerald-700'
+                                      }`}>Com Busca</p>
+                                    </div>
+                                    <div className="flex items-end justify-between">
+                                      <span className={`text-sm font-black tabular-nums leading-none transition-colors ${
+                                        filterBuscaAtiva === true ? 'text-emerald-900' : 'text-emerald-800'
+                                      }`}>{grupoBuscaStats.comBusca.toLocaleString('pt-BR')}</span>
+                                      <span className="text-[9px] font-black text-emerald-600 tabular-nums">{item.count > 0 ? Math.round((grupoBuscaStats.comBusca / item.count) * 100) : 0}%</span>
+                                    </div>
+                                    {filterBuscaAtiva === true && (
+                                      <div className="mt-2 h-0.5 w-full bg-emerald-400 rounded-full" />
+                                    )}
+                                  </button>
+                                </div>
+                              ) : null}
+                              {/* Botão ir para listagem */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const pending: any = { filterGrupo: [item.grupo], grupoNum: c.num, grupoTitulo: c.titulo, grupoDescricao: c.desc };
+                                  // Filtro cito: SEMPRE exceto "COM BUSCA + datas"
+                                  // COM BUSCA + datas → Dashboard fetchWithDates NÃO filtra cito
+                                  // COM BUSCA + sem datas → Dashboard usa filteredComBuscaMap QUE filtra cito
+                                  // SEM BUSCA / sem seleção → SEMPRE filtra cito
+                                  const isComBuscaComDatas = filterBuscaAtiva === true && (grupoDataInicio || grupoDataFim);
+                                  if (!isComBuscaComDatas) {
+                                    if (/25.*29|29.*25/i.test(item.grupo)) {
+                                      pending.filterCitoPep = 'NÃO';
+                                      pending.filterCitoLab = 'NÃO';
+                                    } else if (/30.*49|50.*6[0-4]|6[0-4].*50/i.test(item.grupo)) {
+                                      pending.filterCitoPep = 'NÃO';
+                                    }
+                                  }
+                                  // Envia filtros SEM/COM BUSCA + datas quando selecionado
+                                  if (filterBuscaAtiva !== undefined) {
+                                    if (grupoDataInicio) pending.filterDataInicio = grupoDataInicio;
+                                    if (grupoDataFim) pending.filterDataFim = grupoDataFim;
+                                    pending.buscaAtiva = filterBuscaAtiva;
+                                  }
+                                  console.log('[DEBUG DASH] pendingFilter:', JSON.stringify(pending));
+                                  localStorage.setItem('dashboard:pendingFilter', JSON.stringify(pending));
+                                  setActiveTab('pacientes');
+                                }}
+                                disabled={isLoadingPrioCounts || !grupoBuscaStats || hasOneDateOnly}
+                                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all duration-300 ${
+                                  isLoadingPrioCounts || !grupoBuscaStats || hasOneDateOnly
+                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                                    : `${c.numBg} text-white shadow-lg hover:opacity-90 hover:shadow-xl cursor-pointer`
+                                }`}
+                              >
+                                <ArrowRightCircle className="w-3.5 h-3.5" />
+                                Ir para relação de pacientes
+                              </button>
                             </div>
                           )}
                         </div>
@@ -1051,13 +1554,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     const colorName = EXTRA_COLORS[idx % EXTRA_COLORS.length];
                     const c = extraColorMap[colorName];
                     const pct = totalPct(item.count);
-                    const num = matched.length + idx + 1;
                     const isSelected = selectedGrupo === item.grupo;
                     return (
                       <div
                         key={item.grupo}
-                        onClick={() => handleGrupoClick(item.grupo, item.titulo, item.desc, item.num)}
-                        className={`group relative bg-white rounded-2xl border-2 ${isSelected ? `${c.border} ring-4 ${c.ring} shadow-xl` : `${c.border} ${c.hoverBorder} shadow-lg ${c.glow} ${c.hoverGlow}`} hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 transition-all duration-500 cursor-pointer overflow-hidden`}
+                        onClick={() => handleGrupoClick(item.grupo)}
+                        className={`group relative bg-white rounded-2xl border-2 ${isSelected ? `${c.border} ring-4 ${c.ring} shadow-xl` : `${c.border} ${c.hoverBorder} shadow-lg ${c.glow} ${c.hoverGlow}`} hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 transition-all duration-500 cursor-pointer ${isSelected ? '' : 'overflow-hidden'}`}
                       >
                         <div className={`h-1 w-full bg-gradient-to-r ${c.gradient} ${isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'} transition-opacity`} />
                         <div className="p-5 md:p-6 flex flex-col gap-3">
@@ -1065,7 +1567,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                             <div className="flex items-center gap-3">
                               <div className="flex flex-col items-center gap-0.5">
                                 <span className={`inline-flex items-center justify-center w-9 h-9 rounded-xl ${isSelected ? `${c.numBg} animate-pulse` : c.numBg} ${c.numText} text-[10px] font-black shadow-md ring-2 ${c.ring}`}>
-                                  {num}º
+                                  {item.num}
                                 </span>
                                 <span className={`text-[7px] font-black ${c.text} uppercase tracking-widest leading-none opacity-60`}>Grupo</span>
                               </div>
@@ -1074,26 +1576,165 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                               </div>
                             </div>
                             <div className="text-right">
-                              <span className="text-lg md:text-xl font-black text-slate-800 tabular-nums">{item.count.toLocaleString('pt-BR')}</span>
-                              <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">{pct}%</span>
+                              {isLoadingPrioCounts ? (
+                                <span className="skeleton-scan inline-block h-6 w-16 shadow-sm" />
+                              ) : (
+                                <span className="text-lg md:text-xl font-black text-slate-800 tabular-nums animate-fade-in">{item.count.toLocaleString('pt-BR')}</span>
+                              )}
+                              {isLoadingPrioCounts ? (
+                                <span className="skeleton-scan inline-block h-2.5 w-8 mt-0.5 shadow-xs" />
+                              ) : (
+                                <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest animate-fade-in">{pct}%</span>
+                              )}
                             </div>
                           </div>
                           <h3 className={`text-sm md:text-base font-black ${c.text} uppercase tracking-wide leading-snug truncate`} title={item.grupo}>Mulheres de {item.grupo}</h3>
                           <div className="mt-1 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                             <div className={`h-full bg-gradient-to-r ${c.gradient} rounded-full transition-all duration-700`} style={{ width: `${Math.max(pct, 3)}%` }} />
                           </div>
-                          {/* Indicador de ação quando selecionado — extras */}
+                          {/* Conteúdo expandido quando selecionado — extras */}
                           {isSelected && (
-                            <div className={`relative flex items-center gap-2 px-4 py-3 rounded-xl ${c.bg} border ${c.border} mt-1 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300 overflow-hidden`}>
-                              <div className={`absolute inset-0 bg-gradient-to-r ${c.gradient} opacity-[0.06]`} />
-                              <div className="relative flex items-center gap-2">
-                                <div className={`w-6 h-6 rounded-lg ${c.numBg} flex items-center justify-center shadow-md animate-pulse`}>
-                                  <MousePointerClick className="w-3 h-3 text-white" />
+                            <div className={`relative flex flex-col gap-3 mt-1 animate-fade-in-up`} onClick={(e) => e.stopPropagation()}>
+                              {/* Datas */}
+                              <div className="flex gap-2" onMouseDown={(e) => e.stopPropagation()}>
+                                <div className="flex-1">
+                                  <label className={`text-[7px] font-black ${c.text} uppercase tracking-widest mb-1 block`}>Data Inicial</label>
+                                  <DatePickerPTBR placeholder="Início" value={grupoDataInicio} onChange={setGrupoDataInicio} />
                                 </div>
-                                <span className={`text-[9px] font-black ${c.text} uppercase tracking-wide leading-tight`}>
-                                  <span className={`underline decoration-2 underline-offset-2 decoration-current/30`}>Clique novamente</span> para ver a listagem nominal.
-                                </span>
+                                <div className="flex-1">
+                                  <label className={`text-[7px] font-black ${c.text} uppercase tracking-widest mb-1 block`}>Data Final</label>
+                                  <DatePickerPTBR placeholder="Fim" value={grupoDataFim} onChange={setGrupoDataFim} />
+                                </div>
                               </div>
+                              {/* Contadores Sem Busca / Com Busca */}
+                              {hasOneDateOnly && selectedGrupo ? (
+                                <div className="flex items-center justify-center gap-2 py-4 rounded-xl border-2 border-dashed border-amber-300/80 bg-amber-50/50" onMouseDown={(e) => e.stopPropagation()}>
+                                  <Calendar className="w-4 h-4 text-amber-500" />
+                                  <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest">Preencha ambos os campos de data</span>
+                                </div>
+                              ) : (isLoadingPrioCounts || !grupoBuscaStats) && selectedGrupo ? (
+                                <div className="grid grid-cols-2 gap-2" onMouseDown={(e) => e.stopPropagation()}>
+                                  <div className="rounded-xl p-3 border-2 border-rose-200/80 shadow-sm shadow-rose-100/40">
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                      <span className="skeleton-scan skeleton-scan-rose w-3.5 h-3.5 !rounded-full shadow-sm" />
+                                      <span className="skeleton-scan skeleton-scan-rose h-2 w-12 !rounded-sm" />
+                                    </div>
+                                    <div className="flex items-end justify-between">
+                                      <span className="skeleton-scan skeleton-scan-rose h-4 w-10 shadow-sm" />
+                                      <span className="skeleton-scan skeleton-scan-rose h-2 w-6 !rounded-sm shadow-xs" />
+                                    </div>
+                                  </div>
+                                  <div className="rounded-xl p-3 border-2 border-emerald-200/80 shadow-sm shadow-emerald-100/40">
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                      <span className="skeleton-scan skeleton-scan-emerald w-3.5 h-3.5 !rounded-full shadow-sm" />
+                                      <span className="skeleton-scan skeleton-scan-emerald h-2 w-12 !rounded-sm" />
+                                    </div>
+                                    <div className="flex items-end justify-between">
+                                      <span className="skeleton-scan skeleton-scan-emerald h-4 w-10 shadow-sm" />
+                                      <span className="skeleton-scan skeleton-scan-emerald h-2 w-6 !rounded-sm shadow-xs" />
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : grupoBuscaStats ? (
+                                <div className="grid grid-cols-2 gap-2" onMouseDown={(e) => e.stopPropagation()}>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setFilterBuscaAtiva(prev => (prev === false ? undefined : false));
+                                    }}
+                                    className={`rounded-xl p-3 border-2 shadow-sm transition-all duration-300 cursor-pointer text-left group/btn ${
+                                      filterBuscaAtiva === false
+                                        ? 'bg-gradient-to-br from-rose-100 to-rose-200/80 border-rose-400 shadow-md shadow-rose-200/50 ring-2 ring-rose-300/50 scale-[1.03]'
+                                        : 'bg-gradient-to-br from-rose-50 to-rose-100/50 border-rose-200/60 hover:border-rose-300 hover:shadow-md hover:shadow-rose-100/50 hover:scale-[1.02]'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 ${
+                                        filterBuscaAtiva === false ? 'bg-rose-600 shadow-rose-500/40 scale-110' : 'bg-rose-500 shadow-rose-500/30'
+                                      }`}>
+                                        <CircleOff className="w-2 h-2 text-white" />
+                                      </div>
+                                      <p className={`text-[7px] font-black uppercase tracking-widest leading-none transition-colors ${
+                                        filterBuscaAtiva === false ? 'text-rose-800' : 'text-rose-700'
+                                      }`}>Sem Busca</p>
+                                    </div>
+                                    <div className="flex items-end justify-between">
+                                      <span className={`text-sm font-black tabular-nums leading-none transition-colors ${
+                                        filterBuscaAtiva === false ? 'text-rose-900' : 'text-rose-800'
+                                      }`}>{grupoBuscaStats.semBusca.toLocaleString('pt-BR')}</span>
+                                      <span className="text-[9px] font-black text-rose-600 tabular-nums">{item.count > 0 ? Math.round((grupoBuscaStats.semBusca / item.count) * 100) : 0}%</span>
+                                    </div>
+                                    {filterBuscaAtiva === false && (
+                                      <div className="mt-2 h-0.5 w-full bg-rose-400 rounded-full" />
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setFilterBuscaAtiva(prev => (prev === true ? undefined : true));
+                                    }}
+                                    className={`rounded-xl p-3 border-2 shadow-sm transition-all duration-300 cursor-pointer text-left group/btn ${
+                                      filterBuscaAtiva === true
+                                        ? 'bg-gradient-to-br from-emerald-100 to-emerald-200/80 border-emerald-400 shadow-md shadow-emerald-200/50 ring-2 ring-emerald-300/50 scale-[1.03]'
+                                        : 'bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200/60 hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100/50 hover:scale-[1.02]'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 ${
+                                        filterBuscaAtiva === true ? 'bg-emerald-600 shadow-emerald-500/40 scale-110' : 'bg-emerald-500 shadow-emerald-500/30'
+                                      }`}>
+                                        <Search className="w-2 h-2 text-white" />
+                                      </div>
+                                      <p className={`text-[7px] font-black uppercase tracking-widest leading-none transition-colors ${
+                                        filterBuscaAtiva === true ? 'text-emerald-800' : 'text-emerald-700'
+                                      }`}>Com Busca</p>
+                                    </div>
+                                    <div className="flex items-end justify-between">
+                                      <span className={`text-sm font-black tabular-nums leading-none transition-colors ${
+                                        filterBuscaAtiva === true ? 'text-emerald-900' : 'text-emerald-800'
+                                      }`}>{grupoBuscaStats.comBusca.toLocaleString('pt-BR')}</span>
+                                      <span className="text-[9px] font-black text-emerald-600 tabular-nums">{item.count > 0 ? Math.round((grupoBuscaStats.comBusca / item.count) * 100) : 0}%</span>
+                                    </div>
+                                    {filterBuscaAtiva === true && (
+                                      <div className="mt-2 h-0.5 w-full bg-emerald-400 rounded-full" />
+                                    )}
+                                  </button>
+                                </div>
+                              ) : null}
+                              {/* Botão ir para listagem */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const pending: any = { filterGrupo: [item.grupo], grupoNum: item.num, grupoTitulo: item.titulo, grupoDescricao: '' };
+                                  // SEMPRE envia filtro cito — Dashboard filtra cito em ambos (COM/SEM BUSCA)
+                                  const isComBuscaComDatas = filterBuscaAtiva === true && (grupoDataInicio || grupoDataFim);
+                                  if (!isComBuscaComDatas) {
+                                    if (/25.*29|29.*25/i.test(item.grupo)) {
+                                      pending.filterCitoPep = 'NÃO';
+                                      pending.filterCitoLab = 'NÃO';
+                                    } else if (/30.*49|50.*6[0-4]|6[0-4].*50/i.test(item.grupo)) {
+                                      pending.filterCitoPep = 'NÃO';
+                                    }
+                                  }
+                                  // Datas só enviadas quando buscaAtiva selecionado
+                                  if (filterBuscaAtiva !== undefined) {
+                                    if (grupoDataInicio) pending.filterDataInicio = grupoDataInicio;
+                                    if (grupoDataFim) pending.filterDataFim = grupoDataFim;
+                                    pending.buscaAtiva = filterBuscaAtiva;
+                                  }
+                                  localStorage.setItem('dashboard:pendingFilter', JSON.stringify(pending));
+                                  setActiveTab('pacientes');
+                                }}
+                                disabled={isLoadingPrioCounts || !grupoBuscaStats || hasOneDateOnly}
+                                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all duration-300 ${
+                                  isLoadingPrioCounts || !grupoBuscaStats || hasOneDateOnly
+                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                                    : `${c.numBg} text-white shadow-lg hover:opacity-90 hover:shadow-xl cursor-pointer`
+                                }`}
+                              >
+                                <ArrowRightCircle className="w-3.5 h-3.5" />
+                                Ir para relação de pacientes
+                              </button>
                             </div>
                           )}
                         </div>
@@ -1198,37 +1839,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                         <>
                           <div className="mx-5 border-t border-dashed border-slate-200" />
                           <div className="px-5 py-4 grid grid-cols-2 gap-2.5">
-                            {/* Com Busca Ativa — verde */}
-                            <div
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterStatus: [card.key], buscaAtiva: true, grupoTitulo: card.label || '', grupoDescricao: card.descricao || '' }));
-                                setActiveTab('pacientes');
-                              }}
-                              className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-2xl p-3 border border-emerald-200/60 shadow-sm cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all duration-300 hover:scale-[1.03]"
-                            >
-                              <div className="flex items-center gap-1.5 mb-2">
-                                <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm shadow-emerald-500/30">
-                                  <Search className="w-2 h-2 text-white" />
-                                </div>
-                                <p className="text-[7px] md:text-[8px] font-black text-emerald-700 uppercase tracking-widest leading-none">Com Busca</p>
-                              </div>
-                              <div className="flex items-end justify-between">
-                                <span className="text-sm font-black text-emerald-800 tabular-nums leading-none">
-                                  {buscaAtivaValor.toLocaleString('pt-BR')}
-                                </span>
-                                <span className="text-[10px] font-black text-emerald-600 tabular-nums">{buscaAtivaPct}%</span>
-                              </div>
-                            </div>
-
                             {/* Sem Busca Ativa — rose */}
                             <div
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                localStorage.setItem('dashboard:pendingFilter', JSON.stringify({ filterStatus: [card.key], buscaAtiva: false, grupoTitulo: card.label || '', grupoDescricao: card.descricao || '' }));
-                                setActiveTab('pacientes');
-                              }}
-                              className="bg-gradient-to-br from-rose-50 to-rose-100/50 rounded-2xl p-3 border border-rose-200/60 shadow-sm cursor-pointer hover:shadow-md hover:border-rose-300 transition-all duration-300 hover:scale-[1.03]"
+                              className="bg-gradient-to-br from-rose-50 to-rose-100/50 rounded-2xl p-3 border border-rose-200/60 shadow-sm"
                             >
                               <div className="flex items-center gap-1.5 mb-2">
                                 <div className="w-4 h-4 rounded-full bg-rose-500 flex items-center justify-center shadow-sm shadow-rose-500/30">
@@ -1241,6 +1854,24 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                                   {semBuscaValor.toLocaleString('pt-BR')}
                                 </span>
                                 <span className="text-[10px] font-black text-rose-600 tabular-nums">{semBuscaPct}%</span>
+                              </div>
+                            </div>
+
+                            {/* Com Busca Ativa — verde */}
+                            <div
+                              className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-2xl p-3 border border-emerald-200/60 shadow-sm"
+                            >
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm shadow-emerald-500/30">
+                                  <Search className="w-2 h-2 text-white" />
+                                </div>
+                                <p className="text-[7px] md:text-[8px] font-black text-emerald-700 uppercase tracking-widest leading-none">Com Busca</p>
+                              </div>
+                              <div className="flex items-end justify-between">
+                                <span className="text-sm font-black text-emerald-800 tabular-nums leading-none">
+                                  {buscaAtivaValor.toLocaleString('pt-BR')}
+                                </span>
+                                <span className="text-[10px] font-black text-emerald-600 tabular-nums">{buscaAtivaPct}%</span>
                               </div>
                             </div>
                           </div>

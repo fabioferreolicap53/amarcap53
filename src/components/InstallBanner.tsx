@@ -80,9 +80,15 @@ export const InstallBanner: React.FC = () => {
     if (deferredRef.current && showBanner) return;
 
     const handler = (e: Event) => {
-      e.preventDefault();
+      // preventDefault já foi chamado pelo script inline do index.html
+      if (!(window as any).__deferredPrompt) {
+        e.preventDefault();
+      }
       deferredRef.current = e as BeforeInstallPromptEvent;
-      setState((prev) => ({ ...prev, show: !shouldHideBanner().hide }));
+      (window as any).__deferredPrompt = e;
+      if (!shouldHideBanner().hide) {
+        setState((prev) => ({ ...prev, show: true }));
+      }
     };
     window.addEventListener('beforeinstallprompt', handler);
 

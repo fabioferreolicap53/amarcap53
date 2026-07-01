@@ -57,24 +57,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     let disposed = false;
     let userUnsubscribe: (() => void) | undefined;
+    let retries = 0;
+    const maxRetries = 3;
 
-    pb.collection(collectionName)
-      .subscribe(user.id, (e) => {
-        if (e.action === 'update') {
-          const updatedUser = e.record as UserRecord;
-          setUser(updatedUser);
-          setIsAdmin(updatedUser?.role === 'admin' || updatedUser?.role === 'cap');
-          pb.authStore.save(pb.authStore.token, updatedUser);
-        }
-      })
-      .then((unsub) => {
-        if (disposed) {
-          unsub();
-          return;
-        }
-        userUnsubscribe = unsub;
-      })
-      .catch(() => {});
+    const doSubscribe = () => {
+      if (disposed) return;
+      pb.collection(collectionName)
+        .subscribe(user.id, (e) => {
+          if (e.action === 'update') {
+            const updatedUser = e.record as UserRecord;
+            setUser(updatedUser);
+            setIsAdmin(updatedUser?.role === 'admin' || updatedUser?.role === 'cap');
+            pb.authStore.save(pb.authStore.token, updatedUser);
+          }
+        }, { requestKey: null })
+        .then((unsub) => {
+          retries = 0;
+          if (disposed) {
+            unsub();
+            return;
+          }
+          userUnsubscribe = unsub;
+        })
+        .catch(() => {
+          if (!disposed && retries < maxRetries) {
+            retries++;
+            setTimeout(doSubscribe, 2000 * retries);
+          }
+        });
+    };
+
+    doSubscribe();
 
     return () => {
       disposed = true;

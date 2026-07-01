@@ -247,13 +247,28 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   };
 
   const _patInit = getPatCache();
-  // Se veio do Dashboard com pending filter, ignora cache — tabela começa vazia
-  const _pfHasFilter = (() => {
+  // Lê pendingFilter do Dashboard (lê e remove em uma operação atômica)
+  const _pfData = (() => {
     try {
       const raw = localStorage.getItem('dashboard:pendingFilter');
-      return !!raw;
-    } catch { return false; }
+      if (raw) {
+        localStorage.removeItem('dashboard:pendingFilter');
+        return JSON.parse(raw);
+      }
+    } catch {}
+    return null;
   })();
+  const _pfHasFilter = !!_pfData;
+
+  // Aplica filtros do pendingFilter diretamente nos initial states (sem race condition)
+  const _initFilterGrupo: string[] = _pfData?.filterGrupo ?? [];
+  const _initFilterCitoPep: string = _pfData?.filterCitoPep ?? '';
+  const _initFilterCitoLab: string = _pfData?.filterCitoLab ?? '';
+  const _initFilterDataInicio: string = _pfData?.filterDataInicio ?? '';
+  const _initFilterDataFim: string = _pfData?.filterDataFim ?? '';
+  const _initFilterBuscaAtiva: boolean | null = _pfData?.buscaAtiva ?? null;
+  const _initFilterStatus: string[] = _pfData?.filterStatus ?? [];
+
   const [pacientes, setPacientes] = useState<Paciente[]>(_pfHasFilter ? [] : (_patInit?.pacientes ?? []));
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -265,10 +280,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [selectedDate, setSelectedDate] = useState('');
 
   // Garantir que os detalhes sejam sempre do dado mais recente no estado
-  const activePatientForDetails = patientForDetails 
-    ? (pacientes.find(p => p.id === patientForDetails.id) || patientForDetails) 
+  const activePatientForDetails = patientForDetails
+    ? (pacientes.find(p => p.id === patientForDetails.id) || patientForDetails)
     : null;
-  
+
   // Estados para os campos do modal de acompanhamento
   const [modalTipoBusca, setModalTipoBusca] = useState('');
   const [modalTipoContato, setModalTipoContato] = useState('');
@@ -277,42 +292,12 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [modalEntravesInformadoPor, setModalEntravesInformadoPor] = useState('');
   const [modalObservacoes, setModalObservacoes] = useState('');
 
-  // Estados para Busca e Filtros
+  // Estados para Busca e Filtros (inicializados com pendingFilter do Dashboard)
   const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearchTerm = useDebounce(searchTerm, 400); // 400ms após última tecla
-  const [filterStatus, setFilterStatus] = useState<string[]>([]);
-  const [filterBuscaAtiva, setFilterBuscaAtiva] = useState<boolean | null>(null);
-  const [filterGrupo, setFilterGrupo] = useState<string[]>([]);
-
-  // PendingFilter do Dashboard
-  const [pfData, setPfData] = useState<any>(() => {
-    try {
-      const raw = localStorage.getItem('dashboard:pendingFilter');
-      if (raw) {
-        localStorage.removeItem('dashboard:pendingFilter');
-        return JSON.parse(raw);
-      }
-    } catch {}
-    return null;
-  });
-
-  // Relê quando activeTab muda pra 'pacientes' (componente pode re-renderizar sem remontar)
-  const prevTabRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (prevTabRef.current === activeTab) return;
-    prevTabRef.current = activeTab;
-    if (activeTab === 'pacientes') {
-      try {
-        const raw = localStorage.getItem('dashboard:pendingFilter');
-        if (raw) {
-          setPfData(JSON.parse(raw));
-          localStorage.removeItem('dashboard:pendingFilter');
-        }
-      } catch {}
-    } else {
-      setPfData(null);
-    }
-  }, [activeTab]);
+  const debouncedSearchTerm = useDebounce(searchTerm, 400);
+  const [filterStatus, setFilterStatus] = useState<string[]>(_initFilterStatus);
+  const [filterBuscaAtiva, setFilterBuscaAtiva] = useState<boolean | null>(_initFilterBuscaAtiva);
+  const [filterGrupo, setFilterGrupo] = useState<string[]>(_initFilterGrupo);
 
   // Deriva titulo/descricao a partir do nome do grupo (regex flexível)
   const GRUPO_PATTERNS: { pattern: RegExp; num: string; titulo: string; desc: string }[] = [
@@ -322,27 +307,27 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     { pattern: /25.*29|29.*25/i, num: '4º', titulo: 'Mulheres de 25 a 29 anos', desc: 'que nunca fizeram o exame citopatológico' },
   ];
 
-  const pendingGrupo = pfData?.filterGrupo?.[0] || '';
+  const pendingGrupo = _pfData?.filterGrupo?.[0] || '';
   const infoDoGrupo = pendingGrupo ? GRUPO_PATTERNS.find(p => p.pattern.test(pendingGrupo)) || null : null;
 
-  // Usa dados do pfData se disponíveis, senão deriva do nome do grupo
-  const pendingLabel = pendingGrupo || (pfData?.filterStatus?.[0] && ALERT_CONFIGS[pfData.filterStatus[0]]?.label) || '';
-  const pendingGrupoNum = pfData?.grupoNum || infoDoGrupo?.num || '';
-  const pendingGrupoTitulo = pfData?.grupoTitulo || infoDoGrupo?.titulo || (pendingGrupo ? `Mulheres de ${pendingGrupo} anos` : '');
-  const pendingGrupoDescricao = pfData?.grupoDescricao || infoDoGrupo?.desc || '';
+  // Usa dados do _pfData se disponíveis, senão deriva do nome do grupo
+  const pendingLabel = pendingGrupo || (_pfData?.filterStatus?.[0] && ALERT_CONFIGS[_pfData.filterStatus[0]]?.label) || '';
+  const pendingGrupoNum = _pfData?.grupoNum || infoDoGrupo?.num || '';
+  const pendingGrupoTitulo = _pfData?.grupoTitulo || infoDoGrupo?.titulo || (pendingGrupo ? `Mulheres de ${pendingGrupo} anos` : '');
+  const pendingGrupoDescricao = _pfData?.grupoDescricao || infoDoGrupo?.desc || '';
 
   const [filterTipoBusca, setFilterTipoBusca] = useState<string[]>([]);
   const [filterTipoContato, setFilterTipoContato] = useState<string[]>([]);
   const [filterSituacao, setFilterSituacao] = useState<string[]>([]);
   const [filterEntraves, setFilterEntraves] = useState<string[]>([]);
-  const [filterDataInicio, setFilterDataInicio] = useState('');
-  const [filterDataFim, setFilterDataFim] = useState('');
+  const [filterDataInicio, setFilterDataInicio] = useState(_initFilterDataInicio);
+  const [filterDataFim, setFilterDataFim] = useState(_initFilterDataFim);
   const [filterUnidade, setFilterUnidade] = useState<string[]>([]);
   const [filterEquipe, setFilterEquipe] = useState<string[]>([]);
   const [filterMicroarea, setFilterMicroarea] = useState<string[]>([]);
   const [filterDnaHpvPep, setFilterDnaHpvPep] = useState('');
-  const [filterCitoLab, setFilterCitoLab] = useState('');
-  const [filterCitoPep, setFilterCitoPep] = useState('');
+  const [filterCitoLab, setFilterCitoLab] = useState(_initFilterCitoLab);
+  const [filterCitoPep, setFilterCitoPep] = useState(_initFilterCitoPep);
   const [filterDnaHpvGal, setFilterDnaHpvGal] = useState('');
 
   // CSV Import state
@@ -489,22 +474,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
 
-  // Aplica filtros pendentes do Dashboard (roda quando activeTab muda pra 'pacientes')
-  const [filtersReady, setFiltersReady] = useState(true);
-  useEffect(() => {
-    if (!pfData) return;
-    if (pfData.filterStatus) {
-      setFilterStatus(pfData.filterStatus);
-      if (pfData.buscaAtiva !== undefined) setFilterBuscaAtiva(pfData.buscaAtiva);
-    }
-    if (pfData.filterGrupo) {
-      setFilterGrupo(pfData.filterGrupo);
-    }
-    setCurrentPage(1);
-    localStorage.removeItem('dashboard:pendingFilter');
-    setFiltersReady(false);
-    requestAnimationFrame(() => setFiltersReady(true));
-  }, [activeTab]);
+  // filtersReady — sempre true (filtros são aplicados diretamente nos initial states)
+  const filtersReady = true;
 
   const handleOpenDetails = (paciente: Paciente) => {
     setPatientDetails(paciente);
@@ -734,6 +705,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       const version = ++fetchVersionRef.current;
       try {
         setIsLoading(true);
+        console.log('[DEBUG PATS] fetchPacientes - filterGrupo:', filterGrupo, 'filterCitoPep:', filterCitoPep, 'filterDataInicio:', filterDataInicio, 'filterDataFim:', filterDataFim, 'filterBuscaAtiva:', filterBuscaAtiva);
         const options: any = { sort: 'nome' };
         
         const filterParts = [];
@@ -923,14 +895,15 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
         const effectivePage = searchTerm ? 1 : currentPage;
 
-        // Filtrar por busca ativa (pacientes COM ou SEM acompanhamento)
+        // Filtrar por busca ativa (pacientes COM ou SEM acompanhamento — com filtro de datas se aplicável)
         if (filterBuscaAtiva !== null) {
           try {
-            const allAcomp = await pb.collection('amarcap53_acompanhamentos').getFullList({
-              fields: 'paciente',
-              requestKey: null,
-              batch: 500,
-            });
+            const acompOpts: any = { fields: 'paciente', requestKey: null, batch: 500 };
+            const dateParts: string[] = [];
+            if (filterDataInicio) dateParts.push(`data_busca >= "${filterDataInicio} 00:00:00"`);
+            if (filterDataFim) dateParts.push(`data_busca <= "${filterDataFim} 23:59:59"`);
+            if (dateParts.length > 0) acompOpts.filter = dateParts.join(' && ');
+            const allAcomp = await pb.collection('amarcap53_acompanhamentos').getFullList(acompOpts);
             const acompPacIds = [...new Set(allAcomp.map((a: any) => a.paciente).filter(Boolean))];
             if (acompPacIds.length > 0) {
               if (filterBuscaAtiva === true) {
@@ -1019,7 +992,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
     fetchPacientes();
     return () => { cancelled = true; };
-  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, debouncedSearchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal, filtersReady]);
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, debouncedSearchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal, filterBuscaAtiva, filtersReady]);
 
   // CSV Import handlers
   const convertDateToISO = (value: string): string => {
