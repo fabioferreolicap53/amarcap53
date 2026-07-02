@@ -106,9 +106,9 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Estrutura Desktop */}
       <div className="hidden lg:flex items-center h-full flex-1 min-w-0">
         {/* Coluna: Nav + User Info */}
-        <div className="flex items-center gap-3 lg:gap-4 xl:gap-6 min-w-0 flex-1 h-full">
+        <div className="flex items-center gap-4 lg:gap-5 xl:gap-8 min-w-0 flex-1 h-full">
           {/* Navegação */}
-          <nav className="flex items-center justify-end gap-0.5 lg:gap-1 xl:gap-1.5 overflow-x-auto no-scrollbar pb-1 flex-1 min-w-0 ml-auto">
+          <nav className="flex items-center justify-center gap-1 lg:gap-1.5 xl:gap-2 overflow-x-auto no-scrollbar pb-1 min-w-0">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -116,14 +116,14 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   key={item.id}
                   onClick={() => setActiveTab?.(item.id)}
-                  className={`flex items-center gap-1 lg:gap-1.5 xl:gap-2 px-1.5 lg:px-2 xl:px-3 py-1.5 lg:py-2 xl:py-2.5 rounded-xl transition-all duration-300 whitespace-nowrap group shrink-0 ${
-                    isActive 
-                      ? 'bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.1)] border border-white/20' 
+                  className={`flex items-center gap-1.5 lg:gap-2 xl:gap-2.5 px-2 lg:px-3 xl:px-4 py-2 lg:py-2.5 xl:py-3 rounded-xl transition-all duration-300 whitespace-nowrap group shrink-0 ${
+                    isActive
+                      ? 'bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.1)] border border-white/20'
                       : 'text-white/60 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  <Icon className={`w-3.5 lg:w-3.5 xl:w-4 h-3.5 lg:h-3.5 xl:h-4 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
-                  <span className="text-[9px] lg:text-[10px] xl:text-xs font-bold tracking-wide uppercase">{item.label}</span>
+                  <Icon className={`w-4 lg:w-4 xl:w-[18px] h-4 lg:h-4 xl:h-[18px] transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
+                  <span className="text-[10px] lg:text-xs xl:text-sm font-bold tracking-wide uppercase">{item.label}</span>
                 </button>
               );
             })}
@@ -131,7 +131,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Informações do Usuário */}
           {user && (
-            <div className="hidden md:flex items-center justify-center gap-2 lg:gap-2 xl:gap-5 min-w-0 border-l border-white/10 pl-2 lg:pl-3 xl:pl-5 h-full flex-[0.86]">
+            <div className="hidden md:flex items-center gap-3 lg:gap-4 xl:gap-5 min-w-0 border-l border-white/10 pl-3 lg:pl-4 xl:pl-5 h-full shrink-0">
               {/* Unidade */}
               {user.unidade_saude && (
                 <div className="flex items-center gap-1.5 lg:gap-2 xl:gap-2.5 group/info min-w-0 shrink-0 max-w-[180px] lg:max-w-[220px] xl:max-w-none">

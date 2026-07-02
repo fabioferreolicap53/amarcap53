@@ -256,12 +256,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
   // Migração: descarta cache antigo (chaves de filteredGroupCounts mudaram de padrão para nome real)
   const CACHE_VERSION_KEY = 'dash_cache_version';
-  const CURRENT_CACHE_VERSION = 3;
+  const CURRENT_CACHE_VERSION = 4;
   const storedVersion = (() => { try { return Number(localStorage.getItem(CACHE_VERSION_KEY)) || 0; } catch { return 0; } })();
   if (storedVersion < CURRENT_CACHE_VERSION) {
     localStorage.setItem(CACHE_VERSION_KEY, String(CURRENT_CACHE_VERSION));
     if (_acOld) _acOld.filteredGroupCounts = {};
     if (_ac) _ac.filteredGroupCounts = {};
+    if (_scOld) _scOld.filteredGroupCounts = {};
+    if (_sc) _sc.filteredGroupCounts = {};
   }
 
   const [stats, setStats] = useState(_scOld ?? _sc ?? {
@@ -296,6 +298,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const debouncedFilterDataFim = useDebounce(filterDataFim, 500);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [selectedGrupo, setSelectedGrupo] = useState<string | null>(null);
+  const [selectedPrioIdx, setSelectedPrioIdx] = useState<number | null>(null);
   const [filterBuscaAtiva, setFilterBuscaAtiva] = useState<boolean | undefined>(undefined);
   const [grupoDataInicio, setGrupoDataInicio] = useState('');
   const [grupoDataFim, setGrupoDataFim] = useState('');
@@ -304,12 +307,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const grupoContainerRef = useRef<HTMLDivElement>(null);
   const loadedRecordsRef = useRef<any[]>([]);
   const comBuscaMapRef = useRef<Record<string, number>>(_acOld?.comBuscaMap ?? {});
+  const comBuscaAlertMapRef = useRef<Record<string, number>>({});
+  const selectedGruposDBRef = useRef<string[]>([]);
   const [filteredComBuscaMap, setFilteredComBuscaMap] = useState<Record<string, number>>(_acOld?.filteredComBuscaMap ?? {});
   const grupoBreakdownRef = useRef<Record<string, number>>(_scOld?.grupoBreakdown ?? {});
-  const [filteredGroupCounts, setFilteredGroupCounts] = useState<Record<string, number>>(_acOld?.filteredGroupCounts ?? {});
+  const [filteredGroupCounts, setFilteredGroupCounts] = useState<Record<string, number>>(_scOld?.filteredGroupCounts ?? _acOld?.filteredGroupCounts ?? {});
   const [isLoading, setIsLoading] = useState(true);
   const [acompStats, setAcompStats] = useState(_acOld?.acompStats ?? {
     total: 0,
+    alertComBusca: {} as Record<string, number>,
     sucesso: 0,
     contatos: 0,
     tipoBusca: {} as Record<string, number>,
@@ -394,9 +400,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const displayStats = stats;
 
   // Lógica de dois cliques nos cards de grupo
-  const handleGrupoClick = (grupo: string) => {
-      if (selectedGrupo === grupo) { setSelectedGrupo(null); return; }
-      setSelectedGrupo(grupo);
+  const handleGrupoClick = (prioIdx: number, gruposDB: string[]) => {
+      const key = String(prioIdx);
+      if (selectedGrupo === key) { setSelectedGrupo(null); setSelectedPrioIdx(null); return; }
+      setSelectedGrupo(key);
+      setSelectedPrioIdx(prioIdx);
+      selectedGruposDBRef.current = gruposDB;
       setFilterBuscaAtiva(undefined);
       setGrupoBuscaStats(null);
     };
@@ -419,8 +428,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     // SEM datas custom → skeleton por 400ms, depois dados instantâneos
     if (!debouncedGrupoDataInicio && !debouncedGrupoDataFim) {
       const timer = setTimeout(() => {
-        const totalGrupo = filteredGroupCounts?.[selectedGrupo] ?? (grupoBreakdownRef.current?.[selectedGrupo] || 0);
-        const comBusca = filteredComBuscaMap[selectedGrupo] ?? (comBuscaMapRef.current?.[selectedGrupo] || 0);
+        const grupos = selectedGruposDBRef.current;
+        if (grupos.length === 0) return;
+
+        let totalGrupo = 0;
+        let comBusca = 0;
+
+        grupos.forEach(g => {
+          const groupTotal = filteredGroupCounts?.[g] ?? (grupoBreakdownRef.current?.[g] || 0);
+          totalGrupo += groupTotal;
+          comBusca += (filteredComBuscaMap[g] ?? comBuscaMapRef.current?.[g] ?? 0);
+        });
+
         setGrupoBuscaStats({ comBusca, semBusca: Math.max(totalGrupo - comBusca, 0) });
       }, 400);
       return () => clearTimeout(timer);
@@ -442,10 +461,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         };
 
         // Helper: verificar se paciente pertence ao grupo etário
-        // NOTA: para "com busca", NÃO verificamos cito — o paciente FOI acompanhado,
-        // independently de ter cito preenchido (pode ter sido preenchido DEPOIS da busca)
         const isInGrupo = (pac: any): boolean => {
-          return pac.grupo === selectedGrupo;
+          return selectedGruposDBRef.current.includes(pac.grupo);
         };
 
         // Helper: busca paginada robusta (igual paginatedFetch do fetchStats)
@@ -483,8 +500,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
         if (pacIdsNoPeriodo.size === 0) {
           if (!cancelled) {
-            // Total COM filtro cito: consistente com a contagem exibida no card
-            const totalGrupo = filteredGroupCounts?.[selectedGrupo] ?? (grupoBreakdownRef.current?.[selectedGrupo] || 0);
+            const grupos = selectedGruposDBRef.current;
+            const totalGrupo = grupos.reduce((acc, g) => acc + (filteredGroupCounts?.[g] ?? grupoBreakdownRef.current?.[g] ?? 0), 0);
             setGrupoBuscaStats({ comBusca: 0, semBusca: totalGrupo });
           }
           return;
@@ -514,8 +531,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           comBuscaSet.add(pacId);
         }
 
-        // 6. Total do grupo COM filtro cito (consistente com a contagem exibida no card)
-        const totalGrupo = filteredGroupCounts?.[selectedGrupo] ?? (grupoBreakdownRef.current?.[selectedGrupo] || 0);
+        // 6. Total do grupo (consistente com a contagem exibida no card)
+        const grupos = selectedGruposDBRef.current;
+        const totalGrupo = grupos.reduce((acc, g) => acc + (filteredGroupCounts?.[g] ?? grupoBreakdownRef.current?.[g] ?? 0), 0);
         if (!cancelled) setGrupoBuscaStats({ comBusca: comBuscaSet.size, semBusca: totalGrupo - comBuscaSet.size });
       } catch { if (!cancelled) setGrupoBuscaStats(null); }
     };
@@ -558,9 +576,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     const bf = fp.length > 0 ? fp.join(' && ') : '';
 
     const prio = [
-      { g: '30-49', cf: 'cito_pep = ""' },
-      { g: '50-64', cf: 'cito_pep = ""' },
-      { g: '25-29', cf: 'cito_pep = "" && cito_lab = ""' },
+      { g: '30-49', cf: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
+      { g: '50-64', cf: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
+      { g: '25-29', cf: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
+      { g: '6[45]>|65\\+|6[45]\\+|6[45]\\s*anos|6[45]\\s*$|6[45]\\s*\\)', cf: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
     ];
 
     (async () => {
@@ -665,7 +684,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         // Build acomp filters (only acomp-specific fields, not role/regional — handled via patient IDs below)
         const acompFilterParts: string[] = [];
         if (filterDataInicio) {
-          acompFilterParts.push(`data_busca >= "${filterDataInicio} 00:00:00"`);
+          acompFilterParts.push(`data_busca >= "${filterDataInicio}"`);
         }
         if (filterDataFim) {
           acompFilterParts.push(`data_busca <= "${filterDataFim} 23:59:59"`);
@@ -745,12 +764,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             const g = p.grupo || 'NÃO INFORMADO';
             const hasCito = !!(p.cito_pep && String(p.cito_pep).trim());
             const hasCitoLab = !!(p.cito_lab && String(p.cito_lab).trim());
+            const hasDna = !!(p.dna_hpv_pep && String(p.dna_hpv_pep).trim());
+            const hasDnaGal = !!(p.dna_hpv_gal && String(p.dna_hpv_gal).trim());
             const is3049 = /30.*49/i.test(g);
             const is5064 = /50.*6[0-4]|6[0-4].*50/i.test(g);
             const is2529 = /25.*29|29.*25/i.test(g);
-            if ((is3049 || is5064) && !hasCito) {
-              filteredCounts[g] = (filteredCounts[g] || 0) + 1;
-            } else if (is2529 && !hasCito && !hasCitoLab) {
+            const is65plus = /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i.test(g);
+            
+            if ((is3049 || is5064 || is2529 || is65plus) && !hasCito && !hasCitoLab && !hasDna && !hasDnaGal) {
               filteredCounts[g] = (filteredCounts[g] || 0) + 1;
             }
           });
@@ -778,6 +799,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             coberturaPercent: totalPacientes > 0 ? Math.round((emDia / totalPacientes) * 100) : 0,
             pepMol: pepMolCount, coltMol: coltMolCount, pepCito: pepCitoCount, coltCito: coltCitoCount,
             alertBreakdown: alerts, grupoBreakdown: groups,
+            filteredGroupCounts: filteredCounts,
             examVolume: { cito: pepCitoCount + coltCitoCount, hpv: pepMolCount + coltMolCount, pendente: atrasadas }
           });
         } else {
@@ -787,6 +809,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           const cached = getCache(STATS_CACHE_KEY);
           if (cached) {
             setStats(prev => ({ ...prev, ...cached, examTrend: emptyExamTrend, acompTrend: emptyAcompTrend }));
+            if (cached.filteredGroupCounts) setFilteredGroupCounts(cached.filteredGroupCounts);
           }
 
           const safeCount = async (field?: string, label?: string): Promise<number> => {
@@ -815,8 +838,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           ]);
           if (cancelled) return;
 
-          // Descobrir grupos únicos e contar cada um
+          // Descobrir grupos únicos e contar cada um (incluindo contagem filtrada para prioritários)
           const groups: Record<string, number> = {};
+          const filteredCounts: Record<string, number> = {};
           try {
             // Pegar 500 registros com campo 'grupo' pra descobrir todos os grupos únicos
             const sample = await pb.collection('amarcap53_pacientes').getList(1, 500, {
@@ -829,10 +853,24 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               // Contar registros de cada grupo via safeCount (rápido, sem full scan)
               const countPromises = uniqueGrupos.map(async (g) => {
                 if (g === '--' || g === 'NÃO INFORMADO') return;
+                
+                // Contagem total do grupo
                 const cnt = await safeCount(`grupo = "${g}"`, `grupo_${g}`);
                 if (cnt > 0 && !cancelled) groups[g] = cnt;
+
+                // Contagem filtrada (sem exames) para grupos prioritários
+                const is3049 = /30.*49/i.test(g);
+                const is5064 = /50.*6[0-4]|6[0-4].*50/i.test(g);
+                const is2529 = /25.*29|29.*25/i.test(g);
+                const is65plus = /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i.test(g);
+                
+                if (is3049 || is5064 || is2529 || is65plus) {
+                  const filtered = await safeCount(`grupo = "${g}" && cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""`, `filtered_${g}`);
+                  if (!cancelled) filteredCounts[g] = filtered;
+                }
               });
               await Promise.all(countPromises);
+              if (!cancelled) setFilteredGroupCounts(filteredCounts);
             }
           } catch (err) {
             console.warn('[grupo] discover error:', err);
@@ -877,14 +915,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               coltCito,
               alertBreakdown: { NAO_IDENTIFICADO: atrasadas, PEP_MOLECULAR: pepMol, COLETA_MOLECULAR: coltMol, PEP_CITO: pepCito, COLETA_CITO: coltCito },
               grupoBreakdown: groups,
+              filteredGroupCounts: filteredCounts,
               examVolume: { cito: pepCito + coltCito, hpv: pepMol + coltMol, pendente: atrasadas }
             });
           }
         // Cache de acompanhamentos: renderiza instantâneo, busca em background
         const aCached = getCache(ACOMP_CACHE_KEY);
-        if (aCached && !cancelled) {
+        if (aCached && !cancelled && aCached.acompStats?.total > 0) {
           setAcompStats(aCached.acompStats);
-
         }
 
         // Acompanhamentos
@@ -910,9 +948,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             // 2. Extrai IDs únicos dos pacientes com acompanhamento (~2K)
             const comBuscaPacIds = [...new Set(acompRecords.map((r: any) => r.paciente).filter(Boolean))];
 
-            // 3. Busca APENAS esses pacientes com id+grupo (~2K registros, não 130K)
+            // 3. Busca APENAS esses pacientes com id+grupo+campos de status (~2K registros, não 130K)
             if (comBuscaPacIds.length > 0) {
               const comBuscaMap: Record<string, number> = {};
+              const comBuscaAlerts: Record<string, number> = {};
               const filteredComBusca: Record<string, number> = {};
               const batchSize = 200;
               for (let i = 0; i < comBuscaPacIds.length && !cancelled; i += batchSize) {
@@ -921,22 +960,33 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 try {
                   const pacs = await pb.collection('amarcap53_pacientes').getFullList({
                     filter: idFilter,
-                    fields: 'id,grupo,cito_pep,cito_lab',
+                    fields: 'id,grupo,cito_pep,cito_lab,dna_hpv_pep,dna_hpv_gal',
                     batch: 500,
                     requestKey: null,
                   });
                   pacs.forEach((p: any) => {
+                    // Determinar status do paciente para o card
+                    let status: string;
+                    if (hasValue(p.dna_hpv_pep)) status = 'PEP_MOLECULAR';
+                    else if (hasValue(p.dna_hpv_gal)) status = 'COLETA_MOLECULAR';
+                    else if (hasValue(p.cito_pep)) status = 'PEP_CITO';
+                    else if (hasValue(p.cito_lab)) status = 'COLETA_CITO';
+                    else status = 'NAO_IDENTIFICADO';
+
+                    comBuscaAlerts[status] = (comBuscaAlerts[status] || 0) + 1;
+
                     if (p.grupo) {
                       comBuscaMap[p.grupo] = (comBuscaMap[p.grupo] || 0) + 1;
-                      // filteredComBusca: pacientes com acompanhamento E que atendem filtro cito
+                      // filteredComBusca: pacientes com acompanhamento E que atendem filtro rastreamento
                       const hasCito = !!(p.cito_pep && String(p.cito_pep).trim());
                       const hasCitoLab = !!(p.cito_lab && String(p.cito_lab).trim());
+                      const hasDna = !!(p.dna_hpv_pep && String(p.dna_hpv_pep).trim());
+                      const hasDnaGal = !!(p.dna_hpv_gal && String(p.dna_hpv_gal).trim());
                       const isP3049 = /30.*49/i.test(p.grupo);
                       const isP5064 = /50.*6[0-4]|6[0-4].*50/i.test(p.grupo);
                       const isP2529 = /25.*29|29.*25/i.test(p.grupo);
-                      if ((isP3049 || isP5064) && !hasCito) {
-                        filteredComBusca[p.grupo] = (filteredComBusca[p.grupo] || 0) + 1;
-                      } else if (isP2529 && !hasCito && !hasCitoLab) {
+                      const isP65plus = /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i.test(p.grupo);
+                      if ((isP3049 || isP5064 || isP2529 || isP65plus) && !hasCito && !hasCitoLab && !hasDna && !hasDnaGal) {
                         filteredComBusca[p.grupo] = (filteredComBusca[p.grupo] || 0) + 1;
                       }
                     }
@@ -944,6 +994,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 } catch { /* batch falha, continua */ }
               }
               comBuscaMapRef.current = comBuscaMap;
+              comBuscaAlertMapRef.current = comBuscaAlerts;
               setFilteredComBuscaMap(filteredComBusca);
 
               // Calcula filteredGroupCounts: 3 queries leves (1 cada por grupo)
@@ -951,9 +1002,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               try {
                 const prioGroupNames = Object.keys(grupoBreakdownRef.current);
                 const prioFilters: Array<{ re: RegExp; citoFilter: string }> = [
-                  { re: /30.*49/i, citoFilter: 'cito_pep = ""' },
-                  { re: /50.*6[0-4]|6[0-4].*50/i, citoFilter: 'cito_pep = ""' },
-                  { re: /25.*29|29.*25/i, citoFilter: 'cito_pep = "" && cito_lab = ""' },
+                  { re: /30.*49/i, citoFilter: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
+                  { re: /50.*6[0-4]|6[0-4].*50/i, citoFilter: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
+                  { re: /25.*29|29.*25/i, citoFilter: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
+                  { re: /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i, citoFilter: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
                 ];
                 const countPromises = prioGroupNames.map(async (g) => {
                   const prio = prioFilters.find(p => p.re.test(g));
@@ -996,9 +1048,29 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
         // Só processa stats/acompTrend/comBuscaMap se tiver acompRecords de verdade
         if (scopedPatientIds.length > 0 || loadedRecords.length > 0 || acompRecords.length > 0) {
-          // Process Acompanhamentos
+          // Process Acompanhamentos — contagem por paciente único (consistente com PatientsScreen)
+          const uniqueAcompPacIds = new Set(acompRecords.map((r: any) => r.paciente).filter(Boolean));
+
+          // Se for scope query, calcula alertComBusca a partir de loadedRecords
+          if (isScopeQuery && loadedRecords.length > 0) {
+            const alerts: Record<string, number> = {};
+            loadedRecords.forEach(p => {
+              if (uniqueAcompPacIds.has(p.id)) {
+                let status: string;
+                if (hasValue(p.dna_hpv_pep)) status = 'PEP_MOLECULAR';
+                else if (hasValue(p.dna_hpv_gal)) status = 'COLETA_MOLECULAR';
+                else if (hasValue(p.cito_pep)) status = 'PEP_CITO';
+                else if (hasValue(p.cito_lab)) status = 'COLETA_CITO';
+                else status = 'NAO_IDENTIFICADO';
+                alerts[status] = (alerts[status] || 0) + 1;
+              }
+            });
+            comBuscaAlertMapRef.current = alerts;
+          }
+
           const aStats = {
-            total: acompRecords.length,
+            total: uniqueAcompPacIds.size,
+            alertComBusca: comBuscaAlertMapRef.current,
             sucesso: acompRecords.filter(r => {
               const val = String(r.situacao_pos_busca || '').toLowerCase();
               return val && val.includes('agendamento');
@@ -1063,15 +1135,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             loadedRecords.forEach((p: any) => {
               if (p.grupo && pacComBusca.has(p.id)) {
                 comBuscaMap[p.grupo] = (comBuscaMap[p.grupo] || 0) + 1;
-                // filteredComBusca: com acompanhamento E que atende filtro cito
+                // filteredComBusca: com acompanhamento E que atende filtro rastreamento
                 const hasCito = !!(p.cito_pep && String(p.cito_pep).trim());
                 const hasCitoLab = !!(p.cito_lab && String(p.cito_lab).trim());
+                const hasDna = !!(p.dna_hpv_pep && String(p.dna_hpv_pep).trim());
+                const hasDnaGal = !!(p.dna_hpv_gal && String(p.dna_hpv_gal).trim());
                 const isP3049 = /30.*49/i.test(p.grupo);
                 const isP5064 = /50.*6[0-4]|6[0-4].*50/i.test(p.grupo);
                 const isP2529 = /25.*29|29.*25/i.test(p.grupo);
-                if ((isP3049 || isP5064) && !hasCito) {
-                  filteredComBusca[p.grupo] = (filteredComBusca[p.grupo] || 0) + 1;
-                } else if (isP2529 && !hasCito && !hasCitoLab) {
+                const isP65plus = /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i.test(p.grupo);
+                if ((isP3049 || isP5064 || isP2529 || isP65plus) && !hasCito && !hasCitoLab && !hasDna && !hasDnaGal) {
                   filteredComBusca[p.grupo] = (filteredComBusca[p.grupo] || 0) + 1;
                 }
               }
@@ -1083,17 +1156,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             // Calcula filteredGroupCounts a partir de loadedRecords (sem queries extras)
             const filteredGroupCountsLocal: Record<string, number> = {};
             loadedRecords.forEach((p: any) => {
-              if (p.grupo) {
-                const hasCito = !!(p.cito_pep && String(p.cito_pep).trim());
-                const hasCitoLab = !!(p.cito_lab && String(p.cito_lab).trim());
-                const isP3049 = /30.*49/i.test(p.grupo);
-                const isP5064 = /50.*6[0-4]|6[0-4].*50/i.test(p.grupo);
-                const isP2529 = /25.*29|29.*25/i.test(p.grupo);
-                if ((isP3049 || isP5064) && !hasCito) {
-                  filteredGroupCountsLocal[p.grupo] = (filteredGroupCountsLocal[p.grupo] || 0) + 1;
-                } else if (isP2529 && !hasCito && !hasCitoLab) {
-                  filteredGroupCountsLocal[p.grupo] = (filteredGroupCountsLocal[p.grupo] || 0) + 1;
-                }
+              const g = p.grupo || 'NÃO INFORMADO';
+              const hasCito = !!(p.cito_pep && String(p.cito_pep).trim());
+              const hasCitoLab = !!(p.cito_lab && String(p.cito_lab).trim());
+              const hasDna = !!(p.dna_hpv_pep && String(p.dna_hpv_pep).trim());
+              const hasDnaGal = !!(p.dna_hpv_gal && String(p.dna_hpv_gal).trim());
+              const is3049 = /30.*49/i.test(g);
+              const is5064 = /50.*6[0-4]|6[0-4].*50/i.test(g);
+              const is2529 = /25.*29|29.*25/i.test(g);
+              const is65plus = /64>|65>/i.test(g);
+              
+              if ((is3049 || is5064 || is2529 || is65plus) && !hasCito && !hasCitoLab && !hasDna && !hasDnaGal) {
+                filteredGroupCountsLocal[g] = (filteredGroupCountsLocal[g] || 0) + 1;
               }
             });
             setFilteredGroupCounts(filteredGroupCountsLocal);
@@ -1301,10 +1375,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             const gb = Object.keys(grupoBreakdownRef.current).length > 0 ? grupoBreakdownRef.current : stats.grupoBreakdown;
             if (!gb || Object.keys(gb).length === 0) return null;
             const PRIORITY_GROUPS = [
-              { num: '1º', titulo: 'Mulheres de 30 a 49 anos', desc: 'com atraso no rastreamento com o exame citopatológico (mais de 3 anos) ou que nunca o realizaram', pattern: /30.*49/i, color: 'violet', gradient: 'from-violet-600 to-violet-400', bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', ring: 'ring-violet-400/30', glow: 'shadow-violet-500/25', hoverGlow: 'hover:shadow-violet-500/40', hoverBorder: 'hover:border-violet-400', numBg: 'bg-violet-600', numText: 'text-white', iconColor: 'text-violet-500' },
-              { num: '2º', titulo: 'Mulheres de 50 a 64 anos', desc: 'com atraso no rastreamento com o exame citopatológico (mais de 3 anos) ou que nunca o realizaram', pattern: /50.*6[0-4]|6[0-4].*50|50.*65(?![0-9])|50.*65$/i, color: 'fuchsia', gradient: 'from-fuchsia-600 to-fuchsia-400', bg: 'bg-fuchsia-50', border: 'border-fuchsia-200', text: 'text-fuchsia-700', ring: 'ring-fuchsia-400/30', glow: 'shadow-fuchsia-500/25', hoverGlow: 'hover:shadow-fuchsia-500/40', hoverBorder: 'hover:border-fuchsia-400', numBg: 'bg-fuchsia-600', numText: 'text-white', iconColor: 'text-fuchsia-500' },
-              { num: '3º', titulo: 'Mulheres de 30 a 49 anos', desc: 'independente da história anterior de rastreamento com exame citopatológico', pattern: /64>|65>/i, color: 'blue', gradient: 'from-blue-600 to-blue-400', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', ring: 'ring-blue-400/30', glow: 'shadow-blue-500/25', hoverGlow: 'hover:shadow-blue-500/40', hoverBorder: 'hover:border-blue-400', numBg: 'bg-blue-600', numText: 'text-white', iconColor: 'text-blue-500' },
-              { num: '4º', titulo: 'Mulheres de 25 a 29 anos', desc: 'que nunca fizeram o exame citopatológico', pattern: /25.*29|29.*25/i, color: 'emerald', gradient: 'from-emerald-600 to-emerald-400', bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', ring: 'ring-emerald-400/30', glow: 'shadow-emerald-500/25', hoverGlow: 'hover:shadow-emerald-500/40', hoverBorder: 'hover:border-emerald-400', numBg: 'bg-emerald-600', numText: 'text-white', iconColor: 'text-emerald-500' },
+              { num: '1º', titulo: 'Mulheres de 30 a 49 anos', desc: 'com atraso no rastreamento (mais de 3 anos) ou que nunca o realizaram', pattern: /30.*49/i, color: 'purple', gradient: 'from-purple-600 to-purple-400', bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', ring: 'ring-purple-400/30', glow: 'shadow-purple-500/25', hoverGlow: 'hover:shadow-purple-500/40', hoverBorder: 'hover:border-purple-400', numBg: 'bg-purple-600', numText: 'text-white', iconColor: 'text-purple-500' },
+              { num: '2º', titulo: 'Mulheres de 50 a 64 anos', desc: 'com atraso no rastreamento (mais de 3 anos) ou que nunca o realizaram', pattern: /50.*6[0-4]|6[0-4].*50|50.*65(?![0-9])|50.*65$/i, color: 'fuchsia', gradient: 'from-fuchsia-600 to-fuchsia-400', bg: 'bg-fuchsia-50', border: 'border-fuchsia-200', text: 'text-fuchsia-700', ring: 'ring-fuchsia-400/30', glow: 'shadow-fuchsia-500/25', hoverGlow: 'hover:shadow-fuchsia-500/40', hoverBorder: 'hover:border-fuchsia-400', numBg: 'bg-fuchsia-600', numText: 'text-white', iconColor: 'text-fuchsia-500' },
+              { num: '3º', titulo: 'Mulheres de 30 a 49 anos', desc: 'independente da história anterior de rastreamento', pattern: /^30[\s\-a-z]*49(\s+anos)?$/i, color: 'violet', gradient: 'from-violet-600 to-violet-400', bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', ring: 'ring-violet-400/30', glow: 'shadow-violet-500/25', hoverGlow: 'hover:shadow-violet-500/40', hoverBorder: 'hover:border-violet-400', numBg: 'bg-violet-600', numText: 'text-white', iconColor: 'text-violet-500' },
+              { num: '4º', titulo: 'Mulheres de 25 a 29 anos', desc: 'que nunca fizeram o rastreamento', pattern: /25.*29|29.*25/i, color: 'brown', gradient: 'from-[#92400e] to-[#b45309]', bg: 'bg-[#faf7f2]', border: 'border-[#e9e0d2]', text: 'text-[#78350f]', ring: 'ring-[#92400e]/30', glow: 'shadow-[#92400e]/25', hoverGlow: 'hover:shadow-[#92400e]/40', hoverBorder: 'hover:border-[#92400e]', numBg: 'bg-[#92400e]', numText: 'text-white', iconColor: 'text-[#92400e]' },
             ];
             const EXTRA_COLORS = ['indigo', 'slate', 'cyan', 'amber', 'teal', 'pink', 'rose', 'orange'];
             const extraColorMap: Record<string, { gradient: string; bg: string; border: string; text: string; ring: string; glow: string; hoverGlow: string; hoverBorder: string; numBg: string; numText: string; iconColor: string }> = {
@@ -1320,26 +1394,48 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
             const allGroups = Object.entries(gb)
               .filter(([k]) => k !== 'NÃO INFORMADO' && k !== '--')
-              .map(([k, v]) => ({ grupo: k, count: Number(v) || 0, titulo: `Mulheres de ${k} anos` }));
-            const sortedKeys = allGroups.sort((a, b) => b.count - a.count).map(g => g.grupo);
+              .map(([k, v]) => ({ grupo: k, count: Number(v) || 0 }));
 
-            // Match DB groups to priority definitions
-            const matched: { grupo: string; count: number; titulo: string; desc: string; num: string; priority: typeof PRIORITY_GROUPS[0]; prioIdx: number }[] = [];
-            const unmatched: { grupo: string; count: number; titulo: string; num: string }[] = [];
-
-            sortedKeys.forEach(grupo => {
-              const prioIdx = PRIORITY_GROUPS.findIndex(p => p.pattern.test(grupo));
-              const grpObj = allGroups.find(g => g.grupo === grupo)!;
-              if (prioIdx >= 0) {
-                const pg = PRIORITY_GROUPS[prioIdx];
-                const isPrioGroup = /30.*49|50.*6[0-4]|6[0-4].*50|25.*29|29.*25/i.test(grupo);
-                const filteredCount = isPrioGroup ? (filteredGroupCounts?.[grupo] ?? grpObj.count) : grpObj.count;
-                matched.push({ grupo, count: filteredCount, titulo: grpObj.titulo, desc: pg.desc, num: pg.num, priority: pg, prioIdx });
+            // Refatoração: Agrupar por cartão de prioridade (sumarizando se múltiplos grupos DB baterem no mesmo card)
+            const matched: { count: number; titulo: string; desc: string; num: string; priority: typeof PRIORITY_GROUPS[0]; prioIdx: number; gruposDB: string[] }[] = [];
+            
+            PRIORITY_GROUPS.forEach((pg, prioIdx) => {
+              let gruposDB: string[];
+              if ('reuseFrom' in pg && typeof (pg as any).reuseFrom === 'number') {
+                gruposDB = matched[(pg as any).reuseFrom]?.gruposDB ?? [];
               } else {
-                unmatched.push({ grupo, count: grpObj.count, titulo: grpObj.titulo, num: `${matched.length + unmatched.length + 1}º` });
+                gruposDB = allGroups.filter(g => pg.pattern.test(g.grupo)).map(g => g.grupo);
+              }
+
+              if (gruposDB.length > 0) {
+                const totalCount = gruposDB.reduce((acc, gName) => {
+                  const grpObj = allGroups.find(g => g.grupo === gName);
+                  if (!grpObj) return acc;
+                  return acc + (filteredGroupCounts?.[gName] ?? grpObj.count);
+                }, 0);
+
+                matched.push({
+                  count: totalCount,
+                  titulo: pg.titulo,
+                  desc: pg.desc,
+                  num: pg.num,
+                  priority: pg,
+                  prioIdx,
+                  gruposDB
+                });
               }
             });
-            matched.sort((a, b) => a.prioIdx - b.prioIdx);
+
+            // Grupos que não bateram em nenhum card de prioridade (exclui grupos de idade acima de 64)
+            const matchedGroupsSet = new Set(matched.flatMap(m => m.gruposDB));
+            const unmatched = allGroups
+              .filter(g => !matchedGroupsSet.has(g.grupo) && !/6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i.test(g.grupo))
+              .map((g, idx) => ({
+                grupo: g.grupo,
+                count: g.count,
+                titulo: `Mulheres de ${g.grupo} anos`,
+                num: `${matched.length + idx + 1}º`
+              }));
 
             const totalPct = (v: number) => stats.totalPacientes > 0 ? Math.round((v / stats.totalPacientes) * 100) : 0;
 
@@ -1353,11 +1449,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                   {matched.map((item) => {
                     const c = item.priority;
                     const pct = totalPct(item.count);
-                    const isSelected = selectedGrupo === item.grupo;
+                    const isSelected = selectedPrioIdx === item.prioIdx;
                     return (
                       <div
-                        key={item.grupo}
-                        onClick={() => handleGrupoClick(item.grupo)}
+                        key={item.prioIdx}
+                        onClick={() => handleGrupoClick(item.prioIdx, item.gruposDB)}
                         className={`group relative bg-white rounded-2xl border-2 ${isSelected ? `${c.border} ring-4 ${c.ring} shadow-xl` : `${c.border} ${c.hoverBorder} shadow-lg ${c.glow} ${c.hoverGlow}`} hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 transition-all duration-500 cursor-pointer ${isSelected ? '' : 'overflow-hidden'}`}
                       >
                         <div className={`h-1 w-full bg-gradient-to-r ${c.gradient} ${isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'} transition-opacity`} />
@@ -1388,7 +1484,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                             </div>
                           </div>
                           <h3
-                            onClick={(e) => { e.stopPropagation(); handleGrupoClick(item.grupo); }}
+                            onClick={(e) => { e.stopPropagation(); handleGrupoClick(item.prioIdx, item.gruposDB); }}
                             className={`text-sm md:text-base font-black ${c.text} uppercase tracking-wide leading-snug cursor-pointer`}
                           >{c.titulo}</h3>
                           <p className="text-[10px] md:text-[11px] font-medium text-slate-500 leading-relaxed">{c.desc}</p>
@@ -1399,13 +1495,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                           {isSelected && (
                             <div className={`relative flex flex-col gap-3 mt-1 animate-fade-in-up`} onClick={(e) => e.stopPropagation()}>
                               {/* Datas */}
-                              <div className="flex gap-2" onMouseDown={(e) => e.stopPropagation()}>
-                                <div className="flex-1">
-                                  <label className={`text-[7px] font-black ${c.text} uppercase tracking-widest mb-1 block`}>Data Inicial</label>
+                              <div className="flex gap-3" onMouseDown={(e) => e.stopPropagation()}>
+                                <div className="flex-1 min-w-0">
+                                  <label className={`text-[8px] font-black ${c.text} uppercase tracking-widest mb-1.5 block`}>Data Inicial</label>
                                   <DatePickerPTBR placeholder="Início" value={grupoDataInicio} onChange={setGrupoDataInicio} />
                                 </div>
-                                <div className="flex-1">
-                                  <label className={`text-[7px] font-black ${c.text} uppercase tracking-widest mb-1 block`}>Data Final</label>
+                                <div className="flex-1 min-w-0">
+                                  <label className={`text-[8px] font-black ${c.text} uppercase tracking-widest mb-1.5 block`}>Data Final</label>
                                   <DatePickerPTBR placeholder="Fim" value={grupoDataFim} onChange={setGrupoDataFim} />
                                 </div>
                               </div>
@@ -1508,19 +1604,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  const pending: any = { filterGrupo: [item.grupo], grupoNum: c.num, grupoTitulo: c.titulo, grupoDescricao: c.desc };
-                                  // Filtro cito: SEMPRE exceto "COM BUSCA + datas"
-                                  // COM BUSCA + datas → Dashboard fetchWithDates NÃO filtra cito
-                                  // COM BUSCA + sem datas → Dashboard usa filteredComBuscaMap QUE filtra cito
-                                  // SEM BUSCA / sem seleção → SEMPRE filtra cito
+                                  const pending: any = { filterGrupo: item.gruposDB, grupoNum: c.num, grupoTitulo: c.titulo, grupoDescricao: c.desc };
+                                  // Filtro cito: SEMPRE exceto "COM BUSCA + datas" ou se for o card "independente"
+                                  const isIndependente = !item.desc.includes('atraso') && !item.desc.includes('nunca');
                                   const isComBuscaComDatas = filterBuscaAtiva === true && (grupoDataInicio || grupoDataFim);
-                                  if (!isComBuscaComDatas) {
-                                    if (/25.*29|29.*25/i.test(item.grupo)) {
-                                      pending.filterCitoPep = 'NÃO';
-                                      pending.filterCitoLab = 'NÃO';
-                                    } else if (/30.*49|50.*6[0-4]|6[0-4].*50/i.test(item.grupo)) {
-                                      pending.filterCitoPep = 'NÃO';
-                                    }
+                                  
+                                  if (!isComBuscaComDatas && !isIndependente) {
+                                    pending.filterDnaHpvPep = 'NÃO';
+                                    pending.filterDnaHpvGal = 'NÃO';
+                                    pending.filterCitoPep = 'NÃO';
+                                    pending.filterCitoLab = 'NÃO';
                                   }
                                   // Envia filtros SEM/COM BUSCA + datas quando selecionado
                                   if (filterBuscaAtiva !== undefined) {
@@ -1596,13 +1689,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                           {isSelected && (
                             <div className={`relative flex flex-col gap-3 mt-1 animate-fade-in-up`} onClick={(e) => e.stopPropagation()}>
                               {/* Datas */}
-                              <div className="flex gap-2" onMouseDown={(e) => e.stopPropagation()}>
-                                <div className="flex-1">
-                                  <label className={`text-[7px] font-black ${c.text} uppercase tracking-widest mb-1 block`}>Data Inicial</label>
+                              <div className="flex gap-3" onMouseDown={(e) => e.stopPropagation()}>
+                                <div className="flex-1 min-w-0">
+                                  <label className={`text-[8px] font-black ${c.text} uppercase tracking-widest mb-1.5 block`}>Data Inicial</label>
                                   <DatePickerPTBR placeholder="Início" value={grupoDataInicio} onChange={setGrupoDataInicio} />
                                 </div>
-                                <div className="flex-1">
-                                  <label className={`text-[7px] font-black ${c.text} uppercase tracking-widest mb-1 block`}>Data Final</label>
+                                <div className="flex-1 min-w-0">
+                                  <label className={`text-[8px] font-black ${c.text} uppercase tracking-widest mb-1.5 block`}>Data Final</label>
                                   <DatePickerPTBR placeholder="Fim" value={grupoDataFim} onChange={setGrupoDataFim} />
                                 </div>
                               </div>
@@ -1706,15 +1799,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   const pending: any = { filterGrupo: [item.grupo], grupoNum: item.num, grupoTitulo: item.titulo, grupoDescricao: '' };
-                                  // SEMPRE envia filtro cito — Dashboard filtra cito em ambos (COM/SEM BUSCA)
+                                  // SEMPRE envia filtro rastreamento vazio — Dashboard filtra "sem rastreamento" em ambos (COM/SEM BUSCA)
                                   const isComBuscaComDatas = filterBuscaAtiva === true && (grupoDataInicio || grupoDataFim);
                                   if (!isComBuscaComDatas) {
-                                    if (/25.*29|29.*25/i.test(item.grupo)) {
-                                      pending.filterCitoPep = 'NÃO';
-                                      pending.filterCitoLab = 'NÃO';
-                                    } else if (/30.*49|50.*6[0-4]|6[0-4].*50/i.test(item.grupo)) {
-                                      pending.filterCitoPep = 'NÃO';
-                                    }
+                                    pending.filterDnaHpvPep = 'NÃO';
+                                    pending.filterDnaHpvGal = 'NÃO';
+                                    pending.filterCitoPep = 'NÃO';
+                                    pending.filterCitoLab = 'NÃO';
                                   }
                                   // Datas só enviadas quando buscaAtiva selecionado
                                   if (filterBuscaAtiva !== undefined) {
@@ -1761,8 +1852,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               ].map((card) => {
                 const pct = displayStats.totalPacientes > 0 ? Math.round((card.value / displayStats.totalPacientes) * 100) : 0;
                 const isActiveSearch = card.key === 'NAO_IDENTIFICADO';
-                const buscaAtivaValor = isActiveSearch ? acompStats.total : 0;
-                const buscaAtivaPct = isActiveSearch && displayStats.totalPacientes > 0 ? Math.round((buscaAtivaValor / displayStats.totalPacientes) * 100) : 0;
+                // Busca ativa = pacientes únicos com acompanhamento NESTE status
+                const buscaAtivaValor = (acompStats as any).alertComBusca?.[card.key] || 0;
+                const buscaAtivaPct = displayStats.totalPacientes > 0 ? Math.round((buscaAtivaValor / displayStats.totalPacientes) * 100) : 0;
+                const semBuscaValor = card.value - buscaAtivaValor;
+                const semBuscaPct = displayStats.totalPacientes > 0 ? Math.round((semBuscaValor / displayStats.totalPacientes) * 100) : 0;
                 const Icon = card.icon;
 
                 return (
@@ -1832,16 +1926,23 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     </div>
 
                     {/* Busca Ativa section (only NAO_IDENTIFICADO) */}
-                    {isActiveSearch && (() => {
-                      const semBuscaValor = card.value - buscaAtivaValor;
-                      const semBuscaPct = displayStats.totalPacientes > 0 ? Math.round((semBuscaValor / displayStats.totalPacientes) * 100) : 0;
-                      return (
+                    {isActiveSearch && (
                         <>
                           <div className="mx-5 border-t border-dashed border-slate-200" />
                           <div className="px-5 py-4 grid grid-cols-2 gap-2.5">
                             {/* Sem Busca Ativa — rose */}
                             <div
-                              className="bg-gradient-to-br from-rose-50 to-rose-100/50 rounded-2xl p-3 border border-rose-200/60 shadow-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                localStorage.setItem('dashboard:pendingFilter', JSON.stringify({
+                                  filterStatus: ['NAO_IDENTIFICADO'],
+                                  buscaAtiva: false,
+                                  grupoTitulo: card.label || '',
+                                  grupoDescricao: card.descricao || '',
+                                }));
+                                setActiveTab('pacientes');
+                              }}
+                              className="bg-gradient-to-br from-rose-50 to-rose-100/50 rounded-2xl p-3 border border-rose-200/60 shadow-sm cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all duration-300"
                             >
                               <div className="flex items-center gap-1.5 mb-2">
                                 <div className="w-4 h-4 rounded-full bg-rose-500 flex items-center justify-center shadow-sm shadow-rose-500/30">
@@ -1859,7 +1960,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
                             {/* Com Busca Ativa — verde */}
                             <div
-                              className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-2xl p-3 border border-emerald-200/60 shadow-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                localStorage.setItem('dashboard:pendingFilter', JSON.stringify({
+                                  filterStatus: ['NAO_IDENTIFICADO'],
+                                  buscaAtiva: true,
+                                  grupoTitulo: card.label || '',
+                                  grupoDescricao: card.descricao || '',
+                                }));
+                                setActiveTab('pacientes');
+                              }}
+                              className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-2xl p-3 border border-emerald-200/60 shadow-sm cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all duration-300"
                             >
                               <div className="flex items-center gap-1.5 mb-2">
                                 <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm shadow-emerald-500/30">
@@ -1876,8 +1987,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                             </div>
                           </div>
                         </>
-                      );
-                    })()}
+                      )}
                   </div>
                 );
               })}

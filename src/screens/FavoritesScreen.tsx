@@ -500,7 +500,10 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       const finalServerFilter = serverFilterParts.length > 0 ? serverFilterParts.join(' && ') : '';
       const resultList = await pb.collection('amarcap53_pacientes').getFullList({
         filter: finalServerFilter,
-        sort: 'nome'
+        fields: 'id,nome,cns,unidade,equipe,microarea,idade,grupo,cito_pep,cito_lab,dna_hpv_pep,dna_hpv_gal,alertas_rastreamento',
+        sort: 'nome',
+        batch: 500,
+        requestKey: null,
       });
 
       // Busca acompanhamentos em lote (evita N+1)
@@ -582,18 +585,13 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     let matchesData = true;
     if (filterDataInicio || filterDataFim) {
       if (p.lastAcomp?.data_busca) {
-        const dataAcomp = new Date(p.lastAcomp.data_busca);
-        dataAcomp.setHours(0, 0, 0, 0);
+        const dataAcomp = p.lastAcomp.data_busca.substring(0, 10); // YYYY-MM-DD direto do DB
 
         if (filterDataInicio) {
-          const dInicio = new Date(filterDataInicio);
-          dInicio.setHours(0, 0, 0, 0);
-          if (dataAcomp < dInicio) matchesData = false;
+          if (dataAcomp < filterDataInicio) matchesData = false;
         }
         if (filterDataFim) {
-          const dFim = new Date(filterDataFim);
-          dFim.setHours(0, 0, 0, 0);
-          if (dataAcomp > dFim) matchesData = false;
+          if (dataAcomp > filterDataFim) matchesData = false;
         }
       } else {
         matchesData = false;

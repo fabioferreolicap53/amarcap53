@@ -171,7 +171,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       const search = normalizeText(searchTerm);
       const patientName = normalizeText(acomp.expand?.paciente?.nome || '');
       const cns = normalizeText(acomp.expand?.paciente?.cns || '');
-      const date = acomp.data_busca ? normalizeText(new Date(acomp.data_busca).toLocaleDateString('pt-BR')) : '';
+      const date = acomp.data_busca ? normalizeText(`${acomp.data_busca.split('-').reverse().join('/')}`) : '';
 
       const matchesSearch = !searchTerm || patientName.includes(search) || cns.includes(search) || date.includes(search);
       const matchesTipoBusca = matchesSelectFilter(acomp.tipo_busca, filterTipoBusca, TIPO_BUSCA_OPTIONS);
@@ -181,17 +181,12 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
       let matchesData = true;
       if (acomp.data_busca) {
-        const dataAcomp = new Date(acomp.data_busca);
-        dataAcomp.setHours(0, 0, 0, 0);
+        const dataAcomp = acomp.data_busca.substring(0, 10); // YYYY-MM-DD direto do DB
         if (filterDataInicio) {
-          const dInicio = new Date(filterDataInicio);
-          dInicio.setHours(0, 0, 0, 0);
-          if (dataAcomp < dInicio) matchesData = false;
+          if (dataAcomp < filterDataInicio) matchesData = false;
         }
         if (filterDataFim) {
-          const dFim = new Date(filterDataFim);
-          dFim.setHours(0, 0, 0, 0);
-          if (dataAcomp > dFim) matchesData = false;
+          if (dataAcomp > filterDataFim) matchesData = false;
         }
       } else if (filterDataInicio || filterDataFim) {
         matchesData = false;
@@ -422,11 +417,8 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       // Ajuste de data para o DatePickerPTBR (DD/MM/YYYY)
       let dataBuscaFormatada = '';
       if (acompToEdit.data_busca) {
-        const date = new Date(acompToEdit.data_busca);
-        const d = String(date.getDate()).padStart(2, '0');
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const y = date.getFullYear();
-        dataBuscaFormatada = `${d}/${m}/${y}`;
+        const parts = acompToEdit.data_busca.substring(0, 10).split('-');
+        dataBuscaFormatada = `${parts[2]}/${parts[1]}/${parts[0]}`;
       }
 
       setSelectedAcompanhamento({
@@ -1014,8 +1006,8 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                         const microarea = p.microarea !== undefined && p.microarea !== '' ? p.microarea : '--';
                         
                         // Formatando a data
-                        const dataFormatada = acomp.data_busca 
-                          ? new Date(acomp.data_busca).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+                        const dataFormatada = acomp.data_busca
+                          ? (() => { const p = acomp.data_busca.substring(0,10).split('-'); const mes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(p[1])-1]; return `${p[2]} DE ${mes?.toUpperCase()} DE ${p[0]}`; })()
                           : '--';
 
                         return (

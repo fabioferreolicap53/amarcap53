@@ -264,6 +264,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const _initFilterGrupo: string[] = _pfData?.filterGrupo ?? [];
   const _initFilterCitoPep: string = _pfData?.filterCitoPep ?? '';
   const _initFilterCitoLab: string = _pfData?.filterCitoLab ?? '';
+  const _initFilterDnaHpvPep: string = _pfData?.filterDnaHpvPep ?? '';
+  const _initFilterDnaHpvGal: string = _pfData?.filterDnaHpvGal ?? '';
   const _initFilterDataInicio: string = _pfData?.filterDataInicio ?? '';
   const _initFilterDataFim: string = _pfData?.filterDataFim ?? '';
   const _initFilterBuscaAtiva: boolean | null = _pfData?.buscaAtiva ?? null;
@@ -277,6 +279,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const pageSize = 10;
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [patientForDetails, setPatientDetails] = useState<Paciente | null>(null);
+  const [detailsAcomps, setDetailsAcomps] = useState<any[]>([]);
+  const [detailsAcompsLoading, setDetailsAcompsLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
 
   // Garantir que os detalhes sejam sempre do dado mais recente no estado
@@ -301,10 +305,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
   // Deriva titulo/descricao a partir do nome do grupo (regex flexível)
   const GRUPO_PATTERNS: { pattern: RegExp; num: string; titulo: string; desc: string }[] = [
-    { pattern: /30.*49|49.*30/i, num: '1º', titulo: 'Mulheres de 30 a 49 anos', desc: 'com atraso no rastreamento com o exame citopatológico (mais de 3 anos) ou que nunca o realizaram' },
-    { pattern: /50.*6[0-4]|6[0-4].*50/i, num: '2º', titulo: 'Mulheres de 50 a 64 anos', desc: 'com atraso no rastreamento com o exame citopatológico (mais de 3 anos) ou que nunca o realizaram' },
-    { pattern: /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i, num: '3º', titulo: 'Mulheres de 65+ anos', desc: 'independente da história anterior de rastreamento com exame citopatológico' },
-    { pattern: /25.*29|29.*25/i, num: '4º', titulo: 'Mulheres de 25 a 29 anos', desc: 'que nunca fizeram o exame citopatológico' },
+    { pattern: /30.*49|49.*30/i, num: '1º', titulo: 'Mulheres de 30 a 49 anos', desc: 'com atraso no rastreamento (mais de 3 anos) ou que nunca o realizaram' },
+    { pattern: /50.*6[0-4]|6[0-4].*50/i, num: '2º', titulo: 'Mulheres de 50 a 64 anos', desc: 'com atraso no rastreamento (mais de 3 anos) ou que nunca o realizaram' },
+    { pattern: /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i, num: '3º', titulo: 'Mulheres acima de 64 anos', desc: 'independente da história anterior de rastreamento' },
+    { pattern: /25.*29|29.*25/i, num: '4º', titulo: 'Mulheres de 25 a 29 anos', desc: 'que nunca fizeram o rastreamento' },
   ];
 
   const pendingGrupo = _pfData?.filterGrupo?.[0] || '';
@@ -325,10 +329,34 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [filterUnidade, setFilterUnidade] = useState<string[]>([]);
   const [filterEquipe, setFilterEquipe] = useState<string[]>([]);
   const [filterMicroarea, setFilterMicroarea] = useState<string[]>([]);
-  const [filterDnaHpvPep, setFilterDnaHpvPep] = useState('');
+  const [filterDnaHpvPep, setFilterDnaHpvPep] = useState(_initFilterDnaHpvPep);
   const [filterCitoLab, setFilterCitoLab] = useState(_initFilterCitoLab);
   const [filterCitoPep, setFilterCitoPep] = useState(_initFilterCitoPep);
-  const [filterDnaHpvGal, setFilterDnaHpvGal] = useState('');
+  const [filterDnaHpvGal, setFilterDnaHpvGal] = useState(_initFilterDnaHpvGal);
+
+  // Deriva info do grupo do painel (quando não veio do dashboard)
+  const panelGrupo = filterGrupo.length > 0 ? filterGrupo[0] : '';
+  const panelGrupoInfo = panelGrupo ? GRUPO_PATTERNS.find(p => p.pattern.test(panelGrupo)) || null : null;
+  const panelGrupoNum = panelGrupoInfo?.num || '';
+  const panelGrupoTitulo = panelGrupoInfo?.titulo || (panelGrupo ? `Mulheres de ${panelGrupo} anos` : '');
+  const panelGrupoDescricao = panelGrupoInfo?.desc || '';
+
+  // Qualquer filtro ativo (dashboard OU painel)
+  const hasActiveFilter = pendingLabel ||
+    filterStatus.length > 0 || filterGrupo.length > 0 ||
+    filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0;
+
+  // Label do filtro ativo para exibição no banner
+  const activeFilterLabel = pendingLabel
+    || (filterStatus.length > 0 ? ALERT_CONFIGS[filterStatus[0]]?.label : '')
+    || (filterGrupo.length > 0 ? filterGrupo[0] : '')
+    || 'Filtro ativo';
+
+  const activeFilterTitle = pendingGrupoTitulo || panelGrupoTitulo || '';
+
+  const activeFilterDesc = pendingGrupoDescricao || panelGrupoDescricao || '';
+
+  const activeGrupoNum = pendingGrupoNum || panelGrupoNum || '';
 
   // CSV Import state
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
@@ -477,14 +505,30 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   // filtersReady — sempre true (filtros são aplicados diretamente nos initial states)
   const filtersReady = true;
 
-  const handleOpenDetails = (paciente: Paciente) => {
+  const handleOpenDetails = async (paciente: Paciente) => {
     setPatientDetails(paciente);
     setIsDetailsModalOpen(true);
+    setDetailsAcomps([]);
+    setDetailsAcompsLoading(true);
+    try {
+      const results = await pb.collection('amarcap53_acompanhamentos').getFullList({
+        filter: `paciente = "${paciente.id}"`,
+        sort: '-data_busca',
+        fields: 'id,data_busca,tipo_busca,tipo_contato,situacao_pos_busca,observacoes,created',
+        requestKey: null,
+      });
+      setDetailsAcomps(results);
+    } catch {
+      setDetailsAcomps([]);
+    } finally {
+      setDetailsAcompsLoading(false);
+    }
   };
 
   const handleCloseDetails = () => {
     setIsDetailsModalOpen(false);
     setPatientDetails(null);
+    setDetailsAcomps([]);
   };
 
   const handleOpenModal = (paciente: Paciente) => {
@@ -692,7 +736,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   // Reseta currentPage para 1 quando filtros mudam (evita pagina vazia)
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal]);
+  }, [searchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal, filterBuscaAtiva]);
 
   // Versão do fetch — previne race condition (fetch antigo não fecha loading)
   const fetchVersionRef = useRef(0);
@@ -794,7 +838,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           }
           
           if (filterDataInicio) {
-            acompFilters.push(`data_busca >= "${filterDataInicio} 00:00:00"`);
+            acompFilters.push(`data_busca >= "${filterDataInicio}"`);
           }
           if (filterDataFim) {
             acompFilters.push(`data_busca <= "${filterDataFim} 23:59:59"`);
@@ -805,9 +849,9 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             const regionFilter = patientRegionFilterParts.join(' && ');
             const regionPatients = await pb.collection('amarcap53_pacientes').getFullList({
               filter: regionFilter,
+              fields: 'id',
               batch: 500,
               requestKey: null,
-              fields: 'id'
             });
             const regionIds = regionPatients.map(p => p.id).filter(Boolean);
             if (regionIds.length > 0) {
@@ -850,16 +894,16 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             statusClauses.push('dna_hpv_pep != ""');
           }
           if (filterStatus.includes('COLETA_MOLECULAR')) {
-            statusClauses.push('(dna_hpv_gal != "" && dna_hpv_pep = "")');
+            statusClauses.push('dna_hpv_gal != "" && dna_hpv_pep = ""');
           }
           if (filterStatus.includes('PEP_CITO')) {
-            statusClauses.push('(cito_pep != "" && dna_hpv_gal = "" && dna_hpv_pep = "")');
+            statusClauses.push('cito_pep != "" && dna_hpv_gal = "" && dna_hpv_pep = ""');
           }
           if (filterStatus.includes('COLETA_CITO')) {
-            statusClauses.push('(cito_lab != "" && cito_pep = "" && dna_hpv_gal = "" && dna_hpv_pep = "")');
+            statusClauses.push('cito_lab != "" && cito_pep = "" && dna_hpv_gal = "" && dna_hpv_pep = ""');
           }
           if (filterStatus.includes('NAO_IDENTIFICADO')) {
-            statusClauses.push('(dna_hpv_pep = "" && dna_hpv_gal = "" && cito_pep = "" && cito_lab = "")');
+            statusClauses.push('(dna_hpv_pep = null || dna_hpv_pep = "") && (dna_hpv_gal = null || dna_hpv_gal = "") && (cito_pep = null || cito_pep = "") && (cito_lab = null || cito_lab = "")');
           }
           if (statusClauses.length > 0) {
             filterParts.push(`(${statusClauses.join(' || ')})`);
@@ -888,11 +932,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           filterParts.push(`(nome ~ "${safeSearch}" || cns ~ "${safeSearch}")`);
         }
 
-        if (filterParts.length > 0) {
-          const filterStr = filterParts.join(' && ').trim();
-          if (filterStr) options.filter = filterStr;
-        }
-
         const effectivePage = searchTerm ? 1 : currentPage;
 
         // Filtrar por busca ativa (pacientes COM ou SEM acompanhamento — com filtro de datas se aplicável)
@@ -900,11 +939,13 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           try {
             const acompOpts: any = { fields: 'paciente', requestKey: null, batch: 500 };
             const dateParts: string[] = [];
-            if (filterDataInicio) dateParts.push(`data_busca >= "${filterDataInicio} 00:00:00"`);
+            if (filterDataInicio) dateParts.push(`data_busca >= "${filterDataInicio}"`);
             if (filterDataFim) dateParts.push(`data_busca <= "${filterDataFim} 23:59:59"`);
             if (dateParts.length > 0) acompOpts.filter = dateParts.join(' && ');
+            
             const allAcomp = await pb.collection('amarcap53_acompanhamentos').getFullList(acompOpts);
             const acompPacIds = [...new Set(allAcomp.map((a: any) => a.paciente).filter(Boolean))];
+            
             if (acompPacIds.length > 0) {
               if (filterBuscaAtiva === true) {
                 // COM acompanhamento
@@ -919,10 +960,16 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
               // Nenhum acompanhamento → resultado vazio
               filterParts.push('id = "__none__"');
             }
-            // Rebuild filter
-            const finalFilter = filterParts.join(' && ').trim();
-            if (finalFilter) options.filter = finalFilter;
-          } catch { /* ignora erro */ }
+          } catch (err) {
+            console.error('[DEBUG PATS] Erro ao buscar acompanhamentos:', err);
+          }
+        }
+
+        // Finaliza construção do filtro
+        const finalFilter = filterParts.join(' && ').trim();
+        console.log('[DEBUG PATS] Final Filter:', finalFilter);
+        if (finalFilter) {
+          options.filter = finalFilter;
         }
 
         // Parallel queries — pacientes + acompanhamentos ao mesmo tempo
@@ -1164,6 +1211,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     setFilterCitoLab('');
     setFilterCitoPep('');
     setFilterDnaHpvGal('');
+    setFilterBuscaAtiva(null);
     setCurrentPage(1);
   };
 
@@ -1500,8 +1548,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             )}
           </div>
 
-          {/* Banner premium: filtragem do Dashboard */}
-          {pendingLabel && isLoading && (
+          {/* Banner premium: filtragem (Dashboard OU painel) */}
+          {hasActiveFilter && isLoading && (
             <div className="relative bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-8 md:p-10 rounded-3xl shadow-2xl mb-8 overflow-hidden">
               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMS41Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-60" />
               <div className="absolute -top-16 -right-16 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl" />
@@ -1514,19 +1562,19 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   <h3 className="text-white text-lg md:text-xl font-black tracking-tight uppercase mb-2">
                     Carregando pacientes
                   </h3>
-                  {pendingGrupoTitulo && (
+                  {activeFilterTitle && (
                     <p className="text-blue-300 text-sm md:text-base font-bold uppercase tracking-wide mb-1 max-w-[600px]">
-                      {pendingGrupoTitulo}
+                      {activeFilterTitle}
                     </p>
                   )}
-                  {pendingGrupoDescricao && (
+                  {activeFilterDesc && (
                     <p className="text-blue-200/60 text-[11px] md:text-xs font-medium tracking-wide mb-1 max-w-[600px] italic">
-                      {pendingGrupoDescricao}
+                      {activeFilterDesc}
                     </p>
                   )}
-                  {!pendingGrupoTitulo && (
+                  {!activeFilterTitle && (
                     <p className="text-blue-300 text-xs md:text-sm font-bold uppercase tracking-wide mb-1 max-w-[600px]">
-                      {pendingLabel}
+                      {activeFilterLabel}
                     </p>
                   )}
                   <p className="text-white/50 text-[10px] md:text-[11px] font-medium tracking-wide mt-2">
@@ -1543,7 +1591,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           )}
 
           {/* Badge: filtro ativo — exibição completa (pós carregamento) */}
-          {!isLoading && pendingLabel && (
+          {!isLoading && hasActiveFilter && (
             <div className="mb-5 animate-in fade-in duration-300">
               <div className="relative bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-4 md:p-5 rounded-2xl shadow-lg border border-white/5 overflow-hidden">
                 <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMiI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMS41Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-40" />
@@ -1557,31 +1605,31 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         Filtro ativo
                       </span>
                     </div>
-                    {pendingGrupoNum && (
+                    {activeGrupoNum && (
                       <>
                         <div className="w-px h-4 bg-white/10" />
                         <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-lg bg-blue-500/20 border border-blue-400/30 text-[10px] font-black text-blue-300 uppercase tracking-wide">
-                          {pendingGrupoNum}º Grupo
+                          {activeGrupoNum}º Grupo
                         </span>
                       </>
                     )}
                   </div>
                   {/* Linha 2: titulo do grupo */}
-                  {pendingGrupoTitulo && (
+                  {activeFilterTitle && (
                     <p className="text-blue-200 text-sm md:text-base font-black uppercase tracking-wide leading-snug">
-                      {pendingGrupoTitulo}
+                      {activeFilterTitle}
                     </p>
                   )}
                   {/* Linha 3: descricao detalhada */}
-                  {pendingGrupoDescricao && (
+                  {activeFilterDesc && (
                     <p className="text-blue-300/50 text-[11px] md:text-xs font-medium tracking-wide leading-relaxed">
-                      {pendingGrupoDescricao}
+                      {activeFilterDesc}
                     </p>
                   )}
-                  {/* Fallback: só pendingLabel (status cards) */}
-                  {!pendingGrupoTitulo && (
+                  {/* Fallback: só label do filtro ativo */}
+                  {!activeFilterTitle && (
                     <p className="text-blue-200 text-xs md:text-sm font-bold uppercase tracking-wide">
-                      {pendingLabel}
+                      {activeFilterLabel}
                     </p>
                   )}
                 </div>
@@ -2128,6 +2176,76 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   <p className="text-xs font-bold text-amber-900">{activePatientForDetails.alertas_rastreamento}</p>
                 </div>
               )}
+
+              {/* Timeline de Buscas Realizadas */}
+              <div className="mt-8">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center">
+                      <ClipboardList className="w-3.5 h-3.5 text-slate-500" />
+                    </div>
+                    <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest">Buscas Realizadas</h4>
+                  </div>
+                  {!detailsAcompsLoading && (
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                      {detailsAcomps.length} {detailsAcomps.length === 1 ? 'registro' : 'registros'}
+                    </span>
+                  )}
+                </div>
+
+                {detailsAcompsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-5 h-5 text-slate-300 animate-spin" />
+                  </div>
+                ) : detailsAcomps.length === 0 ? (
+                  <div className="text-center py-8 rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
+                    <SearchX className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <p className="text-[11px] font-bold text-slate-400">Nenhuma busca registrada</p>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    {/* Linha vertical do timeline */}
+                    <div className="absolute left-[15px] top-2 bottom-2 w-px bg-slate-200" />
+
+                    <div className="space-y-1">
+                      {detailsAcomps.map((acomp, idx) => {
+                        const dataFormatada = acomp.data_busca
+                          ? (() => { const p = acomp.data_busca.substring(0,10).split('-'); const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']; return `${p[2]}/${meses[parseInt(p[1])-1]}/${p[0]}`; })()
+                          : '--';
+                        return (
+                          <div key={acomp.id} className="relative flex items-start gap-4 py-3 px-1 group">
+                            {/* Dot */}
+                            <div className="relative z-10 mt-0.5">
+                              <div className={`w-[11px] h-[11px] rounded-full border-2 border-white shadow-sm ${idx === 0 ? 'bg-slate-700' : 'bg-slate-300 group-hover:bg-slate-400'} transition-colors`} />
+                            </div>
+                            {/* Conteúdo */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`text-[11px] font-black tabular-nums ${idx === 0 ? 'text-slate-800' : 'text-slate-600'}`}>
+                                  {dataFormatada}
+                                </span>
+                                {acomp.tipo_busca && (
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[9px] font-bold uppercase tracking-wide">
+                                    {acomp.tipo_busca}
+                                  </span>
+                                )}
+                                {acomp.situacao_pos_busca && (
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-50 text-slate-400 text-[9px] font-bold uppercase tracking-wide border border-slate-100">
+                                    {acomp.situacao_pos_busca}
+                                  </span>
+                                )}
+                              </div>
+                              {acomp.observacoes && (
+                                <p className="text-[10px] text-slate-400 mt-1 line-clamp-2">{acomp.observacoes}</p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="p-6 border-t border-outline-variant/10 bg-surface-container-lowest flex justify-end shrink-0">

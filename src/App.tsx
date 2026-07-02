@@ -18,7 +18,8 @@ import { AuthScreen } from './screens/AuthScreen';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('activeTab') || 'resumo';
+    localStorage.removeItem('activeTab');
+    return 'resumo';
   });
   const { isOpen, closeSidebar, isMobile, setIsMobile } = useSidebar();
   const { user, isLoading } = useAuth();
