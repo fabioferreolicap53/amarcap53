@@ -1,4 +1,4 @@
-const CACHE_NAME = 'amar-saude-v2';
+const CACHE_NAME = 'amar-saude-v4';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -7,30 +7,45 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      Promise.all(keys.map(k => caches.delete(k)))
     ).then(() => clients.claim())
   );
 });
 
 self.addEventListener('fetch', (event) => {
-  // Ignora requests não-GET (POST, etc) e chrome-extension
-  if (event.request.method !== 'GET' || event.request.url.startsWith('chrome-extension://')) {
+  const { request } = event;
+
+  // Ignora requests não-GET e chrome-extension
+  if (request.method !== 'GET' || request.url.startsWith('chrome-extension://')) {
     return;
   }
 
+  const url = new URL(request.url);
+
+  // Ignora hosts externos, API, e arquivos com query string (Vite dev modules)
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/') || url.pathname.includes('/collections/')) return;
+  if (url.search && url.search.includes('v=')) return;
+
   event.respondWith(
-    fetch(event.request)
-      .then(res => {
-        // Só cacheia respostas com sucesso (200-299)
+    caches.match(request).then(cached => {
+      if (cached) return cached;
+
+      return fetch(request).then(res => {
         if (res.ok) {
           const clone = res.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
         }
         return res;
-      })
-      .catch(async () => {
-        const cached = await caches.match(event.request);
-        return cached || new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
-      })
+      }).catch(() => {
+        if (request.mode === 'navigate') {
+          return caches.match('/') || new Response('Offline', {
+            status: 503,
+            statusText: 'Service Unavailable',
+          });
+        }
+        return new Response('', { status: 408, statusText: 'Request Timeout' });
+      });
+    })
   );
 });

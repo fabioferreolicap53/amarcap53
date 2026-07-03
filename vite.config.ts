@@ -6,8 +6,13 @@ import {defineConfig, loadEnv} from 'vite';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  const isDev = mode === 'development';
   return {
-    plugins: [react(), tailwindcss(), compression({ algorithm: 'gzip' })],
+    plugins: [
+      react(),
+      tailwindcss(),
+      ...(!isDev ? [compression({ algorithm: 'gzip' })] : []),
+    ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
@@ -31,6 +36,7 @@ export default defineConfig(({mode}) => {
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
       strictPort: false,
+      port: 3000,
     },
   };
 });

@@ -273,6 +273,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
   const [pacientes, setPacientes] = useState<Paciente[]>(_pfHasFilter ? [] : (_patInit?.pacientes ?? []));
   const [isLoading, setIsLoading] = useState(true);
+  const [isFilterLoading, setIsFilterLoading] = useState(false);
+  const [filterVersion, setFilterVersion] = useState(0); // força refetch ao aplicar filtros
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(_pfHasFilter ? 0 : (_patInit?.totalItems ?? 0));
   const [hasClientSideFilter, setHasClientSideFilter] = useState(false);
@@ -593,11 +595,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       observacoes: modalObservacoes,
     };
 
-    console.log('[SAVE] Payload para amarcap53_acompanhamentos:', JSON.stringify(data, null, 2));
-
     try {
       const result = await pb.collection('amarcap53_acompanhamentos').create(data);
-      console.log('[SAVE] Sucesso:', result);
       
       setPacientes(prev => prev.map(p => {
         if (p.id === selectedPaciente.id) {
@@ -740,6 +739,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
   // Versão do fetch — previne race condition (fetch antigo não fecha loading)
   const fetchVersionRef = useRef(0);
+  const loadedOnceRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -749,7 +749,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       const version = ++fetchVersionRef.current;
       try {
         setIsLoading(true);
-        console.log('[DEBUG PATS] fetchPacientes - filterGrupo:', filterGrupo, 'filterCitoPep:', filterCitoPep, 'filterDataInicio:', filterDataInicio, 'filterDataFim:', filterDataFim, 'filterBuscaAtiva:', filterBuscaAtiva);
         const options: any = { sort: 'nome' };
         
         const filterParts = [];
@@ -865,12 +864,15 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             }
           }
 
-          const acompRecords = await pb.collection('amarcap53_acompanhamentos').getFullList({
-            filter: acompFilters.join(' && '),
-            fields: 'paciente'
-          });
-          
-          const patientIds = Array.from(new Set(acompRecords.map(r => r.paciente)));
+          let patientIds: string[] = [];
+          if (acompFilters.length > 0) {
+            const acompRecords = await pb.collection('amarcap53_acompanhamentos').getFullList({
+              filter: acompFilters.join(' && '),
+              fields: 'paciente',
+              requestKey: null,
+            });
+            patientIds = Array.from(new Set(acompRecords.map(r => r.paciente).filter(Boolean)));
+          }
           if (patientIds.length > 0) {
             filterParts.push(`(${patientIds.map(id => `id = "${id}"`).join(' || ')})`);
           } else {
@@ -967,7 +969,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
         // Finaliza construção do filtro
         const finalFilter = filterParts.join(' && ').trim();
-        console.log('[DEBUG PATS] Final Filter:', finalFilter);
         if (finalFilter) {
           options.filter = finalFilter;
         }
@@ -1030,16 +1031,18 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       } catch (error) {
         console.error("Erro ao buscar pacientes:", error);
       } finally {
-        // Só fecha loading se este fetch for o mais recente
+        // Sempre desliga overlay de filtro (não importa versão)
+        setIsFilterLoading(false);
         if (!cancelled && fetchVersionRef.current === version) {
           setIsLoading(false);
+          loadedOnceRef.current = true;
         }
       }
     };
 
     fetchPacientes();
     return () => { cancelled = true; };
-  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, debouncedSearchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal, filterBuscaAtiva, filtersReady]);
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, debouncedSearchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal, filterBuscaAtiva, filterVersion, filtersReady]);
 
   // CSV Import handlers
   const convertDateToISO = (value: string): string => {
@@ -1081,7 +1084,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const handleCsvImport = async () => {
     if (!csvRecords.length || !csvFileName) return;
 
-    console.log('[PATIENTS] handleCsvImport V3 - build novo carregado');
     setIsCsvUploading(true);
     const totalRecords = csvRecords.length;
 
@@ -1112,7 +1114,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           throw new Error(data.message || `Erro HTTP ${res.status}`);
         }
 
-        console.log(`[IMPORT] Backend: ${data.oldCount} antigos deletados, ${data.imported} novos inseridos, ${data.errors} erros`);
         setIsCsvUploading(false);
         setCsvResult({ success: data.imported, errors: data.errors, total: totalRecords });
       } catch (err: any) {
@@ -1213,6 +1214,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     setFilterDnaHpvGal('');
     setFilterBuscaAtiva(null);
     setCurrentPage(1);
+    localStorage.removeItem('dashboard:pendingFilter');
   };
 
   const calcularIdade = (dataNascimento: string) => {
@@ -1532,13 +1534,9 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                       <RotateCcw className="w-4 h-4" />
                       Resetar
                     </button>
-                    <button 
-                      onClick={() => setIsFilterVisible(false)}
+                    <button
+                      onClick={() => { setIsFilterVisible(false); setIsFilterLoading(true); setFilterVersion(v => v + 1); }}
                       className="flex-1 py-3.5 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all duration-300 shadow-lg shadow-primary/20"
-
-
-
-
                     >
                       Aplicar Filtros
                     </button>
@@ -1919,6 +1917,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       </div>
 
       <LoadingOverlay visible={isLoading} message="Sincronizando pacientes..." />
+      <LoadingOverlay visible={isFilterLoading} variant="card" title="Carregando Pacientes" message="Aplicando filtros, aguarde um momento..." />
 
       {/* Modal Premium */}
       {isModalOpen && selectedPaciente && (

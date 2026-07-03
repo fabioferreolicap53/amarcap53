@@ -1,10 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Share, HeartPulse } from 'lucide-react';
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
+import React, { useState } from 'react';
+import { X, Share } from 'lucide-react';
 
 const DISMISS_TS_KEY = 'pwa-banner-dismissed-at';
 const DISMISS_COUNT_KEY = 'pwa-banner-dismiss-count';
@@ -59,58 +54,13 @@ function calcInitState(): { show: boolean; isIOS: boolean; standalone: boolean }
   // iOS: mostra sempre (não tem beforeinstallprompt)
   if (isIOS) return { show: true, isIOS, standalone: false };
 
-  // Já tem evento capturado pelo inline script do index.html?
-  if ((window as any).__deferredPrompt) {
-    return { show: true, isIOS, standalone: false };
-  }
-
   return { show: false, isIOS, standalone: false };
 }
 
 export const InstallBanner: React.FC = () => {
   const [state, setState] = useState(calcInitState);
-  const deferredRef = useRef<BeforeInstallPromptEvent | null>(
-    (window as any).__deferredPrompt || null,
-  );
 
   const { show: showBanner, isIOS, standalone: isStandalone } = state;
-
-  useEffect(() => {
-    if (isStandalone) return;
-    if (deferredRef.current && showBanner) return;
-
-    const handler = (e: Event) => {
-      // preventDefault já foi chamado pelo script inline do index.html
-      if (!(window as any).__deferredPrompt) {
-        e.preventDefault();
-      }
-      deferredRef.current = e as BeforeInstallPromptEvent;
-      (window as any).__deferredPrompt = e;
-      if (!shouldHideBanner().hide) {
-        setState((prev) => ({ ...prev, show: true }));
-      }
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, [isStandalone, showBanner]);
-
-  const handleInstall = async () => {
-    const promptEvent = deferredRef.current;
-    if (!promptEvent) return;
-
-    await promptEvent.prompt();
-    const { outcome } = await promptEvent.userChoice;
-    if (outcome === 'accepted') {
-      try {
-        localStorage.removeItem(DISMISS_TS_KEY);
-        localStorage.removeItem(DISMISS_COUNT_KEY);
-      } catch {}
-      setState((prev) => ({ ...prev, show: false }));
-    }
-    deferredRef.current = null;
-    (window as any).__deferredPrompt = null;
-  };
 
   const handleClose = () => {
     recordDismiss();
@@ -135,11 +85,7 @@ export const InstallBanner: React.FC = () => {
 
           <div className="flex items-start gap-4 relative z-10">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-900 rounded-2xl flex items-center justify-center shadow-lg shrink-0 border border-white/10 ring-4 ring-blue-500/10">
-              {isIOS ? (
-                <Share className="w-6 h-6 text-white" />
-              ) : (
-                <HeartPulse className="w-6 h-6 text-white" />
-              )}
+              <Share className="w-6 h-6 text-white" />
             </div>
 
             <div className="flex-1 pr-6">
@@ -147,19 +93,8 @@ export const InstallBanner: React.FC = () => {
                 AMAR - CAP 5.3
               </h4>
               <p className="text-white/60 text-[11px] leading-relaxed font-medium">
-                {isIOS
-                  ? 'Toque em "Compartilhar" e depois em "Adicionar à Tela de Início" para instalar o AMAR - CAP 5.3.'
-                  : 'Instale o AMAR - SISTEMA DE RASTREIO CAP 5.3 para acesso rápido aos dados.'}
+                Toque em "Compartilhar" e depois em "Adicionar à Tela de Início" para instalar o AMAR - CAP 5.3.
               </p>
-
-              {!isIOS && (
-                <button
-                  onClick={handleInstall}
-                  className="mt-4 w-full py-3 bg-white text-[#051934] text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-50 transition-all shadow-lg active:scale-95"
-                >
-                  Instalar Agora
-                </button>
-              )}
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Header } from '../components/Header';
 import { ScrollIndicator } from '../components/ScrollIndicator';
 import { Footer } from '../components/Footer';
@@ -88,7 +88,10 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const _fuInit = getFUCache();
   const [acompanhamentos, setAcompanhamentos] = useState<Acompanhamento[]>(_fuInit ?? []);
   const [isLoading, setIsLoading] = useState(!_fuInit);
-  
+  const [isFilterLoading, setIsFilterLoading] = useState(false);
+  const [filterVersion, setFilterVersion] = useState(0); // força refetch ao aplicar filtros
+  const loadedOnceRef = useRef(false);
+
   // Modal de edição state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedAcompanhamento, setSelectedAcompanhamento] = useState<any>(null);
@@ -150,6 +153,8 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     setFilterCitoLab('');
     setFilterCitoPep('');
     setFilterDnaHpvGal('');
+    setFilterPacienteId(null);
+    localStorage.removeItem('followups:pacienteFilter');
   };
 
   const normalizeCanalLabel = (value?: string) => value || '';
@@ -259,17 +264,23 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       try {
         // Build patient region filter (normalize accents: DB stores unaccented)
         const patientRegionFilterParts: string[] = [];
+        const hasUnidadeFilter = filterUnidade.length > 0;
+        const hasEquipeFilter = filterEquipe.length > 0;
+        const hasMicroareaFilter = filterMicroarea.length > 0;
+
+        // Filtro de permissão: só aplica quando NÃO há filtro UI correspondente
         if (!isAdmin) {
-          if (user.role === 'unidade') {
+          if (user.role === 'unidade' && !hasUnidadeFilter) {
             patientRegionFilterParts.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-          } else if (user.role === 'equipe') {
+          } else if (user.role === 'equipe' && !hasUnidadeFilter && !hasEquipeFilter) {
             patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%'), e: normalizeText(user.equipe).replace(/\s+/g, '%') }));
-          } else if (user.role === 'microarea') {
+          } else if (user.role === 'microarea' && !hasUnidadeFilter && !hasEquipeFilter && !hasMicroareaFilter) {
             patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%'), e: normalizeText(user.equipe).replace(/\s+/g, '%') }));
             patientRegionFilterParts.push(`microarea = ${Number(user.microarea)}`);
           }
         }
-        if (filterUnidade.length > 0) {
+        // Filtros UI substituem filtro de permissão
+        if (hasUnidadeFilter) {
           const uParams: Record<string, string> = {};
           const uClauses = filterUnidade.map((u, i) => {
             uParams[`u${i}`] = normalizeText(u).replace(/\s+/g, '%');
@@ -378,7 +389,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         const fetchOpts: any = {
           sort: '-created',
           expand: 'paciente',
-          fields: 'id,created,updated,paciente,data_busca,tipo_busca,tipo_contato,situacao_pos_busca,entraves_identificados,entraves_informado_por,observacoes,profissional,expand.paciente.nome,expand.paciente.cns',
+          fields: 'id,created,updated,paciente,data_busca,tipo_busca,tipo_contato,situacao_pos_busca,entraves_identificados,entraves_informado_por,observacoes,profissional,expand.paciente.nome,expand.paciente.cns,expand.paciente.unidade,expand.paciente.equipe,expand.paciente.microarea',
           batch: 500,
           requestKey: null,
         };
@@ -392,12 +403,14 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         console.error('Erro ao buscar acompanhamentos:', error);
       } finally {
         setIsLoading(false);
+        setIsFilterLoading(false);
+        if (!cancelled) loadedOnceRef.current = true;
       }
     };
 
     fetchAcompanhamentos();
     return () => { cancelled = true; };
-  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, filterUnidade, filterEquipe, filterMicroarea, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal, filterPacienteId]);
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, filterUnidade, filterEquipe, filterMicroarea, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal, filterPacienteId, filterVersion]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este registro?')) {
@@ -565,7 +578,6 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     }
 
     const rawTipoContato = selectedAcompanhamento.tipo_contato || '';
-    console.log('[DEBUG] tipo_contato raw:', rawTipoContato, '| length:', rawTipoContato.length, '| last chars:', JSON.stringify(rawTipoContato.slice(-10)));
 
     const data = {
       tipo_busca: getSelectLabel(selectedAcompanhamento.tipo_busca, TIPO_BUSCA_OPTIONS),
@@ -581,11 +593,8 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       observacoes: selectedAcompanhamento.observacoes || '',
     };
 
-    console.log('[SAVE EDIT] Payload:', JSON.stringify(data, null, 2));
-
     try {
       const result = await pb.collection('amarcap53_acompanhamentos').update(selectedAcompanhamento.id, data);
-      console.log('[SAVE EDIT] Sucesso:', result);
       
       setAcompanhamentos(prev => prev.map(item => {
         if (item.id === selectedAcompanhamento.id) {
@@ -631,6 +640,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       
       <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 no-scrollbar">
         <LoadingOverlay visible={isLoading} message="Sincronizando registros..." />
+        <LoadingOverlay visible={isFilterLoading} variant="card" title="Carregando Acompanhamentos" message="Aplicando filtros, aguarde um momento..." />
 
         {/* Barra de filtro de paciente específico (vindo do long press) */}
         {filterPacienteId && !isLoading && (
@@ -864,7 +874,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                       className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-surface-container-high text-on-surface-variant text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-surface-container-highest transition-all duration-300">
                       <RotateCcw className="w-4 h-4" /> Resetar
                     </button>
-                    <button onClick={() => setIsFilterVisible(false)}
+                    <button onClick={() => { setIsFilterVisible(false); setIsFilterLoading(true); setFilterVersion(v => v + 1); }}
                       className="flex-1 py-3.5 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all duration-300 shadow-lg shadow-primary/20">
                       Aplicar Filtros
                     </button>

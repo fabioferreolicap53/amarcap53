@@ -169,13 +169,15 @@ export const SingleSelect: React.FC<SingleSelectProps> = ({
         
         <div className="flex items-center gap-2">
           {value && !required && !disabled && (
-            <button 
-              type="button"
-              onClick={clearValue}
-              className="p-1 hover:bg-rose-500/10 rounded-lg text-rose-500/40 hover:text-rose-500 transition-colors"
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); onChange(''); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onChange(''); } }}
+              className="p-1 hover:bg-rose-500/10 rounded-lg text-rose-500/40 hover:text-rose-500 transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
-            </button>
+            </span>
           )}
           <ChevronDown className={`w-4 h-4 text-primary/40 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
         </div>

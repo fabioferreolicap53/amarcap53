@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Clock, CheckCircle2, AlertTriangle, ArrowRight, Download, BellRing, Plus, HeartPulse, Calendar, BadgeCheck, TrendingUp, ClipboardList, PieChart, BarChart3, MapPin, LayoutDashboard, Filter, CheckCircle, AlertCircle, Building, X, UserCheck, TestTube2, CircleOff, Search, Activity, Info, MousePointerClick, ArrowRightCircle } from 'lucide-react';
-import { Bar } from 'react-chartjs-2';
+import { Users, Clock, AlertTriangle, Calendar, BadgeCheck, LayoutDashboard, Filter, CheckCircle, X, TestTube2, CircleOff, Search, Activity, ArrowRightCircle } from 'lucide-react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -46,186 +45,6 @@ interface DashboardScreenProps {
 }
 
 // Helper Components
-const SimpleProgressBar: React.FC<{ label: string; value: number; total: number; color: string; rank?: number; isHighlighted?: boolean }> = ({ label, value, total, color, rank, isHighlighted }) => (
-  <div className="group/item relative">
-    <div className="flex items-center justify-between gap-4 mb-2">
-      <div className="flex items-center gap-3 min-w-0">
-        {rank !== undefined && (
-          <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${
-            rank === 0 ? 'bg-amber-100 text-amber-600 ring-1 ring-amber-200' : 
-            rank === 1 ? 'bg-slate-100 text-slate-500 ring-1 ring-slate-200' :
-            rank === 2 ? 'bg-orange-50 text-orange-600 ring-1 ring-orange-100' :
-            'bg-primary/5 text-primary/40'
-          }`}>
-            {rank + 1}
-          </div>
-        )}
-        <span className={`text-[11px] md:text-xs font-black uppercase tracking-widest truncate group-hover/item:text-primary transition-colors ${
-          isHighlighted ? 'text-blue-600' : 'text-primary/70'
-        }`}>{label}</span>
-        {isHighlighted && (
-          <span className="text-[7px] font-black text-blue-500 uppercase tracking-widest bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200">Você</span>
-        )}
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <span className="text-sm md:text-base font-black text-primary">{value}</span>
-        <div className="flex flex-col items-end">
-          <span className="text-[9px] font-black text-primary/40 uppercase tracking-tighter leading-none">Pacientes</span>
-          <span className="text-[10px] font-black text-primary/60 mt-0.5">
-            {total > 0 ? Math.round((value / total) * 100) : 0}%
-          </span>
-        </div>
-      </div>
-    </div>
-    <div className="h-3 w-full bg-slate-100/50 rounded-full overflow-hidden border border-outline-variant/10 shadow-inner relative">
-      <div 
-        className={`h-full ${color} transition-all duration-1000 ease-out shadow-lg rounded-full relative overflow-hidden`} 
-        style={{ width: `${total > 0 && value > 0 ? (value / total) * 100 : 2}%` }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent" />
-      </div>
-    </div>
-  </div>
-);
-
-const ColumnChart: React.FC<{ data: { label: string; value: number; color: string }[] }> = ({ data }) => {
-  const max = Math.max(...data.map(d => d.value), 1);
-  const total = data.reduce((acc, curr) => acc + curr.value, 0);
-
-  return (
-    <div className="relative h-64 w-full px-2">
-      {/* Eixo Y linhas de grade */}
-      {[0, 25, 50, 75, 100].map(pct => (
-        <div key={pct} className="absolute left-0 right-0 border-t border-dashed border-slate-100" style={{ bottom: `${pct}%` }} />
-      ))}
-      
-      <div className="flex items-end justify-around h-full gap-2 md:gap-4 pt-6 pb-4">
-        {data.map((d, i) => {
-          const percentage = total > 0 ? Math.round((d.value / total) * 100) : 0;
-          const heightPercent = (d.value / max) * 100;
-          
-          return (
-            <div key={i} className="flex-1 flex flex-col items-center gap-2 group h-full justify-end">
-              {/* Valor acima da barra */}
-              <div className="flex flex-col items-center transition-all duration-300 group-hover:-translate-y-1">
-                <span className={`text-[11px] md:text-sm font-black leading-none ${d.value > 0 ? 'text-primary' : 'text-slate-300'}`}>
-                  {d.value}
-                </span>
-                {d.value > 0 && (
-                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">
-                    {percentage}%
-                  </span>
-                )}
-              </div>
-
-              {/* Barra */}
-              <div className="relative w-full flex-1 flex items-end justify-center max-w-[56px] min-h-[8px]">
-                {/* Track */}
-                <div className="absolute inset-x-1 bottom-0 top-0 bg-slate-50 rounded-xl border border-slate-100" />
-                {/* Fill */}
-                <div 
-                  className={`absolute inset-x-1 bottom-0 ${d.color} rounded-xl transition-all duration-1000 ease-out shadow-md group-hover:shadow-xl group-hover:brightness-110 z-10`}
-                  style={{ height: `${d.value > 0 ? Math.max(heightPercent, 6) : 3}%` }}
-                >
-                  <div className="absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-white/40 to-transparent rounded-t-xl" />
-                </div>
-                {/* Glow sutil na ativa */}
-                {d.value > 0 && (
-                  <div className={`absolute -inset-x-2 bottom-0 ${d.color.replace('bg-', 'bg-')}/20 blur-xl rounded-full`}
-                    style={{ height: `${Math.max(heightPercent, 6)}%` }} />
-                )}
-              </div>
-
-              {/* Label */}
-              <span className={`text-[9px] md:text-[11px] font-black uppercase tracking-widest transition-colors ${d.value > 0 ? 'text-primary/70' : 'text-slate-300'}`}>
-                {d.label}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-
-
-const InfoPopover: React.FC<{ content: string }> = ({ content }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isHover, setIsHover] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const show = isOpen || isHover;
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleMouseEnter = () => {
-    if (leaveTimer.current) clearTimeout(leaveTimer.current);
-    setIsHover(true);
-  };
-  const handleMouseLeave = () => {
-    leaveTimer.current = setTimeout(() => {
-      setIsHover(false);
-    }, 200);
-  };
-
-  return (
-    <div
-      className="relative inline-flex flex-col items-center"
-      ref={ref}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      {/* Tooltip acima */}
-      <div
-        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 transition-opacity duration-200 pointer-events-auto"
-        style={{ opacity: show ? 1 : 0, visibility: show ? 'visible' : 'hidden' }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="bg-white text-slate-700 text-[11px] leading-relaxed font-medium rounded-xl px-4 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-200/80 max-w-[240px] text-center whitespace-normal">
-          {content}
-        </div>
-        <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.08)]"></div>
-      </div>
-
-      {/* Botão */}
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
-        className="w-4 h-4 rounded-full bg-slate-200/60 hover:bg-primary/15 text-slate-400 hover:text-primary flex items-center justify-center transition-all duration-200 flex-shrink-0"
-        aria-label="Info"
-      >
-        <span className="text-[8px] font-black leading-none" style={{ fontFamily: 'serif', fontStyle: 'italic' }}>i</span>
-      </button>
-    </div>
-  );
-};
-
-const StatCard: React.FC<{ title: string; value: number | string; icon: React.ReactNode; color: string; description?: string }> = ({ title, value, icon, color, description }) => (
-  <div className="bg-white p-6 md:p-7 rounded-[2.5rem] shadow-lg border border-primary/5 hover:border-primary/10 transition-all duration-500 group relative overflow-visible">
-    <div className={`absolute top-0 right-0 w-24 h-24 ${color.replace('bg-', 'bg-')}/5 rounded-full blur-2xl`} />
-    <div className="flex justify-between items-start mb-5 relative z-10">
-      <div className={`w-14 h-14 rounded-[1.25rem] ${color.replace('bg-', 'bg-')}/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-inner`}>
-        {React.cloneElement(icon as React.ReactElement, { className: 'w-7 h-7 ' + color.replace('bg-', 'text-'), strokeWidth: 2.5 })}
-      </div>
-      <div className="flex items-center gap-2">
-        {description && <InfoPopover content={description} />}
-      </div>
-    </div>
-    <div className={`text-4xl md:text-5xl font-black ${color.replace('bg-', 'text-')} tracking-tighter mb-2 relative z-10`}>{value}</div>
-    <p className="text-[11px] font-black text-on-surface-variant/50 uppercase tracking-widest relative z-10">{title}</p>
-  </div>
-);
-
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, setActiveTab }) => {
   const { user, isAdmin } = useAuth();
 
@@ -303,7 +122,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const [grupoDataInicio, setGrupoDataInicio] = useState('');
   const [grupoDataFim, setGrupoDataFim] = useState('');
   const [grupoBuscaStats, setGrupoBuscaStats] = useState<{ comBusca: number; semBusca: number } | null>(null);
-  const [isLoadingPrioCounts, setIsLoadingPrioCounts] = useState(true);
+  const [isLoadingPrioCounts, setIsLoadingPrioCounts] = useState(false);
   const grupoContainerRef = useRef<HTMLDivElement>(null);
   const loadedRecordsRef = useRef<any[]>([]);
   const comBuscaMapRef = useRef<Record<string, number>>(_acOld?.comBuscaMap ?? {});
@@ -313,6 +132,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const grupoBreakdownRef = useRef<Record<string, number>>(_scOld?.grupoBreakdown ?? {});
   const [filteredGroupCounts, setFilteredGroupCounts] = useState<Record<string, number>>(_scOld?.filteredGroupCounts ?? _acOld?.filteredGroupCounts ?? {});
   const [isLoading, setIsLoading] = useState(true);
+  const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [acompStats, setAcompStats] = useState(_acOld?.acompStats ?? {
     total: 0,
     alertComBusca: {} as Record<string, number>,
@@ -330,81 +150,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const formatEnumLabel = (value?: string) => value || '';
   const hasValue = (value: any) => value !== undefined && value !== null && value !== '' && value !== '--';
 
-  // Verifica se paciente tem atraso: cito_pep vazio OU cito_pep com data <= hoje - 3 anos
-  const hasCitoPepAtraso = (p: any): boolean => {
-    if (!p.cito_pep || p.cito_pep === '--' || p.cito_pep === '') return true;
-    const d = new Date(p.cito_pep);
-    if (isNaN(d.getTime())) return true;
-    const tresAnosAtras = new Date();
-    tresAnosAtras.setFullYear(tresAnosAtras.getFullYear() - 3);
-    return d <= tresAnosAtras;
-  };
-
-  // Filtra stats por grupo selecionado
-  const getFilteredStats = (grupo: string | null) => {
-    if (!grupo) return stats;
-    const match = loadedRecordsRef.current.find((r: any) => r.grupo === grupo);
-    if (!match) return stats;
-    // Dado agregado (safeCount) — usa direto
-    if ('total' in match) {
-      const { total, pepMol, coltMol, pepCito, coltCito, atrasadas } = match;
-      const emDia = Math.max(total - atrasadas, 0);
-      return {
-        ...stats,
-        totalPacientes: total,
-        coletasAtrasadas: atrasadas,
-        examesEmDia: emDia,
-        resultadosAlterados: pepMol + coltMol + pepCito + coltCito,
-        coberturaPercent: total > 0 ? Math.round((emDia / total) * 100) : 0,
-        pepMol, coltMol, pepCito, coltCito,
-        alertBreakdown: {
-          PEP_MOLECULAR: pepMol,
-          COLETA_MOLECULAR: coltMol,
-          PEP_CITO: pepCito,
-          COLETA_CITO: coltCito,
-          NAO_IDENTIFICADO: atrasadas,
-        },
-      };
-    }
-    // Dados completos (do fetch principal isScopeQuery) — filtra registros
-    const filtered = loadedRecordsRef.current.filter((p: any) => p.grupo === grupo);
-    const total = filtered.length;
-    if (total === 0) return stats;
-    const alerts: Record<string, number> = {};
-    filtered.forEach((p: any) => {
-      let status: string;
-      if (hasValue(p.dna_hpv_pep)) status = 'PEP_MOLECULAR';
-      else if (hasValue(p.dna_hpv_gal)) status = 'COLETA_MOLECULAR';
-      else if (hasValue(p.cito_pep)) status = 'PEP_CITO';
-      else if (hasValue(p.cito_lab)) status = 'COLETA_CITO';
-      else status = 'NAO_IDENTIFICADO';
-      alerts[status] = (alerts[status] || 0) + 1;
-    });
-    const pepMol = alerts['PEP_MOLECULAR'] || 0;
-    const coltMol = alerts['COLETA_MOLECULAR'] || 0;
-    const pepCito = alerts['PEP_CITO'] || 0;
-    const coltCito = alerts['COLETA_CITO'] || 0;
-    const atrasadas = alerts['NAO_IDENTIFICADO'] || 0;
-    const emDia = Math.max(total - atrasadas, 0);
-    return {
-      ...stats,
-      totalPacientes: total,
-      coletasAtrasadas: atrasadas,
-      examesEmDia: emDia,
-      resultadosAlterados: pepMol + coltMol + pepCito + coltCito,
-      coberturaPercent: total > 0 ? Math.round((emDia / total) * 100) : 0,
-      pepMol, coltMol, pepCito, coltCito,
-      alertBreakdown: alerts,
-    };
-  };
   const displayStats = stats;
 
   // Lógica de dois cliques nos cards de grupo
-  const handleGrupoClick = (prioIdx: number, gruposDB: string[]) => {
-      const key = String(prioIdx);
+  const handleGrupoClick = (prioIdx: number | string, gruposDB: string[]) => {
+      const numIdx = typeof prioIdx === 'string' ? parseInt(prioIdx) : prioIdx;
+      const key = String(numIdx);
       if (selectedGrupo === key) { setSelectedGrupo(null); setSelectedPrioIdx(null); return; }
       setSelectedGrupo(key);
-      setSelectedPrioIdx(prioIdx);
+      setSelectedPrioIdx(numIdx);
       selectedGruposDBRef.current = gruposDB;
       setFilterBuscaAtiva(undefined);
       setGrupoBuscaStats(null);
@@ -576,10 +330,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     const bf = fp.length > 0 ? fp.join(' && ') : '';
 
     const prio = [
-      { g: '30-49', cf: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
-      { g: '50-64', cf: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
-      { g: '25-29', cf: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
-      { g: '6[45]>|65\\+|6[45]\\+|6[45]\\s*anos|6[45]\\s*$|6[45]\\s*\\)', cf: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
+      { g: '30-49', cf: "cito_pep = '' && cito_lab = '' && dna_hpv_pep = '' && dna_hpv_gal = ''" },
+      { g: '50-64', cf: "cito_pep = '' && cito_lab = '' && dna_hpv_pep = '' && dna_hpv_gal = ''" },
+      { g: '25-29', cf: "cito_pep = '' && cito_lab = '' && dna_hpv_pep = '' && dna_hpv_gal = ''" },
+      { g: '6[45]>|65\\+|6[45]\\+|6[45]\\s*anos|6[45]\\s*$|6[45]\\s*\\)', cf: "cito_pep = '' && cito_lab = '' && dna_hpv_pep = '' && dna_hpv_gal = ''" },
     ];
 
     (async () => {
@@ -831,10 +585,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
           const [totalPacientes, pepMol, coltMol, pepCito, coltCito] = await Promise.all([
             safeCount(undefined, 'total'),
-            safeCount('dna_hpv_pep != ""', 'dna_hpv_pep'),
-            safeCount('dna_hpv_gal != "" && dna_hpv_pep = ""', 'dna_hpv_gal'),
-            safeCount('cito_pep != "" && dna_hpv_gal = "" && dna_hpv_pep = ""', 'cito_pep'),
-            safeCount('cito_lab != "" && cito_pep = "" && dna_hpv_gal = "" && dna_hpv_pep = ""', 'cito_lab'),
+            safeCount("dna_hpv_pep != ''", 'dna_hpv_pep'),
+            safeCount("dna_hpv_gal != '' && dna_hpv_pep = ''", 'dna_hpv_gal'),
+            safeCount("cito_pep != '' && dna_hpv_gal = '' && dna_hpv_pep = ''", 'cito_pep'),
+            safeCount("cito_lab != '' && cito_pep = '' && dna_hpv_gal = '' && dna_hpv_pep = ''", 'cito_lab'),
           ]);
           if (cancelled) return;
 
@@ -865,7 +619,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 const is65plus = /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i.test(g);
                 
                 if (is3049 || is5064 || is2529 || is65plus) {
-                  const filtered = await safeCount(`grupo = "${g}" && cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""`, `filtered_${g}`);
+                  const filtered = await safeCount(`grupo = "${g}" && cito_pep = '' && cito_lab = '' && dna_hpv_pep = '' && dna_hpv_gal = ''`, `filtered_${g}`);
                   if (!cancelled) filteredCounts[g] = filtered;
                 }
               });
@@ -1002,10 +756,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               try {
                 const prioGroupNames = Object.keys(grupoBreakdownRef.current);
                 const prioFilters: Array<{ re: RegExp; citoFilter: string }> = [
-                  { re: /30.*49/i, citoFilter: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
-                  { re: /50.*6[0-4]|6[0-4].*50/i, citoFilter: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
-                  { re: /25.*29|29.*25/i, citoFilter: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
-                  { re: /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i, citoFilter: 'cito_pep = "" && cito_lab = "" && dna_hpv_pep = "" && dna_hpv_gal = ""' },
+                  { re: /30.*49/i, citoFilter: "cito_pep = '' && cito_lab = '' && dna_hpv_pep = '' && dna_hpv_gal = ''" },
+                  { re: /50.*6[0-4]|6[0-4].*50/i, citoFilter: "cito_pep = '' && cito_lab = '' && dna_hpv_pep = '' && dna_hpv_gal = ''" },
+                  { re: /25.*29|29.*25/i, citoFilter: "cito_pep = '' && cito_lab = '' && dna_hpv_pep = '' && dna_hpv_gal = ''" },
+                  { re: /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i, citoFilter: "cito_pep = '' && cito_lab = '' && dna_hpv_pep = '' && dna_hpv_gal = ''" },
                 ];
                 const countPromises = prioGroupNames.map(async (g) => {
                   const prio = prioFilters.find(p => p.re.test(g));
@@ -1184,7 +938,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         if (error?.isAbort) return;
         console.error('Erro ao buscar estatísticas:', error);
       } finally {
-        if (!cancelled) setIsLoading(false);
+        setIsFilterLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -1210,15 +967,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl group-hover:bg-white/10 transition-all duration-700"></div>
 
               <div className="relative z-10 flex-1 max-w-[80%]">
-                <div className="flex items-center justify-center md:justify-start gap-3 mb-4">
+                <div className="flex items-center justify-center md:justify-start gap-3">
                   <div className="w-16 h-16 md:w-20 md:h-20 bg-white/10 backdrop-blur-md rounded-2xl md:rounded-3xl flex items-center justify-center ring-1 ring-white/20 shadow-inner">
                     <LayoutDashboard className="w-8 h-8 md:w-10 md:h-10 text-blue-300" />
                   </div>
                   <h1 className="text-2xl md:text-[2.5rem] font-black tracking-tight uppercase leading-none">Resumo <span className="text-blue-300 opacity-50">Geral</span></h1>
                 </div>
-                <p className="text-base md:text-lg text-white/70 font-medium leading-relaxed md:whitespace-nowrap mx-auto md:mx-0">
-                  Olá, <span className="text-white font-black">{user?.name || 'Profissional'}</span>! Acompanhe o panorama atualizado do seu território.
-                </p>
               </div>
 
               {/* Total de Pacientes */}
@@ -1352,14 +1106,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                         setFilterUnidade([]);
                         setFilterEquipe([]);
                         setFilterMicroarea([]);
+                        localStorage.removeItem('dashboard:pendingFilter');
                       }}
                       className="flex-1 flex items-center justify-center gap-2 py-4 bg-rose-50 text-rose-600 text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-rose-100 transition-all border border-rose-100"
                     >
                       <AlertTriangle className="w-4 h-4" />
                       Limpar
                     </button>
-                    <button 
-                      onClick={() => setIsFilterVisible(false)}
+                    <button
+                      onClick={() => { setIsFilterVisible(false); setIsFilterLoading(true); }}
                       className="flex-1 py-4 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-primary/20"
                     >
                       Aplicar Filtros
@@ -1434,7 +1189,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 grupo: g.grupo,
                 count: g.count,
                 titulo: `Mulheres de ${g.grupo} anos`,
-                num: `${matched.length + idx + 1}º`
+                num: `${matched.length + idx + 1}º`,
+                gruposDB: [g.grupo]
               }));
 
             const totalPct = (v: number) => stats.totalPacientes > 0 ? Math.round((v / stats.totalPacientes) * 100) : 0;
@@ -1621,7 +1377,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                                     if (grupoDataFim) pending.filterDataFim = grupoDataFim;
                                     pending.buscaAtiva = filterBuscaAtiva;
                                   }
-                                  console.log('[DEBUG DASH] pendingFilter:', JSON.stringify(pending));
                                   localStorage.setItem('dashboard:pendingFilter', JSON.stringify(pending));
                                   setActiveTab('pacientes');
                                 }}
@@ -1651,7 +1406,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     return (
                       <div
                         key={item.grupo}
-                        onClick={() => handleGrupoClick(item.grupo)}
+                        onClick={() => handleGrupoClick(item.num, item.gruposDB)}
                         className={`group relative bg-white rounded-2xl border-2 ${isSelected ? `${c.border} ring-4 ${c.ring} shadow-xl` : `${c.border} ${c.hoverBorder} shadow-lg ${c.glow} ${c.hoverGlow}`} hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 transition-all duration-500 cursor-pointer ${isSelected ? '' : 'overflow-hidden'}`}
                       >
                         <div className={`h-1 w-full bg-gradient-to-r ${c.gradient} ${isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'} transition-opacity`} />
@@ -1997,54 +1752,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           {/* Gráficos e Tabelas */}
 
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-            {/* Performance de Busca Ativa */}
-            <div className="bg-white p-6 md:p-9 rounded-[2.5rem] shadow-xl border border-primary/5 relative overflow-hidden lg:col-span-2">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl" />
-              <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-8 relative z-10 gap-4 text-center sm:text-left">
-                <div className="flex flex-col items-center sm:items-start">
-                  <h3 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight flex items-center gap-3">
-                    <PieChart className="w-6 h-6 text-tertiary" />
-                    Performance
-                  </h3>
-                  <p className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Resultados das Buscas</p>
-                </div>
-                <div className="bg-primary/5 px-4 py-2 rounded-xl border border-primary/10 shadow-sm shrink-0">
-                  <span className="text-xl font-black text-primary">{acompStats.total}</span>
-                  <span className="text-[10px] font-bold text-primary/40 uppercase ml-2">Total</span>
-                </div>
-              </div>
-
-              <div className="space-y-6 relative z-10">
-                <SimpleProgressBar 
-                  label="Sucesso" 
-                  value={acompStats.sucesso} 
-                  total={acompStats.total} 
-                  color="bg-emerald-500" 
-                />
-                <SimpleProgressBar 
-                  label="Efetivos" 
-                  value={acompStats.contatos} 
-                  total={acompStats.total} 
-                  color="bg-blue-500" 
-                />
-                <SimpleProgressBar 
-                  label="Infrutíferas" 
-                  value={acompStats.total - acompStats.contatos} 
-                  total={acompStats.total} 
-                  color="bg-rose-500" 
-                />
-              </div>
-            </div>
-
-          </div>
-
-
           <Footer />
         </div>
       </div>
 
       <LoadingOverlay visible={isLoading} message="Carregando resumo..." />
+      <LoadingOverlay visible={isFilterLoading && !isLoading} variant="card" title="Carregando Dados" message="Aplicando filtros avançados, aguarde um momento..." />
     </div>
   );
 };

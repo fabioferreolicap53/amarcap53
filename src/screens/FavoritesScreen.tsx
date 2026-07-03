@@ -246,7 +246,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
   const _favInit = getFavCache();
   const [pacientes, setPacientes] = useState<Paciente[]>(_favInit ?? []);
   const [isLoading, setIsLoading] = useState(!_favInit);
-  
+  const [isFilterLoading, setIsFilterLoading] = useState(false);
+
   // Estados de Busca e Filtro
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
@@ -473,8 +474,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       // Filtros SIM/NÃO de exames (server-side)
       const simNaoFilter = (field: string, val: string) => {
         if (!val) return null;
-        if (val === 'SIM') return `${field} != ""`;
-        if (val === 'NÃO') return `${field} = ""`;
+        if (val === 'SIM') return `${field} != ''`;
+        if (val === 'NÃO') return `${field} = ''`;
         return null;
       };
       const dnaHpvPepF = simNaoFilter('dna_hpv_pep', filterDnaHpvPep);
@@ -562,6 +563,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       console.error("Erro ao buscar favoritos:", error);
     } finally {
       setIsLoading(false);
+      setIsFilterLoading(false);
     }
   };
 
@@ -663,9 +665,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     };
 
     try {
-      // #region debug-point C:favorites-followup-create-payload
-      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"C",location:"FavoritesScreen.tsx:handleSaveFollowUp",msg:"favorites create payload",data:{payload:data},ts:Date.now()})}).catch(()=>{});
-      // #endregion
+
       await pb.collection('amarcap53_acompanhamentos').create(data);
       alert('Acompanhamento registrado com sucesso!');
       handleCloseModal();
@@ -676,13 +676,9 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
           sort: '-created',
           fields: 'id,tipo_busca,tipo_contato,situacao_pos_busca,entraves_informado_por',
         });
-        // #region debug-point H:favorites-followup-create-samples
-        fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"H",location:"FavoritesScreen.tsx:handleSaveFollowUp-samples",msg:"favorites existing samples",data:{items:sampleRecords.items},ts:Date.now()})}).catch(()=>{});
-        // #endregion
+
       } catch (_) {}
-      // #region debug-point D:favorites-followup-create-error
-      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"acompanhamento-save-fail",runId:"pre-fix",hypothesisId:"D",location:"FavoritesScreen.tsx:handleSaveFollowUp-catch",msg:"favorites create error",data:{payload:data,errorData:error?.data||null,errorMessage:error?.message||null,response:error?.response||null},ts:Date.now()})}).catch(()=>{});
-      // #endregion
+
       console.error('Erro ao salvar acompanhamento:', error);
       const pbError = error.data?.data;
       let errorMsg = 'Erro ao salvar o acompanhamento.';
@@ -953,7 +949,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                       className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-surface-container-high text-on-surface-variant text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-surface-container-highest transition-all duration-300">
                       <RotateCcw className="w-4 h-4" /> Resetar
                     </button>
-                    <button onClick={() => setIsFilterVisible(false)}
+                    <button onClick={() => { setIsFilterVisible(false); setIsFilterLoading(true); }}
                       className="flex-1 py-3.5 bg-primary text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all duration-300 shadow-lg shadow-primary/20">
                       Aplicar Filtros
                     </button>
@@ -1157,6 +1153,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       </div>
 
       {/* Modais */}
+      <LoadingOverlay visible={isFilterLoading} variant="card" title="Carregando Favoritos" message="Aplicando filtros de rastreamento, aguarde um momento..." />
+
       {isModalOpen && selectedPaciente && (
         <div className="fixed inset-0 bg-primary/20 backdrop-blur-md z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
           <div data-dropdown-root="true" className="relative bg-surface-container-lowest w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl shadow-[0px_24px_48px_rgba(0,0,0,0.15)] overflow-visible border border-white/20 animate-in zoom-in-95 duration-300">
