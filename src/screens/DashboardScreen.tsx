@@ -1197,17 +1197,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             
             PRIORITY_GROUPS.forEach((pg, prioIdx) => {
               let gruposDB: string[];
-              if ('reuseFrom' in pg && typeof (pg as any).reuseFrom === 'number') {
+              const isIndependente = 'reuseFrom' in pg && typeof (pg as any).reuseFrom === 'number';
+              if (isIndependente) {
                 gruposDB = matched[(pg as any).reuseFrom]?.gruposDB ?? [];
               } else {
                 gruposDB = allGroups.filter(g => pg.pattern.test(g.grupo)).map(g => g.grupo);
               }
 
               if (gruposDB.length > 0) {
-                const isIndependente = 'reuseFrom' in pg;
                 const totalCount = gruposDB.reduce((acc, gName) => {
                   const grpObj = allGroups.find(g => g.grupo === gName);
                   if (!grpObj) return acc;
+                  // Cards independentes (reuseFrom) usam TOTAL (grpObj.count), não filtrado
                   return acc + (isIndependente ? grpObj.count : (filteredGroupCounts?.[gName] ?? grpObj.count));
                 }, 0);
 
