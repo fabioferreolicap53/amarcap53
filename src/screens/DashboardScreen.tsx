@@ -1128,11 +1128,52 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         {/* SELECIONE O GRUPO PRIORITÁRIO */}
           {(() => {
             const gb = Object.keys(grupoBreakdownRef.current).length > 0 ? grupoBreakdownRef.current : stats.grupoBreakdown;
-            if (!gb || Object.keys(gb).length === 0) return null;
+            if (!gb || Object.keys(gb).length === 0) {
+              if (!isLoading) return null;
+              // Loading: mostra 4 cartões reais com skeleton apenas nos números
+              return (
+                <div className="mb-8 md:mb-12">
+                  <div className="text-center mb-8">
+                    <h2 className="text-xs md:text-sm font-black text-primary/40 uppercase tracking-[0.25em]">Selecione o Grupo Prioritário</h2>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+                    {PRIORITY_GROUPS.slice(0, 4).map((c, i) => (
+                      <div key={i} className={`group relative bg-white rounded-2xl border-2 ${c.border} shadow-lg ${c.glow}`}>
+                        <div className={`h-1 w-full bg-gradient-to-r ${c.gradient} opacity-70`} />
+                        <div className="p-5 md:p-6 flex flex-col gap-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className={`inline-flex items-center justify-center w-9 h-9 rounded-xl ${c.numBg} ${c.numText} text-xs font-black shadow-md ring-2 ${c.ring}`}>
+                                  {c.num}
+                                </span>
+                                <span className={`text-[7px] font-black ${c.text} uppercase tracking-widest leading-none opacity-60`}>Grupo</span>
+                              </div>
+                              <div className={`w-7 h-7 rounded-lg ${c.bg} flex items-center justify-center ring-1 ${c.ring}`}>
+                                <Users className={`w-4 h-4 ${c.iconColor}`} />
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="skeleton-scan inline-block h-6 w-16 shadow-sm" />
+                              <span className="skeleton-scan inline-block h-2.5 w-8 mt-0.5 shadow-xs" />
+                            </div>
+                          </div>
+                          <h3 className={`text-sm md:text-base font-black ${c.text} uppercase tracking-wide leading-snug`}>{c.titulo}</h3>
+                          <p className="text-[10px] md:text-[11px] font-medium text-slate-500 leading-relaxed">{c.desc}</p>
+                          <div className="mt-1 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full bg-gradient-to-r ${c.gradient} rounded-full w-0 transition-all duration-700`} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
             const PRIORITY_GROUPS = [
               { num: '1º', titulo: 'Mulheres de 30 a 49 anos', desc: 'com atraso no rastreamento (mais de 3 anos) ou que nunca o realizaram', pattern: /30.*49/i, color: 'purple', gradient: 'from-purple-600 to-purple-400', bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', ring: 'ring-purple-400/30', glow: 'shadow-purple-500/25', hoverGlow: 'hover:shadow-purple-500/40', hoverBorder: 'hover:border-purple-400', numBg: 'bg-purple-600', numText: 'text-white', iconColor: 'text-purple-500' },
               { num: '2º', titulo: 'Mulheres de 50 a 64 anos', desc: 'com atraso no rastreamento (mais de 3 anos) ou que nunca o realizaram', pattern: /50.*6[0-4]|6[0-4].*50|50.*65(?![0-9])|50.*65$/i, color: 'fuchsia', gradient: 'from-fuchsia-600 to-fuchsia-400', bg: 'bg-fuchsia-50', border: 'border-fuchsia-200', text: 'text-fuchsia-700', ring: 'ring-fuchsia-400/30', glow: 'shadow-fuchsia-500/25', hoverGlow: 'hover:shadow-fuchsia-500/40', hoverBorder: 'hover:border-fuchsia-400', numBg: 'bg-fuchsia-600', numText: 'text-white', iconColor: 'text-fuchsia-500' },
-              { num: '3º', titulo: 'Mulheres de 30 a 49 anos', desc: 'independente da história anterior de rastreamento', pattern: /^30[\s\-a-z]*49(\s+anos)?$/i, color: 'violet', gradient: 'from-violet-600 to-violet-400', bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', ring: 'ring-violet-400/30', glow: 'shadow-violet-500/25', hoverGlow: 'hover:shadow-violet-500/40', hoverBorder: 'hover:border-violet-400', numBg: 'bg-violet-600', numText: 'text-white', iconColor: 'text-violet-500' },
+              { num: '3º', titulo: 'Mulheres de 30 a 49 anos', desc: 'independente da história anterior de rastreamento', reuseFrom: 0, color: 'violet', gradient: 'from-violet-600 to-violet-400', bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', ring: 'ring-violet-400/30', glow: 'shadow-violet-500/25', hoverGlow: 'hover:shadow-violet-500/40', hoverBorder: 'hover:border-violet-400', numBg: 'bg-violet-600', numText: 'text-white', iconColor: 'text-violet-500' },
               { num: '4º', titulo: 'Mulheres de 25 a 29 anos', desc: 'que nunca fizeram o rastreamento', pattern: /25.*29|29.*25/i, color: 'brown', gradient: 'from-[#92400e] to-[#b45309]', bg: 'bg-[#faf7f2]', border: 'border-[#e9e0d2]', text: 'text-[#78350f]', ring: 'ring-[#92400e]/30', glow: 'shadow-[#92400e]/25', hoverGlow: 'hover:shadow-[#92400e]/40', hoverBorder: 'hover:border-[#92400e]', numBg: 'bg-[#92400e]', numText: 'text-white', iconColor: 'text-[#92400e]' },
             ];
             const EXTRA_COLORS = ['indigo', 'slate', 'cyan', 'amber', 'teal', 'pink', 'rose', 'orange'];
