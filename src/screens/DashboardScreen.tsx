@@ -1204,10 +1204,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               }
 
               if (gruposDB.length > 0) {
+                const isIndependente = 'reuseFrom' in pg;
                 const totalCount = gruposDB.reduce((acc, gName) => {
                   const grpObj = allGroups.find(g => g.grupo === gName);
                   if (!grpObj) return acc;
-                  return acc + (filteredGroupCounts?.[gName] ?? grpObj.count);
+                  return acc + (isIndependente ? grpObj.count : (filteredGroupCounts?.[gName] ?? grpObj.count));
                 }, 0);
 
                 matched.push({
