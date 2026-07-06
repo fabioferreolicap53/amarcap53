@@ -180,24 +180,26 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
       return;
     }
 
-    // SEM datas custom → skeleton por 400ms, depois dados instantâneos
+    // SEM datas custom → computa imediatamente dos dados já carregados
     if (!debouncedGrupoDataInicio && !debouncedGrupoDataFim) {
-      const timer = setTimeout(() => {
-        const grupos = selectedGruposDBRef.current;
-        if (grupos.length === 0) return;
+      const grupos = selectedGruposDBRef.current;
+      if (grupos.length === 0) return;
 
-        let totalGrupo = 0;
-        let comBusca = 0;
+      // Se dados ainda não carregaram, espera (skeleton)
+      const hasData = grupos.some(g => (filteredGroupCounts?.[g] ?? grupoBreakdownRef.current?.[g] ?? 0) > 0);
+      if (!hasData && Object.keys(grupoBreakdownRef.current).length === 0) return;
 
-        grupos.forEach(g => {
-          const groupTotal = filteredGroupCounts?.[g] ?? (grupoBreakdownRef.current?.[g] || 0);
-          totalGrupo += groupTotal;
-          comBusca += (filteredComBuscaMap[g] ?? comBuscaMapRef.current?.[g] ?? 0);
-        });
+      let totalGrupo = 0;
+      let comBusca = 0;
 
-        setGrupoBuscaStats({ comBusca, semBusca: Math.max(totalGrupo - comBusca, 0) });
-      }, 400);
-      return () => clearTimeout(timer);
+      grupos.forEach(g => {
+        const groupTotal = filteredGroupCounts?.[g] ?? (grupoBreakdownRef.current?.[g] || 0);
+        totalGrupo += groupTotal;
+        comBusca += (filteredComBuscaMap[g] ?? comBuscaMapRef.current?.[g] ?? 0);
+      });
+
+      setGrupoBuscaStats({ comBusca, semBusca: Math.max(totalGrupo - comBusca, 0) });
+      return;
     }
 
     // COM datas custom → busca robusta: 1) todos acompanhamentos 2) cruza com pacientes do grupo
