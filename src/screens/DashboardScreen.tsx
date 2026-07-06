@@ -1197,8 +1197,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             
             PRIORITY_GROUPS.forEach((pg, prioIdx) => {
               let gruposDB: string[];
-              const isIndependente = 'reuseFrom' in pg && typeof (pg as any).reuseFrom === 'number';
-              if (isIndependente) {
+              if ('reuseFrom' in pg && typeof (pg as any).reuseFrom === 'number') {
                 gruposDB = matched[(pg as any).reuseFrom]?.gruposDB ?? [];
               } else {
                 gruposDB = allGroups.filter(g => pg.pattern.test(g.grupo)).map(g => g.grupo);
@@ -1208,8 +1207,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 const totalCount = gruposDB.reduce((acc, gName) => {
                   const grpObj = allGroups.find(g => g.grupo === gName);
                   if (!grpObj) return acc;
-                  // Cards independentes (reuseFrom) usam TOTAL (grpObj.count), não filtrado
-                  return acc + (isIndependente ? grpObj.count : (filteredGroupCounts?.[gName] ?? grpObj.count));
+                  return acc + (filteredGroupCounts?.[gName] ?? grpObj.count);
                 }, 0);
 
                 matched.push({
@@ -1404,11 +1402,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   const pending: any = { filterGrupo: item.gruposDB, grupoNum: c.num, grupoTitulo: c.titulo, grupoDescricao: c.desc };
-                                  // Filtro cito: SEMPRE exceto "COM BUSCA + datas" ou se for o card "independente"
-                                  const isIndependente = !item.desc.includes('atraso') && !item.desc.includes('nunca');
+                                  // Filtro cito: SEMPRE (exceto COM BUSCA + datas)
                                   const isComBuscaComDatas = filterBuscaAtiva === true && (grupoDataInicio || grupoDataFim);
                                   
-                                  if (!isComBuscaComDatas && !isIndependente) {
+                                  if (!isComBuscaComDatas) {
                                     pending.filterDnaHpvPep = 'NÃO';
                                     pending.filterDnaHpvGal = 'NÃO';
                                     pending.filterCitoPep = 'NÃO';
