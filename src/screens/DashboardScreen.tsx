@@ -186,16 +186,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
       if (grupos.length === 0) return;
 
       // Se dados ainda não carregaram, espera (skeleton)
-      const hasData = grupos.some(g => (filteredGroupCounts?.[g] ?? grupoBreakdownRef.current?.[g] ?? 0) > 0);
-      if (!hasData && Object.keys(grupoBreakdownRef.current).length === 0) return;
+      const hasFilteredCounts = grupos.some(g => filteredGroupCounts?.[g] !== undefined);
+      if (!hasFilteredCounts) return;
 
       let totalGrupo = 0;
       let comBusca = 0;
 
       grupos.forEach(g => {
-        const groupTotal = filteredGroupCounts?.[g] ?? (grupoBreakdownRef.current?.[g] || 0);
+        const groupTotal = filteredGroupCounts?.[g] ?? 0;
         totalGrupo += groupTotal;
-        comBusca += (filteredComBuscaMap[g] ?? comBuscaMapRef.current?.[g] ?? 0);
+        comBusca += (filteredComBuscaMap[g] ?? 0);
       });
 
       setGrupoBuscaStats({ comBusca, semBusca: Math.max(totalGrupo - comBusca, 0) });
@@ -258,7 +258,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         if (pacIdsNoPeriodo.size === 0) {
           if (!cancelled) {
             const grupos = selectedGruposDBRef.current;
-            const totalGrupo = grupos.reduce((acc, g) => acc + (filteredGroupCounts?.[g] ?? grupoBreakdownRef.current?.[g] ?? 0), 0);
+            const totalGrupo = grupos.reduce((acc, g) => acc + (filteredGroupCounts?.[g] ?? 0), 0);
             setGrupoBuscaStats({ comBusca: 0, semBusca: totalGrupo });
           }
           return;
@@ -290,7 +290,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
         // 6. Total do grupo (consistente com a contagem exibida no card)
         const grupos = selectedGruposDBRef.current;
-        const totalGrupo = grupos.reduce((acc, g) => acc + (filteredGroupCounts?.[g] ?? grupoBreakdownRef.current?.[g] ?? 0), 0);
+        const totalGrupo = grupos.reduce((acc, g) => acc + (filteredGroupCounts?.[g] ?? 0), 0);
         if (!cancelled) setGrupoBuscaStats({ comBusca: comBuscaSet.size, semBusca: totalGrupo - comBuscaSet.size });
       } catch { if (!cancelled) setGrupoBuscaStats(null); }
     };
@@ -1298,10 +1298,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                                       }`}>Sem Busca</p>
                                     </div>
                                     <div className="flex items-end justify-between">
-                                      <span className={`text-sm font-black tabular-nums leading-none transition-colors ${
+                                      <span key={`sb-${grupoBuscaStats.semBusca}`} className={`text-sm font-black tabular-nums leading-none transition-colors animate-fade-in ${
                                         filterBuscaAtiva === false ? 'text-rose-900' : 'text-rose-800'
                                       }`}>{grupoBuscaStats.semBusca.toLocaleString('pt-BR')}</span>
-                                      <span className="text-[9px] font-black text-rose-600 tabular-nums">{item.count > 0 ? Math.round((grupoBuscaStats.semBusca / item.count) * 100) : 0}%</span>
+                                      <span key={`sbp-${grupoBuscaStats.semBusca}`} className="text-[9px] font-black text-rose-600 tabular-nums animate-fade-in">{item.count > 0 ? Math.round((grupoBuscaStats.semBusca / item.count) * 100) : 0}%</span>
                                     </div>
                                     {filterBuscaAtiva === false && (
                                       <div className="mt-2 h-0.5 w-full bg-rose-400 rounded-full" />
@@ -1329,10 +1329,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                                       }`}>Com Busca</p>
                                     </div>
                                     <div className="flex items-end justify-between">
-                                      <span className={`text-sm font-black tabular-nums leading-none transition-colors ${
+                                      <span key={`cb-${grupoBuscaStats.comBusca}`} className={`text-sm font-black tabular-nums leading-none transition-colors animate-fade-in ${
                                         filterBuscaAtiva === true ? 'text-emerald-900' : 'text-emerald-800'
                                       }`}>{grupoBuscaStats.comBusca.toLocaleString('pt-BR')}</span>
-                                      <span className="text-[9px] font-black text-emerald-600 tabular-nums">{item.count > 0 ? Math.round((grupoBuscaStats.comBusca / item.count) * 100) : 0}%</span>
+                                      <span key={`cbp-${grupoBuscaStats.comBusca}`} className="text-[9px] font-black text-emerald-600 tabular-nums animate-fade-in">{item.count > 0 ? Math.round((grupoBuscaStats.comBusca / item.count) * 100) : 0}%</span>
                                     </div>
                                     {filterBuscaAtiva === true && (
                                       <div className="mt-2 h-0.5 w-full bg-emerald-400 rounded-full" />
@@ -1490,10 +1490,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                                       }`}>Sem Busca</p>
                                     </div>
                                     <div className="flex items-end justify-between">
-                                      <span className={`text-sm font-black tabular-nums leading-none transition-colors ${
+                                      <span key={`sb2-${grupoBuscaStats.semBusca}`} className={`text-sm font-black tabular-nums leading-none transition-colors animate-fade-in ${
                                         filterBuscaAtiva === false ? 'text-rose-900' : 'text-rose-800'
                                       }`}>{grupoBuscaStats.semBusca.toLocaleString('pt-BR')}</span>
-                                      <span className="text-[9px] font-black text-rose-600 tabular-nums">{item.count > 0 ? Math.round((grupoBuscaStats.semBusca / item.count) * 100) : 0}%</span>
+                                      <span key={`sbp2-${grupoBuscaStats.semBusca}`} className="text-[9px] font-black text-rose-600 tabular-nums animate-fade-in">{item.count > 0 ? Math.round((grupoBuscaStats.semBusca / item.count) * 100) : 0}%</span>
                                     </div>
                                     {filterBuscaAtiva === false && (
                                       <div className="mt-2 h-0.5 w-full bg-rose-400 rounded-full" />
@@ -1521,10 +1521,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                                       }`}>Com Busca</p>
                                     </div>
                                     <div className="flex items-end justify-between">
-                                      <span className={`text-sm font-black tabular-nums leading-none transition-colors ${
+                                      <span key={`cb2-${grupoBuscaStats.comBusca}`} className={`text-sm font-black tabular-nums leading-none transition-colors animate-fade-in ${
                                         filterBuscaAtiva === true ? 'text-emerald-900' : 'text-emerald-800'
                                       }`}>{grupoBuscaStats.comBusca.toLocaleString('pt-BR')}</span>
-                                      <span className="text-[9px] font-black text-emerald-600 tabular-nums">{item.count > 0 ? Math.round((grupoBuscaStats.comBusca / item.count) * 100) : 0}%</span>
+                                      <span key={`cbp2-${grupoBuscaStats.comBusca}`} className="text-[9px] font-black text-emerald-600 tabular-nums animate-fade-in">{item.count > 0 ? Math.round((grupoBuscaStats.comBusca / item.count) * 100) : 0}%</span>
                                     </div>
                                     {filterBuscaAtiva === true && (
                                       <div className="mt-2 h-0.5 w-full bg-emerald-400 rounded-full" />
