@@ -122,7 +122,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const [grupoDataInicio, setGrupoDataInicio] = useState('');
   const [grupoDataFim, setGrupoDataFim] = useState('');
   const [grupoBuscaStats, setGrupoBuscaStats] = useState<{ comBusca: number; semBusca: number } | null>(null);
-  const [isLoadingPrioCounts, setIsLoadingPrioCounts] = useState(false);
+  const _hasCachedGroupCounts = Object.keys(_scOld?.filteredGroupCounts ?? _acOld?.filteredGroupCounts ?? {}).length > 0;
+  const [isLoadingPrioCounts, setIsLoadingPrioCounts] = useState(!_hasCachedGroupCounts);
   const grupoContainerRef = useRef<HTMLDivElement>(null);
   const loadedRecordsRef = useRef<any[]>([]);
   const comBuscaMapRef = useRef<Record<string, number>>(_acOld?.comBuscaMap ?? {});
@@ -512,24 +513,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           const emDia = Math.max(totalPacientes - atrasadas, 0);
           grupoBreakdownRef.current = groups;
 
-          // Calcula contagens filtradas por grupo prioritário (scoped: usa loadedRecords)
-          const filteredCounts: Record<string, number> = {};
-          loadedRecords.forEach((p: any) => {
-            const g = p.grupo || 'NÃO INFORMADO';
-            const hasCito = !!(p.cito_pep && String(p.cito_pep).trim());
-            const hasCitoLab = !!(p.cito_lab && String(p.cito_lab).trim());
-            const hasDna = !!(p.dna_hpv_pep && String(p.dna_hpv_pep).trim());
-            const hasDnaGal = !!(p.dna_hpv_gal && String(p.dna_hpv_gal).trim());
-            const is3049 = /30.*49/i.test(g);
-            const is5064 = /50.*6[0-4]|6[0-4].*50/i.test(g);
-            const is2529 = /25.*29|29.*25/i.test(g);
-            const is65plus = /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i.test(g);
-            
-            if ((is3049 || is5064 || is2529 || is65plus) && !hasCito && !hasCitoLab && !hasDna && !hasDnaGal) {
-              filteredCounts[g] = (filteredCounts[g] || 0) + 1;
-            }
-          });
-          setFilteredGroupCounts(filteredCounts);
+          // filteredGroupCounts já setado pela query leve — não sobrescrever
 
           setStats(prev => ({
             ...prev,
@@ -553,7 +537,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             coberturaPercent: totalPacientes > 0 ? Math.round((emDia / totalPacientes) * 100) : 0,
             pepMol: pepMolCount, coltMol: coltMolCount, pepCito: pepCitoCount, coltCito: coltCitoCount,
             alertBreakdown: alerts, grupoBreakdown: groups,
-            filteredGroupCounts: filteredCounts,
+            filteredGroupCounts,
             examVolume: { cito: pepCitoCount + coltCitoCount, hpv: pepMolCount + coltMolCount, pendente: atrasadas }
           });
         } else {
@@ -592,11 +576,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           ]);
           if (cancelled) return;
 
-          // Descobrir grupos únicos e contar cada um (incluindo contagem filtrada para prioritários)
           const groups: Record<string, number> = {};
-          const filteredCounts: Record<string, number> = {};
           try {
-            // Pegar 500 registros com campo 'grupo' pra descobrir todos os grupos únicos
             const sample = await pb.collection('amarcap53_pacientes').getList(1, 500, {
               fields: 'grupo',
               requestKey: null,
@@ -604,27 +585,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             });
             if (!cancelled) {
               const uniqueGrupos = [...new Set(sample.items.map((r: any) => r.grupo).filter(Boolean))];
-              // Contar registros de cada grupo via safeCount (rápido, sem full scan)
               const countPromises = uniqueGrupos.map(async (g) => {
                 if (g === '--' || g === 'NÃO INFORMADO') return;
-                
-                // Contagem total do grupo
                 const cnt = await safeCount(`grupo = "${g}"`, `grupo_${g}`);
                 if (cnt > 0 && !cancelled) groups[g] = cnt;
-
-                // Contagem filtrada (sem exames) para grupos prioritários
-                const is3049 = /30.*49/i.test(g);
-                const is5064 = /50.*6[0-4]|6[0-4].*50/i.test(g);
-                const is2529 = /25.*29|29.*25/i.test(g);
-                const is65plus = /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i.test(g);
-                
-                if (is3049 || is5064 || is2529 || is65plus) {
-                  const filtered = await safeCount(`grupo = "${g}" && cito_pep = '' && cito_lab = '' && dna_hpv_pep = '' && dna_hpv_gal = ''`, `filtered_${g}`);
-                  if (!cancelled) filteredCounts[g] = filtered;
-                }
               });
               await Promise.all(countPromises);
-              if (!cancelled) setFilteredGroupCounts(filteredCounts);
+              // filteredGroupCounts já setado pela query leve — não sobrescrever
             }
           } catch (err) {
             console.warn('[grupo] discover error:', err);
@@ -669,7 +636,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               coltCito,
               alertBreakdown: { NAO_IDENTIFICADO: atrasadas, PEP_MOLECULAR: pepMol, COLETA_MOLECULAR: coltMol, PEP_CITO: pepCito, COLETA_CITO: coltCito },
               grupoBreakdown: groups,
-              filteredGroupCounts: filteredCounts,
+              filteredGroupCounts,
               examVolume: { cito: pepCito + coltCito, hpv: pepMol + coltMol, pendente: atrasadas }
             });
           }
@@ -751,36 +718,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               comBuscaAlertMapRef.current = comBuscaAlerts;
               setFilteredComBuscaMap(filteredComBusca);
 
-              // Calcula filteredGroupCounts: 3 queries leves (1 cada por grupo)
-              let filteredCounts: Record<string, number> = {};
-              try {
-                const prioGroupNames = Object.keys(grupoBreakdownRef.current);
-                const prioFilters: Array<{ re: RegExp; citoFilter: string }> = [
-                  { re: /30.*49/i, citoFilter: "cito_pep = '' && cito_lab = '' && dna_hpv_pep = '' && dna_hpv_gal = ''" },
-                  { re: /50.*6[0-4]|6[0-4].*50/i, citoFilter: "cito_pep = '' && cito_lab = '' && dna_hpv_pep = '' && dna_hpv_gal = ''" },
-                  { re: /25.*29|29.*25/i, citoFilter: "cito_pep = '' && cito_lab = '' && dna_hpv_pep = '' && dna_hpv_gal = ''" },
-                  { re: /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i, citoFilter: "cito_pep = '' && cito_lab = '' && dna_hpv_pep = '' && dna_hpv_gal = ''" },
-                ];
-                const countPromises = prioGroupNames.map(async (g) => {
-                  const prio = prioFilters.find(p => p.re.test(g));
-                  if (!prio) return;
-                  try {
-                    const res = await pb.collection('amarcap53_pacientes').getList(1, 1, {
-                      filter: `grupo = "${g}" && ${prio.citoFilter}`,
-                      fields: 'id',
-                      requestKey: null,
-                    });
-                    filteredCounts[g] = res.totalItems;
-                  } catch { filteredCounts[g] = 0; }
-                });
-                await Promise.all(countPromises);
-                setFilteredGroupCounts(filteredCounts);
-              } catch { /* fallback vazio */ }
-
               if (!cancelled) {
                 setStats(prev => ({ ...prev, comBuscaMap }));
                 const existingCache = getCache(ACOMP_CACHE_KEY) || {};
-                setCache(ACOMP_CACHE_KEY, { ...existingCache, comBuscaMap, filteredComBuscaMap: filteredComBusca, filteredGroupCounts: filteredCounts });
+                setCache(ACOMP_CACHE_KEY, { ...existingCache, comBuscaMap, filteredComBuscaMap: filteredComBusca });
               }
             }
           } catch (e) {
