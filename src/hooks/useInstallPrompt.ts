@@ -19,18 +19,25 @@ function isStandalone(): boolean {
   return false;
 }
 
+function hasInstalledFlag(): boolean {
+  try { return localStorage.getItem('pwa_installed') === '1'; }
+  catch { return false; }
+}
+
 function isDismissed(): boolean {
+  try { return sessionStorage.getItem('pwa_install_banner_dismiss') === '1'; }
+  catch { return false; }
+}
+
+// Detecta se PWA já está instalada via API do browser
+async function detectInstalled(): Promise<boolean> {
   try {
-    // Migração: limpa estado de dismiss antigo (banner não aparecia)
-    const MIGRATED_KEY = 'pwa_banner_v2_migrated';
-    if (!localStorage.getItem(MIGRATED_KEY)) {
-      ['pwa_install_banner_dismissed', 'pwa-banner-dismissed-at', 'pwa-banner-dismiss-count'].forEach(k => {
-        try { localStorage.removeItem(k); } catch {}
-      });
-      localStorage.setItem(MIGRATED_KEY, '1');
+    if ('getInstalledRelatedApps' in navigator) {
+      const apps = await (navigator as any).getInstalledRelatedApps();
+      if (apps && apps.length > 0) return true;
     }
-    return localStorage.getItem('pwa_install_banner_dismissed') === '1';
-  } catch { return false; }
+  } catch {}
+  return false;
 }
 
 // Captura global FORA do componente
@@ -46,13 +53,22 @@ if (typeof window !== 'undefined') {
 export function useInstallPrompt() {
   const platform = getPlatform();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(capturedPrompt);
-  const [installed, setInstalled] = useState(() => {
-    try { return isStandalone() || localStorage.getItem('pwa_installed') === '1'; }
-    catch { return isStandalone(); }
-  });
   const [dismissed, setDismissed] = useState(isDismissed);
+  const [installed, setInstalled] = useState(() => {
+    if (isStandalone()) return true;
+    if (hasInstalledFlag()) return true;
+    return false;
+  });
 
   useEffect(() => {
+    // Detecta instalação via API (funciona em janela anônima)
+    detectInstalled().then(detectionResult => {
+      if (detectionResult) {
+        setInstalled(true);
+        try { localStorage.setItem('pwa_installed', '1'); } catch {}
+      }
+    });
+
     const handler = (e: Event) => {
       e.preventDefault();
       capturedPrompt = e;
@@ -67,8 +83,7 @@ export function useInstallPrompt() {
     };
     window.addEventListener('appinstalled', installedHandler);
 
-    // Se app instalado via outro método (ex: browser menu)
-    if (isStandalone() && !localStorage.getItem('pwa_installed')) {
+    if (isStandalone() && !hasInstalledFlag()) {
       try { localStorage.setItem('pwa_installed', '1'); } catch {}
     }
 
@@ -94,7 +109,7 @@ export function useInstallPrompt() {
   }, [deferredPrompt]);
 
   const dismiss = useCallback(() => {
-    try { localStorage.setItem('pwa_install_banner_dismissed', '1'); } catch {}
+    try { sessionStorage.setItem('pwa_install_banner_dismiss', '1'); } catch {}
     setDismissed(true);
   }, []);
 
