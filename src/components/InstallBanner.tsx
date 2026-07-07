@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Download, TouchpadIcon, ChevronDown, ChevronUp, Smartphone, Monitor } from 'lucide-react';
+import { X, Download, MousePointerClick, ChevronDown, ChevronUp, Smartphone, Monitor } from 'lucide-react';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
 
 const PLATFORM_INSTRUCTIONS: Record<string, { steps: string[]; icon: string }> = {
@@ -93,7 +93,7 @@ export const InstallBanner: React.FC = () => {
                     tabIndex={0}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') install(); }}
                   >
-                    <TouchpadIcon className="w-3.5 h-3.5" />
+                    <MousePointerClick className="w-3.5 h-3.5" />
                     Instalar agora
                   </button>
                 </>
