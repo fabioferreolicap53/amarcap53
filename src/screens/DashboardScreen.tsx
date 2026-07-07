@@ -129,6 +129,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const comBuscaAlertMapRef = useRef<Record<string, number>>({});
   const selectedGruposDBRef = useRef<string[]>([]);
   const [filteredComBuscaMap, setFilteredComBuscaMap] = useState<Record<string, number>>(_acOld?.filteredComBuscaMap ?? {});
+  const [filteredComBuscaMapIndep, setFilteredComBuscaMapIndep] = useState<Record<string, number>>(_acOld?.filteredComBuscaMapIndep ?? {});
   const grupoBreakdownRef = useRef<Record<string, number>>(_scOld?.grupoBreakdown ?? {});
   const [filteredGroupCounts, setFilteredGroupCounts] = useState<Record<string, number>>({});
   const [filteredGroupCountsIndep, setFilteredGroupCountsIndep] = useState<Record<string, number>>({});
@@ -190,6 +191,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
       const isIndependente = selectedIsIndependenteRef.current;
       const sourceCounts = isIndependente ? filteredGroupCountsIndep : filteredGroupCounts;
+      const sourceComBusca = isIndependente ? filteredComBuscaMapIndep : filteredComBuscaMap;
 
       // Se dados ainda não carregaram, espera (skeleton)
       const hasFilteredCounts = grupos.some(g => sourceCounts?.[g] !== undefined);
@@ -201,7 +203,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
       grupos.forEach(g => {
         const groupTotal = sourceCounts?.[g] ?? 0;
         totalGrupo += groupTotal;
-        comBusca += (filteredComBuscaMap[g] ?? 0);
+        comBusca += (sourceComBusca?.[g] ?? 0);
       });
 
       setGrupoBuscaStats({ comBusca, semBusca: Math.max(totalGrupo - comBusca, 0) });
@@ -286,23 +288,31 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         }
         if (cancelled) return;
 
-        // 5. Filtrar: só pacientes do grupo (com regras de cito)
+        // 5. Filtrar: só pacientes do grupo (com regras de cito/dna)
         const comBuscaSet = new Set<string>();
+        const isIndependenteDates = selectedIsIndependenteRef.current;
         for (const pacId of pacIdsComBusca) {
           const pac = pacMap.get(pacId);
           if (!pac || !isInGrupo(pac)) continue;
+          // 3º card independente: só conta se DNA não foi feito
+          if (isIndependenteDates) {
+            const hasDna = !!(pac.dna_hpv_pep && String(pac.dna_hpv_pep).trim());
+            const hasDnaGal = !!(pac.dna_hpv_gal && String(pac.dna_hpv_gal).trim());
+            if (hasDna || hasDnaGal) continue;
+          }
           comBuscaSet.add(pacId);
         }
 
         // 6. Total do grupo (consistente com a contagem exibida no card)
         const grupos = selectedGruposDBRef.current;
-        const totalGrupo = grupos.reduce((acc, g) => acc + (filteredGroupCounts?.[g] ?? 0), 0);
-        if (!cancelled) setGrupoBuscaStats({ comBusca: comBuscaSet.size, semBusca: totalGrupo - comBuscaSet.size });
+        const sourceCountsDates = isIndependenteDates ? filteredGroupCountsIndep : filteredGroupCounts;
+        const totalGrupo = grupos.reduce((acc, g) => acc + (sourceCountsDates?.[g] ?? 0), 0);
+        if (!cancelled) setGrupoBuscaStats({ comBusca: comBuscaSet.size, semBusca: Math.max(totalGrupo - comBuscaSet.size, 0) });
       } catch { if (!cancelled) setGrupoBuscaStats(null); }
     };
     fetchWithDates();
     return () => { cancelled = true; };
-  }, [selectedGrupo, debouncedGrupoDataInicio, debouncedGrupoDataFim, stats, filteredGroupCounts, filteredGroupCountsIndep, filteredComBuscaMap]);
+  }, [selectedGrupo, debouncedGrupoDataInicio, debouncedGrupoDataFim, stats, filteredGroupCounts, filteredGroupCountsIndep, filteredComBuscaMap, filteredComBuscaMapIndep]);
 
   // Click fora do container de grupos → cancela seleção
   useEffect(() => {
@@ -692,6 +702,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               const comBuscaMap: Record<string, number> = {};
               const comBuscaAlerts: Record<string, number> = {};
               const filteredComBusca: Record<string, number> = {};
+              const filteredComBuscaIndep: Record<string, number> = {};
               const batchSize = 200;
               for (let i = 0; i < comBuscaPacIds.length && !cancelled; i += batchSize) {
                 const chunkIds = comBuscaPacIds.slice(i, i + batchSize);
@@ -728,6 +739,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                       if ((isP3049 || isP5064 || isP2529 || isP65plus) && !hasCito && !hasCitoLab && !hasDna && !hasDnaGal) {
                         filteredComBusca[p.grupo] = (filteredComBusca[p.grupo] || 0) + 1;
                       }
+                      // 3º card: DNA não feito (sem DNA mas com ou sem cito)
+                      if ((isP3049 || isP5064 || isP2529 || isP65plus) && !hasDna && !hasDnaGal) {
+                        filteredComBuscaIndep[p.grupo] = (filteredComBuscaIndep[p.grupo] || 0) + 1;
+                      }
                     }
                   });
                 } catch { /* batch falha, continua */ }
@@ -735,11 +750,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               comBuscaMapRef.current = comBuscaMap;
               comBuscaAlertMapRef.current = comBuscaAlerts;
               setFilteredComBuscaMap(filteredComBusca);
+              setFilteredComBuscaMapIndep(filteredComBuscaIndep);
 
               if (!cancelled) {
                 setStats(prev => ({ ...prev, comBuscaMap }));
                 const existingCache = getCache(ACOMP_CACHE_KEY) || {};
-                setCache(ACOMP_CACHE_KEY, { ...existingCache, comBuscaMap, filteredComBuscaMap: filteredComBusca });
+                setCache(ACOMP_CACHE_KEY, { ...existingCache, comBuscaMap, filteredComBuscaMap: filteredComBusca, filteredComBuscaMapIndep: filteredComBuscaIndep });
               }
             }
           } catch (e) {
@@ -840,15 +856,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
           // Calcula comBuscaMap: contagem de pacientes COM acompanhamento por grupo (só pra scoped, admin já calculou)
           let scopedFilteredComBusca: Record<string, number> = {};
+          let scopedFilteredComBuscaIndep: Record<string, number> = {};
           let scopedFilteredGroupCounts: Record<string, number> = {};
+          let scopedFilteredGroupCountsIndep: Record<string, number> = {};
           if (loadedRecords.length > 0) {
             const pacComBusca = new Set(acompRecords.map((r: any) => r.paciente).filter(Boolean));
             const comBuscaMap: Record<string, number> = {};
             const filteredComBusca: Record<string, number> = {};
+            const filteredComBuscaIndepLocal: Record<string, number> = {};
             loadedRecords.forEach((p: any) => {
               if (p.grupo && pacComBusca.has(p.id)) {
                 comBuscaMap[p.grupo] = (comBuscaMap[p.grupo] || 0) + 1;
-                // filteredComBusca: com acompanhamento E que atende filtro rastreamento
                 const hasCito = !!(p.cito_pep && String(p.cito_pep).trim());
                 const hasCitoLab = !!(p.cito_lab && String(p.cito_lab).trim());
                 const hasDna = !!(p.dna_hpv_pep && String(p.dna_hpv_pep).trim());
@@ -857,17 +875,25 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                 const isP5064 = /50.*6[0-4]|6[0-4].*50/i.test(p.grupo);
                 const isP2529 = /25.*29|29.*25/i.test(p.grupo);
                 const isP65plus = /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i.test(p.grupo);
-                if ((isP3049 || isP5064 || isP2529 || isP65plus) && !hasCito && !hasCitoLab && !hasDna && !hasDnaGal) {
+                const isPrioritario = isP3049 || isP5064 || isP2529 || isP65plus;
+                if (isPrioritario && !hasCito && !hasCitoLab && !hasDna && !hasDnaGal) {
                   filteredComBusca[p.grupo] = (filteredComBusca[p.grupo] || 0) + 1;
+                }
+                // 3º card: comBusca sem DNA (inclui quem já tem cito)
+                if (isPrioritario && !hasDna && !hasDnaGal) {
+                  filteredComBuscaIndepLocal[p.grupo] = (filteredComBuscaIndepLocal[p.grupo] || 0) + 1;
                 }
               }
             });
             comBuscaMapRef.current = comBuscaMap;
             setFilteredComBuscaMap(filteredComBusca);
+            setFilteredComBuscaMapIndep(filteredComBuscaIndepLocal);
             scopedFilteredComBusca = filteredComBusca;
+            scopedFilteredComBuscaIndep = filteredComBuscaIndepLocal;
 
-            // Calcula filteredGroupCounts a partir de loadedRecords (sem queries extras)
+            // Calcula filteredGroupCounts + filteredGroupCountsIndep a partir de loadedRecords
             const filteredGroupCountsLocal: Record<string, number> = {};
+            const filteredGroupCountsIndepLocal: Record<string, number> = {};
             loadedRecords.forEach((p: any) => {
               const g = p.grupo || 'NÃO INFORMADO';
               const hasCito = !!(p.cito_pep && String(p.cito_pep).trim());
@@ -877,20 +903,26 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               const is3049 = /30.*49/i.test(g);
               const is5064 = /50.*6[0-4]|6[0-4].*50/i.test(g);
               const is2529 = /25.*29|29.*25/i.test(g);
-              const is65plus = /64>|65>/i.test(g);
-              
-              if ((is3049 || is5064 || is2529 || is65plus) && !hasCito && !hasCitoLab && !hasDna && !hasDnaGal) {
+              const is65plus = /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i.test(g);
+              const isPrioritario = is3049 || is5064 || is2529 || is65plus;
+              if (isPrioritario && !hasCito && !hasCitoLab && !hasDna && !hasDnaGal) {
                 filteredGroupCountsLocal[g] = (filteredGroupCountsLocal[g] || 0) + 1;
+              }
+              // 3º card: DNA não feito (cito irrelevante)
+              if (isPrioritario && !hasDna && !hasDnaGal) {
+                filteredGroupCountsIndepLocal[g] = (filteredGroupCountsIndepLocal[g] || 0) + 1;
               }
             });
             setFilteredGroupCounts(filteredGroupCountsLocal);
+            setFilteredGroupCountsIndep(filteredGroupCountsIndepLocal);
             scopedFilteredGroupCounts = filteredGroupCountsLocal;
+            scopedFilteredGroupCountsIndep = filteredGroupCountsIndepLocal;
           }
 
           if (!cancelled) {
             setStats(prev => ({ ...prev, examTrend: examTrendFinal, acompTrend: acompTrendFinal, comBuscaMap: comBuscaMapRef.current }));
             setAcompStats(aStats);
-            setCache(ACOMP_CACHE_KEY, { acompStats: aStats, comBuscaMap: comBuscaMapRef.current, filteredComBuscaMap: scopedFilteredComBusca, filteredGroupCounts: scopedFilteredGroupCounts });
+            setCache(ACOMP_CACHE_KEY, { acompStats: aStats, comBuscaMap: comBuscaMapRef.current, filteredComBuscaMap: scopedFilteredComBusca, filteredComBuscaMapIndep: scopedFilteredComBuscaIndep, filteredGroupCounts: scopedFilteredGroupCounts, filteredGroupCountsIndep: scopedFilteredGroupCountsIndep });
           }
         }
       } catch (error: any) {
@@ -1211,7 +1243,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     return (
                       <div
                         key={item.prioIdx}
-                        onClick={() => handleGrupoClick(item.prioIdx, item.gruposDB, !!(item.priority as any).reuseFrom)}
+                        onClick={() => handleGrupoClick(item.prioIdx, item.gruposDB, 'reuseFrom' in (item.priority as any) && typeof (item.priority as any).reuseFrom === 'number')}
                         className={`group relative bg-white rounded-2xl border-2 ${isSelected ? `${c.border} ring-4 ${c.ring} shadow-xl` : `${c.border} ${c.hoverBorder} shadow-lg ${c.glow} ${c.hoverGlow}`} hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 transition-all duration-500 cursor-pointer ${isSelected ? '' : 'overflow-hidden'}`}
                       >
                         <div className={`h-1 w-full bg-gradient-to-r ${c.gradient} ${isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'} transition-opacity`} />
@@ -1242,7 +1274,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                             </div>
                           </div>
                           <h3
-                            onClick={(e) => { e.stopPropagation(); handleGrupoClick(item.prioIdx, item.gruposDB, !!(item.priority as any).reuseFrom); }}
+                            onClick={(e) => { e.stopPropagation(); handleGrupoClick(item.prioIdx, item.gruposDB, 'reuseFrom' in (item.priority as any) && typeof (item.priority as any).reuseFrom === 'number'); }}
                             className={`text-sm md:text-base font-black ${c.text} uppercase tracking-wide leading-snug cursor-pointer`}
                           >{c.titulo}</h3>
                           <p className="text-[10px] md:text-[11px] font-medium text-slate-500 leading-relaxed">{c.desc}</p>
