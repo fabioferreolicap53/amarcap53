@@ -46,7 +46,10 @@ if (typeof window !== 'undefined') {
 export function useInstallPrompt() {
   const platform = getPlatform();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(capturedPrompt);
-  const [installed, setInstalled] = useState(isStandalone());
+  const [installed, setInstalled] = useState(() => {
+    try { return isStandalone() || localStorage.getItem('pwa_installed') === '1'; }
+    catch { return isStandalone(); }
+  });
   const [dismissed, setDismissed] = useState(isDismissed);
 
   useEffect(() => {
@@ -60,8 +63,14 @@ export function useInstallPrompt() {
     const installedHandler = () => {
       setInstalled(true);
       setDeferredPrompt(null);
+      try { localStorage.setItem('pwa_installed', '1'); } catch {}
     };
     window.addEventListener('appinstalled', installedHandler);
+
+    // Se app instalado via outro método (ex: browser menu)
+    if (isStandalone() && !localStorage.getItem('pwa_installed')) {
+      try { localStorage.setItem('pwa_installed', '1'); } catch {}
+    }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
