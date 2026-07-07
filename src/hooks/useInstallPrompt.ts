@@ -59,9 +59,7 @@ export function useInstallPrompt() {
 
   const canNativeInstall = !!deferredPrompt && !installed;
 
-  const shouldShow = !installed && !dismissed && (
-    canNativeInstall || platform === 'ios' || platform === 'android'
-  );
+  const shouldShow = !installed && !dismissed;
 
   const install = async () => {
     if (!deferredPrompt) return;
