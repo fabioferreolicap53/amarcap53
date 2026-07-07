@@ -21,6 +21,14 @@ function isStandalone(): boolean {
 
 function isDismissed(): boolean {
   try {
+    // Migração: limpa estado de dismiss antigo (banner não aparecia)
+    const MIGRATED_KEY = 'pwa_banner_v2_migrated';
+    if (!localStorage.getItem(MIGRATED_KEY)) {
+      ['pwa_install_banner_dismissed', 'pwa-banner-dismissed-at', 'pwa-banner-dismiss-count'].forEach(k => {
+        try { localStorage.removeItem(k); } catch {}
+      });
+      localStorage.setItem(MIGRATED_KEY, '1');
+    }
     return localStorage.getItem('pwa_install_banner_dismissed') === '1';
   } catch { return false; }
 }
