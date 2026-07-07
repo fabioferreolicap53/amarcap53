@@ -131,6 +131,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const [filteredComBuscaMap, setFilteredComBuscaMap] = useState<Record<string, number>>(_acOld?.filteredComBuscaMap ?? {});
   const grupoBreakdownRef = useRef<Record<string, number>>(_scOld?.grupoBreakdown ?? {});
   const [filteredGroupCounts, setFilteredGroupCounts] = useState<Record<string, number>>({});
+  const [filteredGroupCountsIndep, setFilteredGroupCountsIndep] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [acompStats, setAcompStats] = useState(_acOld?.acompStats ?? {
@@ -351,6 +352,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
       // Para cada grupo prioritário, conta filtrado (em paralelo) usando nome REAL
       const counts: Record<string, number> = {};
+      const countsIndep: Record<string, number> = {};
       await Promise.all([...groupNames].map(async (g) => {
         const matchedPrio = prio.find(p => new RegExp(p.g.replace('-', '.*'), 'i').test(g));
         if (!matchedPrio) return;
@@ -359,9 +361,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           const rF = await pb.collection('amarcap53_pacientes').getList(1, 1, { filter: fF, fields: 'id', requestKey: null });
           counts[g] = rF.totalItems;
         } catch { /* ignora */ }
+        // 3º card: "independente" — DNA não feito (sem DNA mas com cito registrado)
+        try {
+          const fI = bf
+            ? `${bf} && grupo = "${g}" && dna_hpv_pep = '' && dna_hpv_gal = ''`
+            : `grupo = "${g}" && dna_hpv_pep = '' && dna_hpv_gal = ''`;
+          const rI = await pb.collection('amarcap53_pacientes').getList(1, 1, { filter: fI, fields: 'id', requestKey: null });
+          countsIndep[g] = rI.totalItems;
+        } catch { /* ignora */ }
       }));
       if (!cancelled) {
         if (Object.keys(counts).length > 0) setFilteredGroupCounts(counts);
+        if (Object.keys(countsIndep).length > 0) setFilteredGroupCountsIndep(countsIndep);
         setIsLoadingPrioCounts(false);
       }
     })();
@@ -1146,10 +1157,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               }
 
               if (gruposDB.length > 0) {
+                const isIndependente = 'reuseFrom' in pg && typeof (pg as any).reuseFrom === 'number';
                 const totalCount = gruposDB.reduce((acc, gName) => {
                   const grpObj = allGroups.find(g => g.grupo === gName);
                   if (!grpObj) return acc;
-                  return acc + (filteredGroupCounts?.[gName] ?? grpObj.count);
+                  const baseCount = filteredGroupCounts?.[gName] ?? grpObj.count;
+                  return acc + (isIndependente ? (filteredGroupCountsIndep?.[gName] ?? baseCount) : baseCount);
                 }, 0);
 
                 matched.push({
@@ -1344,14 +1357,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   const pending: any = { filterGrupo: item.gruposDB, grupoNum: c.num, grupoTitulo: c.titulo, grupoDescricao: c.desc };
-                                  // Filtro cito: SEMPRE (exceto COM BUSCA + datas)
+                                  const isIndependente = 'reuseFrom' in c && typeof (c as any).reuseFrom === 'number';
+                                  // Filtro cito: SEMPRE (exceto COM BUSCA + datas ou independente)
                                   const isComBuscaComDatas = filterBuscaAtiva === true && (grupoDataInicio || grupoDataFim);
                                   
-                                  if (!isComBuscaComDatas) {
+                                  if (!isComBuscaComDatas && !isIndependente) {
                                     pending.filterDnaHpvPep = 'NÃO';
                                     pending.filterDnaHpvGal = 'NÃO';
                                     pending.filterCitoPep = 'NÃO';
                                     pending.filterCitoLab = 'NÃO';
+                                  } else if (!isComBuscaComDatas && isIndependente) {
+                                    // 3º card: só DNA não feito (inclui cito feito)
+                                    pending.filterDnaHpvPep = 'NÃO';
+                                    pending.filterDnaHpvGal = 'NÃO';
                                   }
                                   // Envia filtros SEM/COM BUSCA + datas quando selecionado
                                   if (filterBuscaAtiva !== undefined) {
