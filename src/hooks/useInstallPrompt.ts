@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 type Platform = 'android' | 'ios' | 'windows' | 'other';
 
@@ -11,13 +11,21 @@ function getPlatform(): Platform {
 }
 
 function isStandalone(): boolean {
-  if (window.matchMedia('(display-mode: standalone)').matches) return true;
-  if ((window.navigator as any).standalone === true) return true;
-  if (window.matchMedia('(display-mode: window-controls-overlay)').matches) return true;
+  try {
+    if (window.matchMedia('(display-mode: standalone)').matches) return true;
+    if ((window.navigator as any).standalone === true) return true;
+    if (window.matchMedia('(display-mode: window-controls-overlay)').matches) return true;
+  } catch {}
   return false;
 }
 
-// Captura global FORA do componente — antes do React montar
+function isDismissed(): boolean {
+  try {
+    return localStorage.getItem('pwa_install_banner_dismissed') === '1';
+  } catch { return false; }
+}
+
+// Captura global FORA do componente
 let capturedPrompt: any = null;
 
 if (typeof window !== 'undefined') {
@@ -27,15 +35,11 @@ if (typeof window !== 'undefined') {
   });
 }
 
-const DISMISS_KEY = 'pwa_install_banner_dismissed';
-
 export function useInstallPrompt() {
   const platform = getPlatform();
-  const standalone = isStandalone();
-  const dismissed = localStorage.getItem(DISMISS_KEY) === '1';
-
   const [deferredPrompt, setDeferredPrompt] = useState<any>(capturedPrompt);
-  const [installed, setInstalled] = useState(standalone);
+  const [installed, setInstalled] = useState(isStandalone());
+  const [dismissed, setDismissed] = useState(isDismissed);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -58,22 +62,24 @@ export function useInstallPrompt() {
   }, []);
 
   const canNativeInstall = !!deferredPrompt && !installed;
-
   const shouldShow = !installed && !dismissed;
 
-  const install = async () => {
+  const install = useCallback(async () => {
     if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
-      setInstalled(true);
-    }
-  };
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+        setInstalled(true);
+      }
+    } catch {}
+  }, [deferredPrompt]);
 
-  const dismiss = () => {
-    localStorage.setItem(DISMISS_KEY, '1');
-  };
+  const dismiss = useCallback(() => {
+    try { localStorage.setItem('pwa_install_banner_dismissed', '1'); } catch {}
+    setDismissed(true);
+  }, []);
 
   return { shouldShow, platform, canNativeInstall, install, dismiss, installed };
 }
