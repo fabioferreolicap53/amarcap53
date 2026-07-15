@@ -152,19 +152,28 @@ export function AuthScreen() {
       setAuthState('login');
     } catch (err: any) {
       console.error('Erro detalhado:', err.data);
-      
+
       let msg = 'Erro ao criar conta. Verifique os dados.';
-      
-      if (err.data?.data) {
+
+      // Hook server-side: combinação duplicada
+      if (err.data?.message && err.data.message.includes('combinação')) {
+        msg = err.data.message;
+      } else if (err.message && err.message.includes('combinação')) {
+        msg = err.message;
+      } else if (err.data?.data) {
         const firstField = Object.keys(err.data.data)[0];
         const fieldError = err.data.data[firstField];
-        msg = `Erro no campo ${firstField}: ${fieldError.message}`;
-      } else if (err.message === 'Já existe um cadastro com esta combinação de perfil.') {
-        msg = err.message;
+        const fieldMsg = String(fieldError.message || '').toLowerCase();
+        // "Value must be unique" do PocketBase → traduz p/ combinação duplicada
+        if (fieldMsg.includes('unique')) {
+          msg = 'Já existe um cadastro com esta combinação de perfil e localização.';
+        } else {
+          msg = `Erro no campo ${firstField}: ${fieldError.message}`;
+        }
       } else if (err.data?.message) {
         msg = err.data.message;
       }
-      
+
       setError(msg);
     } finally {
       setIsLoading(false);
