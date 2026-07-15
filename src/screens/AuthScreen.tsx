@@ -111,7 +111,7 @@ export function AuthScreen() {
       } else if (perfil === 'equipe') {
         filterCondition = `unidade_saude="${finalUnidade}" && equipe="${finalEquipe}" && role="equipe"`;
       } else if (perfil === 'microarea') {
-        filterCondition = `unidade_saude="${finalUnidade}" && equipe="${finalEquipe}" && microarea="${finalMicroarea}"`;
+        filterCondition = `unidade_saude="${finalUnidade}" && equipe="${finalEquipe}" && microarea="${finalMicroarea}" && role="microarea"`;
       }
 
       const existingUser = await pb.collection('amarcap53_users').getFirstListItem(filterCondition).catch(() => null);
