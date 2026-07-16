@@ -34,16 +34,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = pb.authStore.onChange((token, model) => {
-      const userModel = model as UserRecord;
-      setUser(userModel);
-      setIsAdmin(userModel?.role === 'admin' || userModel?.role === 'cap');
-    });
+    let disposed = false;
+    let safetyTimer: ReturnType<typeof setTimeout>;
 
-    setIsLoading(false);
+    try {
+      const unsubscribe = pb.authStore.onChange((token, model) => {
+        if (disposed) return;
+        const userModel = model as UserRecord;
+        setUser(userModel);
+        setIsAdmin(userModel?.role === 'admin' || userModel?.role === 'cap');
+      });
+
+      setIsLoading(false);
+
+      return () => {
+        disposed = true;
+        clearTimeout(safetyTimer);
+        unsubscribe();
+      };
+    } catch (err) {
+      console.error('[Auth] Erro ao inicializar authStore:', err);
+      setIsLoading(false);
+    }
+
+    // Safety: força isLoading=false após 4s mesmo se algo falhar
+    safetyTimer = setTimeout(() => {
+      if (!disposed) setIsLoading(false);
+    }, 4000);
 
     return () => {
-      unsubscribe();
+      disposed = true;
+      clearTimeout(safetyTimer);
     };
   }, []);
 
@@ -105,17 +126,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     let cancelled = false;
     let pendingSync: Promise<void> | null = null;
+    let lastSyncTime = 0;
+    const SYNC_INTERVAL = 30000; // 30s entre syncs
 
     const syncCurrentUser = async () => {
-      // Se ja tem uma sync pendente, aguarda ela terminar
+      // Evita syncs muito frequentes (proteção contra múltiplos eventos focus/visibility)
+      const now = Date.now();
+      if (now - lastSyncTime < 10000) return;
+      lastSyncTime = now;
+
+      // Se já tem sync pendente, aguarda
       if (pendingSync) {
         await pendingSync.catch(() => {});
+        return;
       }
 
       const sync = (async () => {
         try {
           const freshUser = await pb.collection(collectionName).getOne(user.id, {
-            requestKey: null
+            requestKey: null,
           });
           if (cancelled) return;
 
@@ -128,20 +157,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             pb.authStore.save(pb.authStore.token, freshUser);
           }
         } catch (error) {
-          // Erro silencioso
+          // Erro silencioso (rede, timeout, etc)
         }
       })();
 
       pendingSync = sync;
       await sync.catch(() => {});
+      pendingSync = null;
     };
 
-    const intervalId = window.setInterval(syncCurrentUser, 30000);
+    const intervalId = window.setInterval(syncCurrentUser, SYNC_INTERVAL);
 
     let debounceTimer: ReturnType<typeof setTimeout>;
     const debouncedSync = () => {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(syncCurrentUser, 300);
+      debounceTimer = setTimeout(syncCurrentUser, 600); // 600ms debounce
     };
 
     const handleFocus = debouncedSync;
@@ -155,11 +185,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    syncCurrentUser();
+    // Primeira sync com delay para não travar a inicialização
+    const initialSyncTimer = setTimeout(syncCurrentUser, 2000);
 
     return () => {
       cancelled = true;
       pendingSync = null;
+      clearTimeout(initialSyncTimer);
       clearTimeout(debounceTimer);
       window.clearInterval(intervalId);
       window.removeEventListener('focus', handleFocus);

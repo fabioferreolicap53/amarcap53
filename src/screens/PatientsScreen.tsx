@@ -307,10 +307,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
   // Deriva titulo/descricao a partir do nome do grupo (regex flexível)
   const GRUPO_PATTERNS: { pattern: RegExp; num: string; titulo: string; desc: string }[] = [
-    { pattern: /30.*49|49.*30/i, num: '1º', titulo: 'Mulheres de 30 a 49 anos', desc: 'com atraso no rastreamento (mais de 3 anos) ou que nunca o realizaram' },
-    { pattern: /50.*6[0-4]|6[0-4].*50/i, num: '2º', titulo: 'Mulheres de 50 a 64 anos', desc: 'com atraso no rastreamento (mais de 3 anos) ou que nunca o realizaram' },
-    { pattern: /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i, num: '3º', titulo: 'Mulheres acima de 64 anos', desc: 'independente da história anterior de rastreamento' },
-    { pattern: /25.*29|29.*25/i, num: '4º', titulo: 'Mulheres de 25 a 29 anos', desc: 'que nunca fizeram o rastreamento' },
+    { pattern: /30.*49|49.*30/i, num: '1º', titulo: 'Mulheres de 30 a 49 anos', desc: 'em atraso no rastreamento com exame e, também, ainda não realizaram o teste de DNA-HPV citopatológico (mais de 3 anos sem rastreio)' },
+    { pattern: /50.*6[0-4]|6[0-4].*50/i, num: '2º', titulo: 'Mulheres de 50 a 64 anos', desc: 'em atraso no rastreamento com exame e, também, ainda não realizaram o teste de DNA-HPV citopatológico (mais de 3 anos sem rastreio)' },
+    { pattern: /6[45]>|65\+|6[45]\+|6[45]\s*anos|6[45]\s*$|6[45]\s*\)/i, num: '3º', titulo: 'Mulheres acima de 64 anos', desc: 'citopatológico e, também, ainda não realizaram o teste de DNA-HPV' },
+    { pattern: /25.*29|29.*25/i, num: '4º', titulo: 'Mulheres de 25 a 29 anos', desc: 'que nunca fizeram o rastreamento com o exame citopatológico e, também, ainda não realizaram o teste de DNA-HPV' },
   ];
 
   const pendingGrupo = _pfData?.filterGrupo?.[0] || '';
