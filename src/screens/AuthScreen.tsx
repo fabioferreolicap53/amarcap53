@@ -63,143 +63,77 @@ export function AuthScreen() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submittingRef.current) return; // Previne double-submit
+    if (submittingRef.current) return;
     submittingRef.current = true;
     setIsLoading(true);
     clearMessages();
     try {
+      // Validações básicas no client
       if (password !== passwordConfirm) {
         setError('As senhas não coincidem.');
         setIsLoading(false);
         return;
       }
-
       if (!perfil) {
         setError('Selecione um perfil de acesso.');
         setIsLoading(false);
         return;
       }
-
       if (perfil !== 'cap' && !unidadeSaude) {
         setError('Selecione a unidade de saúde.');
         setIsLoading(false);
         return;
       }
-
       if ((perfil === 'equipe' || perfil === 'microarea') && !equipe) {
         setError('Selecione a equipe.');
         setIsLoading(false);
         return;
       }
-
       if (perfil === 'microarea' && !microarea) {
         setError('Selecione a microárea.');
         setIsLoading(false);
         return;
       }
 
-      const finalUnidade = perfil === 'cap' ? '' : unidadeSaude.trim();
-      const finalEquipe = (perfil === 'cap' || perfil === 'unidade') ? '' : equipe.trim();
-      const finalMicroarea = perfil === 'microarea' ? microarea.trim() : 'N/A';
+      // Toda validação de unicidade acontece no servidor via endpoint customizado
+      const resp = await fetch(`${pb.baseURL}/api/custom/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          passwordConfirm,
+          role: perfil,
+          unidade_saude: perfil === 'cap' ? '' : unidadeSaude.trim(),
+          equipe: (perfil === 'cap' || perfil === 'unidade') ? '' : equipe.trim(),
+          microarea: perfil === 'microarea' ? microarea.trim() : 'N/A',
+        }),
+      });
 
-      // Escapa aspas para evitar falha no filtro do PocketBase
-      const esc = (v: string) => v.replace(/"/g, '\\"');
+      const result = await resp.json();
 
-      // Helper: busca registro, retorna null APENAS se não encontrado (404)
-      const findExisting = async (filter: string) => {
-        try {
-          return await pb.collection('amarcap53_users').getFirstListItem(filter, { requestKey: null });
-        } catch (err: any) {
-          // PocketBase retorna status 404 quando nenhum registro é encontrado
-          if (err?.status === 404 || err?.status === 0) return null;
-          // Qualquer outro erro (rede, filtro, permissão) → propaga
-          throw err;
-        }
-      };
-
-      // 1. Verifica e-mail duplicado
-      const existingEmail = await findExisting(`email="${esc(email)}"`);
-      if (existingEmail) {
-        setError('Este e-mail já está sendo utilizado por outro usuário.');
+      if (!resp.ok || !result.record) {
+        setError(result.message || 'Erro ao criar conta. Verifique os dados.');
         setIsLoading(false);
         return;
       }
 
-      // 2. Verifica combinação de localização duplicada
-      let filterCondition = '';
-      if (perfil === 'cap') {
-        filterCondition = `role="cap"`;
-      } else if (perfil === 'unidade') {
-        filterCondition = `unidade_saude="${esc(finalUnidade)}" && role="unidade"`;
-      } else if (perfil === 'equipe') {
-        filterCondition = `unidade_saude="${esc(finalUnidade)}" && equipe="${esc(finalEquipe)}" && role="equipe"`;
-      } else if (perfil === 'microarea') {
-        filterCondition = `unidade_saude="${esc(finalUnidade)}" && equipe="${esc(finalEquipe)}" && microarea="${esc(finalMicroarea)}" && role="microarea"`;
-      }
-
-      const existingUser = await findExisting(filterCondition);
-
-      if (existingUser) {
-        let msg = 'Já existe um cadastro com esta combinação.';
-        if (perfil === 'cap') msg = 'Já existe um usuário cadastrado para a Coordenação (CAP).';
-        else if (perfil === 'unidade') msg = `Já existe um gestor cadastrado para a unidade "${finalUnidade}".`;
-        else if (perfil === 'equipe') msg = `Já existe um enfermeiro/médico cadastrado para a equipe "${finalEquipe}" da unidade "${finalUnidade}".`;
-        else if (perfil === 'microarea') msg = `Já existe um agente cadastrado para a microárea "${finalMicroarea}" da equipe "${finalEquipe}" na unidade "${finalUnidade}".`;
-        
-        setError(msg);
-        setIsLoading(false);
-        return;
-      }
-
-      const data: Record<string, any> = {
-        username: email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') + Math.floor(Math.random() * 10000),
-        email,
-        emailVisibility: true,
-        password,
-        passwordConfirm,
-        unidade_saude: finalUnidade,
-        equipe: finalEquipe,
-        role: perfil,
-        microarea: finalMicroarea
-      };
-
-      await pb.collection('amarcap53_users').create(data);
-      
+      // Cadastro OK — envia verificação de e-mail
       try {
         await pb.collection('amarcap53_users').requestVerification(email);
       } catch (verifyErr) {
         console.warn('Verificação já enviada ou erro silencioso:', verifyErr);
       }
-      
+
       setSuccessMsg('Cadastro realizado! Verifique seu e-mail (e a caixa de SPAM) para ativar a conta.');
       setAuthState('login');
     } catch (err: any) {
-      console.error('Erro detalhado:', err.data);
-
-      let msg = 'Erro ao criar conta. Verifique os dados.';
-
-      // Hook server-side: combinação duplicada
-      if (err.status === 409) {
-        msg = 'Já existe um cadastro com esta combinação de perfil e localização.';
-      } else if (err.data?.message && err.data.message.includes('combinação')) {
-        msg = err.data.message;
-      } else if (err.message && err.message.includes('combinação')) {
-        msg = err.message;
-      } else if (err.data?.data) {
-        const firstField = Object.keys(err.data.data)[0];
-        const fieldError = err.data.data[firstField];
-        const fieldMsg = String(fieldError.message || '').toLowerCase();
-        // "Value must be unique" do PocketBase → traduz p/ combinação duplicada
-        if (fieldMsg.includes('unique')) {
-          msg = 'Já existe um cadastro com esta combinação de perfil e localização.';
-        } else {
-          msg = `Erro no campo ${firstField}: ${fieldError.message}`;
-        }
-      } else if (err.data?.message) {
-        msg = err.data.message;
+      console.error('Erro no registro:', err);
+      if (err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')) {
+        setError('Erro de conexão. Verifique sua internet e tente novamente.');
+      } else {
+        setError('Erro ao criar conta. Tente novamente.');
       }
-
-      setError(msg);
     } finally {
       submittingRef.current = false;
       setIsLoading(false);
