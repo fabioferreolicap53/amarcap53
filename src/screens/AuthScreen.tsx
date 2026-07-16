@@ -99,13 +99,27 @@ export function AuthScreen() {
       // Escapa aspas para evitar falha no filtro do PocketBase
       const esc = (v: string) => v.replace(/"/g, '\\"');
 
-      const existingEmail = await pb.collection('amarcap53_users').getFirstListItem(`email="${esc(email)}"`).catch(() => null);
+      // Helper: busca registro, retorna null APENAS se não encontrado (404)
+      const findExisting = async (filter: string) => {
+        try {
+          return await pb.collection('amarcap53_users').getFirstListItem(filter, { requestKey: null });
+        } catch (err: any) {
+          // PocketBase retorna status 404 quando nenhum registro é encontrado
+          if (err?.status === 404 || err?.status === 0) return null;
+          // Qualquer outro erro (rede, filtro, permissão) → propaga
+          throw err;
+        }
+      };
+
+      // 1. Verifica e-mail duplicado
+      const existingEmail = await findExisting(`email="${esc(email)}"`);
       if (existingEmail) {
         setError('Este e-mail já está sendo utilizado por outro usuário.');
         setIsLoading(false);
         return;
       }
 
+      // 2. Verifica combinação de localização duplicada
       let filterCondition = '';
       if (perfil === 'cap') {
         filterCondition = `role="cap"`;
@@ -117,7 +131,7 @@ export function AuthScreen() {
         filterCondition = `unidade_saude="${esc(finalUnidade)}" && equipe="${esc(finalEquipe)}" && microarea="${esc(finalMicroarea)}" && role="microarea"`;
       }
 
-      const existingUser = await pb.collection('amarcap53_users').getFirstListItem(filterCondition).catch(() => null);
+      const existingUser = await findExisting(filterCondition);
 
       if (existingUser) {
         let msg = 'Já existe um cadastro com esta combinação.';
