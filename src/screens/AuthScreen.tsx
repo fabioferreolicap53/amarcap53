@@ -271,34 +271,34 @@ export function AuthScreen() {
       {/* Form Panel — Scrollable for virtual keyboard */}
       <div className="relative z-10 w-full lg:w-1/2 lg:ml-auto flex flex-col min-h-dvh min-h-[100dvh] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
         <div
-          className="flex-1 flex items-center justify-center px-5 py-8 sm:px-8 md:px-10 lg:px-14 xl:px-16"
-          style={{ paddingTop: 'max(2rem, env(safe-area-inset-top, 2rem))', paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 2rem))' }}
+          className="flex-1 flex items-center justify-center px-4 py-6 sm:px-8 md:px-10 lg:px-14 xl:px-16"
+          style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top, 1.5rem))', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}
         >
           <div className="w-full max-w-[440px] lg:max-w-[400px] xl:max-w-[420px]">
-            {/* Mobile logo */}
-            <div className="lg:hidden flex flex-col items-center mb-8 sm:mb-10 animate-[fadeSlideIn_0.5s_ease-out]">
-              <div className="w-[4.5rem] h-[4.5rem] sm:w-[5rem] sm:h-[5rem] rounded-[1.25rem] bg-gradient-to-br from-[#001b3d] to-[#003d7a] flex items-center justify-center shadow-xl shadow-blue-900/20 ring-1 ring-white/10 mb-4">
-                <Heart className="w-9 h-9 sm:w-10 sm:h-10 text-white" />
+            {/* Mobile logo — compacto */}
+            <div className="lg:hidden flex flex-col items-center mb-5 sm:mb-10 animate-[fadeSlideIn_0.5s_ease-out]">
+              <div className="w-14 h-14 sm:w-[4.5rem] sm:h-[4.5rem] rounded-[1rem] sm:rounded-[1.25rem] bg-gradient-to-br from-[#001b3d] to-[#003d7a] flex items-center justify-center shadow-lg shadow-blue-900/20 ring-1 ring-white/10 mb-2.5 sm:mb-4">
+                <Heart className="w-7 h-7 sm:w-9 sm:h-9 text-white" />
               </div>
-              <h1 className="text-[1.625rem] sm:text-2xl font-black text-[#001b3d] tracking-tight leading-tight">{appConfig.name}</h1>
-              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1.5 text-center max-w-[300px] leading-relaxed">{appConfig.description}</p>
+              <h1 className="text-[1.375rem] sm:text-[1.625rem] font-black text-[#001b3d] tracking-tight leading-tight">{appConfig.name}</h1>
+              <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1 text-center max-w-[260px] sm:max-w-[300px] leading-snug sm:leading-relaxed">{appConfig.description}</p>
             </div>
 
             {/* Form Card — Premium glassmorphism */}
             <div
-              className="bg-white/80 sm:bg-white backdrop-blur-xl sm:backdrop-blur-none rounded-[1.75rem] sm:rounded-[2rem] shadow-[0_8px_40px_rgba(0,0,0,0.06)] sm:shadow-[0_20px_60px_rgba(0,0,0,0.08)] lg:shadow-[0_25px_80px_rgba(0,0,0,0.12)] border border-white/60 sm:border-slate-200/50 lg:border-slate-200/60 p-6 sm:p-8 md:p-10 relative overflow-hidden animate-[fadeSlideIn_0.6s_ease-out_0.1s_both]"
+              className="bg-white/80 sm:bg-white backdrop-blur-xl sm:backdrop-blur-none rounded-[1.25rem] sm:rounded-[2rem] shadow-[0_8px_40px_rgba(0,0,0,0.06)] sm:shadow-[0_20px_60px_rgba(0,0,0,0.08)] lg:shadow-[0_25px_80px_rgba(0,0,0,0.12)] border border-white/60 sm:border-slate-200/50 lg:border-slate-200/60 p-5 sm:p-8 md:p-10 relative overflow-hidden animate-[fadeSlideIn_0.6s_ease-out_0.1s_both]"
             >
               {/* Top gradient bar */}
               <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-500 via-[#001b3d] to-blue-500" />
 
               {/* Header */}
-              <div className="mb-6 sm:mb-8">
-                <h2 className="text-xl sm:text-[1.375rem] md:text-2xl lg:text-[1.625rem] font-black text-[#001b3d] tracking-tight leading-tight">
+              <div className="mb-4 sm:mb-8">
+                <h2 className="text-lg sm:text-[1.375rem] md:text-2xl lg:text-[1.625rem] font-black text-[#001b3d] tracking-tight leading-tight">
                   {authState === 'login' && 'Bem-vindo de volta'}
                   {authState === 'register' && 'Solicitar Acesso'}
                   {authState === 'forgot_password' && 'Recuperar Senha'}
                 </h2>
-                <p className="text-[11px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-2 leading-relaxed">
+                <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1.5 sm:mt-2 leading-snug sm:leading-relaxed">
                   {authState === 'login' && 'Acesse sua conta'}
                   {authState === 'register' && 'Preencha os dados para criar sua conta'}
                   {authState === 'forgot_password' && 'Enviaremos um link de recuperação'}
@@ -307,26 +307,26 @@ export function AuthScreen() {
 
               {/* Messages */}
               {error && (
-                <div className="mb-5 sm:mb-6 p-3.5 sm:p-4 bg-rose-50/80 backdrop-blur-sm border border-rose-100 rounded-xl sm:rounded-2xl flex items-start gap-3 animate-[shakeIn_0.4s_ease-out]">
-                  <div className="w-7 h-7 rounded-lg bg-rose-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-rose-500/30">
-                    <span className="text-white text-[11px] font-black">!</span>
+                <div className="mb-3 sm:mb-6 p-3 sm:p-4 bg-rose-50/80 backdrop-blur-sm border border-rose-100 rounded-xl sm:rounded-2xl flex items-start gap-2.5 sm:gap-3 animate-[shakeIn_0.4s_ease-out]">
+                  <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-rose-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-rose-500/30">
+                    <span className="text-white text-[10px] sm:text-[11px] font-black">!</span>
                   </div>
-                  <p className="text-xs font-bold text-rose-700 leading-relaxed">{error}</p>
+                  <p className="text-[11px] sm:text-xs font-bold text-rose-700 leading-snug sm:leading-relaxed">{error}</p>
                 </div>
               )}
 
               {successMsg && (
-                <div className="mb-5 sm:mb-6 p-3.5 sm:p-4 bg-emerald-50/80 backdrop-blur-sm border border-emerald-100 rounded-xl sm:rounded-2xl flex items-start gap-3 animate-[fadeSlideIn_0.4s_ease-out]">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-emerald-500/30">
-                    <BadgeCheck className="w-4 h-4 text-white" />
+                <div className="mb-3 sm:mb-6 p-3 sm:p-4 bg-emerald-50/80 backdrop-blur-sm border border-emerald-100 rounded-xl sm:rounded-2xl flex items-start gap-2.5 sm:gap-3 animate-[fadeSlideIn_0.4s_ease-out]">
+                  <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-emerald-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-emerald-500/30">
+                    <BadgeCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                   </div>
-                  <p className="text-xs font-bold text-emerald-700 leading-relaxed">{successMsg}</p>
+                  <p className="text-[11px] sm:text-xs font-bold text-emerald-700 leading-snug sm:leading-relaxed">{successMsg}</p>
                 </div>
               )}
 
               {/* Login Form */}
               {authState === 'login' && (
-                <form className="space-y-4 sm:space-y-5" onSubmit={handleLogin}>
+                <form className="space-y-3.5 sm:space-y-5" onSubmit={handleLogin}>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-black text-slate-500 uppercase tracking-[0.15em] ml-1">E-mail de acesso</label>
                     <div className="relative">
@@ -539,7 +539,7 @@ export function AuthScreen() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-black text-slate-500 uppercase tracking-[0.15em] ml-1">Senha</label>
                       <div className="relative">
@@ -649,41 +649,41 @@ export function AuthScreen() {
               )}
 
               {/* Footer Nav */}
-              <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-slate-100">
+              <div className="mt-5 sm:mt-8 pt-4 sm:pt-6 border-t border-slate-100">
                 {authState === 'login' ? (
                   <p className="text-center">
-                    <span className="text-xs font-bold text-slate-400">Não possui conta? </span>
+                    <span className="text-[11px] sm:text-xs font-bold text-slate-400">Não possui conta? </span>
                     <button
                       onClick={() => { setAuthState('register'); clearMessages(); }}
-                      className="text-xs font-black text-[#001b3d] hover:text-blue-600 active:text-blue-700 transition-colors inline-flex items-center gap-1.5 min-h-[44px]"
+                      className="text-[11px] sm:text-xs font-black text-[#001b3d] hover:text-blue-600 active:text-blue-700 transition-colors inline-flex items-center gap-1.5 min-h-[44px]"
                     >
-                      Solicitar acesso <ArrowRight className="w-4 h-4" />
+                      Solicitar acesso <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </button>
                   </p>
                 ) : (
                   <button
                     onClick={() => { setAuthState('login'); clearMessages(); }}
-                    className="w-full flex items-center justify-center gap-2 text-xs font-bold text-slate-400 hover:text-slate-600 active:text-slate-700 transition-colors min-h-[44px]"
+                    className="w-full flex items-center justify-center gap-2 text-[11px] sm:text-xs font-bold text-slate-400 hover:text-slate-600 active:text-slate-700 transition-colors min-h-[44px]"
                   >
-                    <ArrowLeft className="w-4 h-4" /> Voltar para o login
+                    <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Voltar para o login
                   </button>
                 )}
               </div>
             </div>
 
             {/* Mobile Footer */}
-            <div className="flex flex-col items-center gap-6 sm:gap-8 mt-6 sm:mt-8 animate-[fadeSlideIn_0.6s_ease-out_0.3s_both]">
-              <div className="flex-col gap-2 flex lg:hidden">
+            <div className="flex flex-col items-center gap-4 sm:gap-8 mt-5 sm:mt-8 animate-[fadeSlideIn_0.6s_ease-out_0.3s_both]">
+              <div className="flex-col gap-1.5 flex lg:hidden">
                 <div className="flex items-center gap-2 justify-center">
-                  <div className="w-px h-4 bg-slate-300/30" />
-                  <p className="text-slate-400 text-[9px] font-bold uppercase tracking-[0.15em] text-center">Coordenadoria Geral de Atenção Primária — AP 5.3</p>
+                  <div className="w-px h-3 bg-slate-300/30" />
+                  <p className="text-slate-400 text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.15em] text-center">Coordenadoria Geral de Atenção Primária — AP 5.3</p>
                 </div>
                 <div className="flex items-center gap-2 justify-center">
-                  <div className="w-px h-3 bg-slate-300/20" />
-                  <p className="text-slate-400/70 text-[9px] font-semibold tracking-[0.2em]">© 2026 AMAR — Todos os direitos reservados</p>
+                  <div className="w-px h-2.5 bg-slate-300/20" />
+                  <p className="text-slate-400/70 text-[8px] sm:text-[9px] font-semibold tracking-[0.2em]">© 2026 AMAR — Todos os direitos reservados</p>
                 </div>
               </div>
-              <p className="text-slate-300 text-[9px] font-bold uppercase tracking-[0.25em] text-center">Desenvolvido por Fabio Ferreira de Oliveira — DAPS/CAP5.3</p>
+              <p className="text-slate-300 text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.25em] text-center">Desenvolvido por Fabio Ferreira de Oliveira — DAPS/CAP5.3</p>
             </div>
           </div>
         </div>
