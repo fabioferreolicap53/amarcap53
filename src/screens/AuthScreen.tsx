@@ -92,11 +92,14 @@ export function AuthScreen() {
         return;
       }
 
-      const finalUnidade = perfil === 'cap' ? '' : unidadeSaude;
-      const finalEquipe = (perfil === 'cap' || perfil === 'unidade') ? '' : equipe;
-      const finalMicroarea = perfil === 'microarea' ? microarea : 'N/A';
+      const finalUnidade = perfil === 'cap' ? '' : unidadeSaude.trim();
+      const finalEquipe = (perfil === 'cap' || perfil === 'unidade') ? '' : equipe.trim();
+      const finalMicroarea = perfil === 'microarea' ? microarea.trim() : 'N/A';
 
-      const existingEmail = await pb.collection('amarcap53_users').getFirstListItem(`email="${email}"`).catch(() => null);
+      // Escapa aspas para evitar falha no filtro do PocketBase
+      const esc = (v: string) => v.replace(/"/g, '\\"');
+
+      const existingEmail = await pb.collection('amarcap53_users').getFirstListItem(`email="${esc(email)}"`).catch(() => null);
       if (existingEmail) {
         setError('Este e-mail já está sendo utilizado por outro usuário.');
         setIsLoading(false);
@@ -107,11 +110,11 @@ export function AuthScreen() {
       if (perfil === 'cap') {
         filterCondition = `role="cap"`;
       } else if (perfil === 'unidade') {
-        filterCondition = `unidade_saude="${finalUnidade}" && role="unidade"`;
+        filterCondition = `unidade_saude="${esc(finalUnidade)}" && role="unidade"`;
       } else if (perfil === 'equipe') {
-        filterCondition = `unidade_saude="${finalUnidade}" && equipe="${finalEquipe}" && role="equipe"`;
+        filterCondition = `unidade_saude="${esc(finalUnidade)}" && equipe="${esc(finalEquipe)}" && role="equipe"`;
       } else if (perfil === 'microarea') {
-        filterCondition = `unidade_saude="${finalUnidade}" && equipe="${finalEquipe}" && microarea="${finalMicroarea}" && role="microarea"`;
+        filterCondition = `unidade_saude="${esc(finalUnidade)}" && equipe="${esc(finalEquipe)}" && microarea="${esc(finalMicroarea)}" && role="microarea"`;
       }
 
       const existingUser = await pb.collection('amarcap53_users').getFirstListItem(filterCondition).catch(() => null);
@@ -156,7 +159,9 @@ export function AuthScreen() {
       let msg = 'Erro ao criar conta. Verifique os dados.';
 
       // Hook server-side: combinação duplicada
-      if (err.data?.message && err.data.message.includes('combinação')) {
+      if (err.status === 409) {
+        msg = 'Já existe um cadastro com esta combinação de perfil e localização.';
+      } else if (err.data?.message && err.data.message.includes('combinação')) {
         msg = err.data.message;
       } else if (err.message && err.message.includes('combinação')) {
         msg = err.message;
