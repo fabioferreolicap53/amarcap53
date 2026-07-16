@@ -1,67 +1,28 @@
 // register.pb.js
-// POST /api/custom/register — cadastro com validação server-side de unicidade
-// Bypassa hooks: toda validação acontece aqui via DAO (fail-closed)
-
-function esc(v) {
-  return String(v || '').replace(/"/g, '\\"');
-}
+// POST /api/custom/register — cadastro com validação ATÔMICA server-side
+// Usa dao.runInTransaction() + SQL direto para eliminar race condition
 
 function getDao() {
   try { return $app.dao(); } catch(e) { return null; }
 }
 
-function checkEmailDuplicate(dao, email) {
+// Conta registros via SQL direto (mais confiável que findRecordsByFilter)
+function countBySql(dao, where) {
   try {
-    var existing = dao.findRecordsByFilter(
-      'amarcap53_users',
-      'email = "' + esc(email) + '"',
-      '-created',
-      1,
-      0
-    );
-    return existing && existing.length > 0;
+    var row = dao.db().newQuery(
+      'SELECT COUNT(*) as total FROM amarcap53_users WHERE ' + where
+    ).one();
+    return (row && row.get) ? (row.get('total') || 0) : 0;
   } catch (e) {
-    // Fail-closed: se filtro falhar, assume duplicata
-    console.error('[register] Erro ao verificar email:', e);
-    return true;
-  }
-}
-
-function checkComboDuplicate(dao, role, unidade, equipe, microarea) {
-  var filter = '';
-  if (role === 'cap') {
-    filter = 'role = "cap"';
-  } else if (role === 'unidade') {
-    filter = 'role = "unidade" && unidade_saude = "' + esc(unidade) + '"';
-  } else if (role === 'equipe') {
-    filter = 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '"';
-  } else if (role === 'microarea') {
-    filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && microarea = "' + esc(microarea) + '"';
-  }
-  if (!filter) return { found: false, msg: '' };
-
-  try {
-    var existing = dao.findRecordsByFilter('amarcap53_users', filter, '-created', 1, 0);
-    if (existing && existing.length > 0) {
-      var msg = 'Já existe um cadastro com esta combinação.';
-      if (role === 'cap') msg = 'Já existe um usuário cadastrado para a Coordenação (CAP).';
-      else if (role === 'unidade') msg = 'Já existe um gestor cadastrado para a unidade "' + unidade + '".';
-      else if (role === 'equipe') msg = 'Já existe um enfermeiro/médico cadastrado para a equipe "' + equipe + '" da unidade "' + unidade + '".';
-      else if (role === 'microarea') msg = 'Já existe um agente cadastrado para a microárea "' + microarea + '" da equipe "' + equipe + '" na unidade "' + unidade + '".';
-      return { found: true, msg: msg };
-    }
-    return { found: false, msg: '' };
-  } catch (e) {
-    // Fail-closed
-    console.error('[register] Erro ao verificar combinação:', e, 'Filtro:', filter);
-    return { found: true, msg: 'Erro ao validar combinação. Tente novamente.' };
+    console.error('[register] SQL error:', e.message, 'WHERE:', where);
+    return -1; // -1 = erro (fail-closed)
   }
 }
 
 // ─── POST /api/custom/register ──────────────────────────
 routerAdd('POST', '/api/custom/register', function(c) {
   try {
-    // Parse body
+    // ── Parse body ──
     var body;
     try {
       var info = c.requestInfo();
@@ -81,7 +42,6 @@ routerAdd('POST', '/api/custom/register', function(c) {
       } else { body = {}; }
     } catch (_) { body = {}; }
 
-    // Extrair e normalizar campos
     var email = String(body.email || '').trim();
     var password = String(body.password || '');
     var passwordConfirm = String(body.passwordConfirm || '');
@@ -90,7 +50,7 @@ routerAdd('POST', '/api/custom/register', function(c) {
     var equipe = String(body.equipe || '').trim();
     var microarea = String(body.microarea || '').trim();
 
-    // ── Validações obrigatórias ──
+    // ── Validações ──
     if (!email || !password || !role) {
       return c.json(400, { code: 400, message: 'Campos obrigatórios não preenchidos.' });
     }
@@ -113,49 +73,105 @@ routerAdd('POST', '/api/custom/register', function(c) {
       return c.json(400, { code: 400, message: 'Selecione a microárea.' });
     }
 
-    // ── DAO ──
     var dao = getDao();
     if (!dao) return c.json(500, { code: 500, message: 'DAO indisponível.' });
 
-    // ── Verificar email duplicado ──
-    if (checkEmailDuplicate(dao, email)) {
+    // ── Escapa valor para SQL (substitui aspas simples) ──
+    function sqlEsc(v) {
+      return String(v || '').replace(/'/g, "''");
+    }
+
+    // ── Verificações ANTES da transação (leitura rápida) ──
+    // Email duplicado
+    var emailCount = countBySql(dao, "email = '" + sqlEsc(email) + "'");
+    if (emailCount === -1) {
+      return c.json(500, { code: 500, message: 'Erro ao verificar e-mail. Tente novamente.' });
+    }
+    if (emailCount > 0) {
       return c.json(400, { code: 400, message: 'Este e-mail já está sendo utilizado por outro usuário.' });
     }
 
-    // ── Verificar combinação duplicada ──
-    var combo = checkComboDuplicate(dao, role, unidadeSaude, equipe, microarea);
-    if (combo.found) {
-      return c.json(400, { code: 400, message: combo.msg });
+    // Combinação duplicada
+    var comboWhere = "role = '" + sqlEsc(role) + "'";
+    if (role === 'unidade') {
+      comboWhere += " AND unidade_saude = '" + sqlEsc(unidadeSaude) + "'";
+    } else if (role === 'equipe') {
+      comboWhere += " AND unidade_saude = '" + sqlEsc(unidadeSaude) + "' AND equipe = '" + sqlEsc(equipe) + "'";
+    } else if (role === 'microarea') {
+      comboWhere += " AND unidade_saude = '" + sqlEsc(unidadeSaude) + "' AND equipe = '" + sqlEsc(equipe) + "' AND microarea = '" + sqlEsc(microarea) + "'";
     }
 
-    // ── Criar usuário via DAO (com hash de senha) ──
-    var collection = dao.findCollectionByNameOrId('amarcap53_users');
-    if (!collection) return c.json(500, { code: 500, message: 'Coleção não encontrada.' });
+    var comboCount = countBySql(dao, comboWhere);
+    if (comboCount === -1) {
+      return c.json(500, { code: 500, message: 'Erro ao validar combinação. Tente novamente.' });
+    }
+    if (comboCount > 0) {
+      var msg = 'Já existe um cadastro com esta combinação.';
+      if (role === 'cap') msg = 'Já existe um usuário cadastrado para a Coordenação (CAP).';
+      else if (role === 'unidade') msg = 'Já existe um gestor cadastrado para a unidade "' + unidadeSaude + '".';
+      else if (role === 'equipe') msg = 'Já existe um enfermeiro/médico cadastrado para a equipe "' + equipe + '" da unidade "' + unidadeSaude + '".';
+      else if (role === 'microarea') msg = 'Já existe um agente cadastrado para a microárea "' + microarea + '" da equipe "' + equipe + '" na unidade "' + unidadeSaude + '".';
+      return c.json(400, { code: 400, message: msg });
+    }
 
-    var record = new Record(collection);
-    record.set('username', email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') + Math.floor(Math.random() * 10000));
-    record.set('email', email);
-    record.set('emailVisibility', true);
-    record.setPassword(password);
-    record.set('unidade_saude', unidadeSaude);
-    record.set('equipe', equipe);
-    record.set('role', role);
-    record.set('microarea', microarea);
+    // ── Transação ATÔMICA: re-verifica + cria ──
+    var createdRecord = null;
 
-    dao.saveRecord(record);
+    dao.runInTransaction(function(txDao) {
+      // Re-verifica email dentro da transação (proteção contra race condition)
+      var emailCountTx = countBySql(txDao, "email = '" + sqlEsc(email) + "'");
+      if (emailCountTx === -1) throw new Error('Erro ao verificar e-mail.');
+      if (emailCountTx > 0) throw new Error('EMAIL_DUPLICADO');
+
+      // Re-verifica combinação dentro da transação
+      var comboCountTx = countBySql(txDao, comboWhere);
+      if (comboCountTx === -1) throw new Error('Erro ao validar combinação.');
+      if (comboCountTx > 0) throw new Error('COMBO_DUPLICADO');
+
+      // Cria o usuário
+      var collection = txDao.findCollectionByNameOrId('amarcap53_users');
+      if (!collection) throw new Error('Coleção amarcap53_users não encontrada.');
+
+      var record = new Record(collection);
+      record.set('username', email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') + Math.floor(Math.random() * 10000));
+      record.set('email', email);
+      record.set('emailVisibility', true);
+      record.setPassword(password);
+      record.set('unidade_saude', unidadeSaude);
+      record.set('equipe', equipe);
+      record.set('role', role);
+      record.set('microarea', microarea);
+
+      txDao.saveRecord(record);
+      createdRecord = { id: record.id, email: email };
+    });
+
+    if (!createdRecord) {
+      return c.json(500, { code: 500, message: 'Erro ao criar conta.' });
+    }
 
     return c.json(200, {
       code: 200,
       message: 'Cadastro realizado com sucesso!',
-      record: { id: record.id, email: email }
+      record: createdRecord
     });
 
   } catch (err) {
     var errMsg = (err && err.message) ? err.message : 'Erro inesperado.';
-    // Catch unique constraint errors do SQLite
+
+    // Erros de duplicata customizados
+    if (errMsg === 'EMAIL_DUPLICADO') {
+      return c.json(400, { code: 400, message: 'Este e-mail já está sendo utilizado por outro usuário.' });
+    }
+    if (errMsg === 'COMBO_DUPLICADO') {
+      return c.json(400, { code: 400, message: 'Já existe um cadastro com esta combinação de perfil e localização.' });
+    }
+
+    // Unique constraint do SQLite
     if (errMsg.indexOf('unique') !== -1 || errMsg.indexOf('Unique') !== -1 || errMsg.indexOf('UNIQUE') !== -1) {
       return c.json(400, { code: 400, message: 'Já existe um cadastro com esta combinação de perfil e localização.' });
     }
+
     console.error('[register] CRASH:', errMsg);
     return c.json(500, { code: 500, message: 'Erro ao criar conta. Verifique os dados.' });
   }
