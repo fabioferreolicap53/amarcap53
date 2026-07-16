@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { pb } from '../lib/pocketbase';
 import { Activity, Mail, Lock, Building, Users, MapPin, ArrowRight, ArrowLeft, Eye, EyeOff, Shield, Heart, BadgeCheck } from 'lucide-react';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
@@ -10,6 +10,7 @@ export function AuthScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const submittingRef = useRef(false); // Previne double-submit
 
   const appConfig = {
     name: 'AMAR',
@@ -45,6 +46,8 @@ export function AuthScreen() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsLoading(true);
     clearMessages();
     try {
@@ -53,12 +56,15 @@ export function AuthScreen() {
       console.error(err);
       setError('Credenciais inválidas. Verifique seu e-mail e senha.');
     } finally {
+      submittingRef.current = false;
       setIsLoading(false);
     }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return; // Previne double-submit
+    submittingRef.current = true;
     setIsLoading(true);
     clearMessages();
     try {
@@ -195,12 +201,15 @@ export function AuthScreen() {
 
       setError(msg);
     } finally {
+      submittingRef.current = false;
       setIsLoading(false);
     }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsLoading(true);
     clearMessages();
     try {
@@ -210,6 +219,7 @@ export function AuthScreen() {
       console.error(err);
       setError('Erro ao solicitar recuperação. Tente novamente mais tarde.');
     } finally {
+      submittingRef.current = false;
       setIsLoading(false);
     }
   };
