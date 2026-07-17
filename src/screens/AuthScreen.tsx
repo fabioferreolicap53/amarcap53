@@ -44,66 +44,37 @@ export function AuthScreen() {
   const toggleShowPassword = () => setShowPassword(!showPassword);
   const toggleShowPasswordConfirm = () => setShowPasswordConfirm(!showPasswordConfirm);
 
-  // Processa verificação de e-mail
-  // Suporta dois formatos:
-  // 1. {ACTION_URL} do PocketBase → redireciona com ?verified=1 (sucesso) ou ?error=MSG (erro)
-  // 2. {APP_URL}/?verify=TOKEN → processa token via confirmVerification()
+  // Processa verificação de e-mail via token na URL
+  // Template de e-mail: {APP_URL}/?verify={TOKEN}
+  // O cliente extrai o token e chama confirmVerification() do SDK PocketBase
   const verifyProcessed = useRef(false);
   useEffect(() => {
     if (verifyProcessed.current) return;
 
     const params = new URLSearchParams(window.location.search);
-    const verified = params.get('verified');
-    const errorParam = params.get('error');
     const verifyToken = params.get('verify');
 
-    // Limpa query string e hash da URL
-    const cleanUrl = () => {
-      window.history.replaceState({}, '', window.location.pathname);
-    };
+    if (!verifyToken) return;
 
-    // Formato 1: PocketBase redirecionou após verificar ({ACTION_URL}?verified=1)
-    if (verified === '1' || verified === 'true') {
-      verifyProcessed.current = true;
-      cleanUrl();
-      setSuccessMsg('E-mail verificado com sucesso! Agora você pode fazer login.');
-      return;
-    }
+    verifyProcessed.current = true;
+    // Limpa a URL imediatamente para evitar reprocessamento
+    window.history.replaceState({}, '', window.location.pathname);
 
-    // PocketBase redirecionou com erro na verificação
-    if (errorParam) {
-      verifyProcessed.current = true;
-      cleanUrl();
-      if (errorParam.includes('expired') || errorParam.includes('expirado')) {
-        setError('O link de verificação expirou. Solicite um novo cadastro.');
-      } else {
-        setError('Erro ao verificar e-mail. Solicite um novo cadastro.');
-      }
-      return;
-    }
-
-    // Formato 2: Token na query string (?verify=TOKEN)
-    if (verifyToken) {
-      verifyProcessed.current = true;
-      cleanUrl();
-
-      pb.collection('amarcap53_users').confirmVerification(decodeURIComponent(verifyToken))
-        .then(() => {
-          setSuccessMsg('E-mail verificado com sucesso! Agora você pode fazer login.');
-        })
-        .catch((err: any) => {
-          console.error('Erro na verificação:', err);
-          const msg = err?.data?.message || err?.message || '';
-          if (msg.includes('expired') || msg.includes('expirado')) {
-            setError('O link de verificação expirou. Solicite um novo cadastro.');
-          } else if (msg.includes('already') || msg.includes('já verificado') || msg.includes('Invalid')) {
-            setSuccessMsg('E-mail já verificado. Você pode fazer login.');
-          } else {
-            setError('Erro ao verificar e-mail. Solicite um novo cadastro.');
-          }
-        });
-      return;
-    }
+    pb.collection('amarcap53_users').confirmVerification(verifyToken)
+      .then(() => {
+        setSuccessMsg('E-mail verificado com sucesso! Agora você pode fazer login.');
+      })
+      .catch((err: any) => {
+        console.error('Erro na verificação:', err);
+        const msg = err?.data?.message || err?.message || '';
+        if (msg.includes('expired') || msg.includes('expirado')) {
+          setError('O link de verificação expirou. Solicite um novo cadastro.');
+        } else if (msg.includes('already') || msg.includes('verificado') || msg.includes('Invalid')) {
+          setSuccessMsg('E-mail já verificado. Você pode fazer login.');
+        } else {
+          setError('Erro ao verificar e-mail. Solicite um novo cadastro.');
+        }
+      });
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
