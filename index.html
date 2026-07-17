@@ -37,12 +37,14 @@
         var params = new URLSearchParams(window.location.search);
         var token = params.get('verify');
         if (token) {
+          // Usa a mesma URL do PocketBase que o app usa
+          var pbUrl = 'https://centraldedados.dev.br';
           // Limpa a URL imediatamente
           window.history.replaceState(null, '', window.location.pathname);
 
           // Envia token para PocketBase via fetch (se disponível)
           if (window.fetch) {
-            fetch('https://centraldedados.dev.br/api/verification/confirm', {
+            fetch(pbUrl + '/api/verification/confirm', {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: 'token=' + encodeURIComponent(token),
@@ -57,7 +59,7 @@
             // Fallback: formulário HTML para navegadores sem fetch
             var form = document.createElement('form');
             form.method = 'POST';
-            form.action = 'https://centraldedados.dev.br/api/verification/confirm';
+            form.action = pbUrl + '/api/verification/confirm';
             form.style.display = 'none';
             var input = document.createElement('input');
             input.type = 'hidden';

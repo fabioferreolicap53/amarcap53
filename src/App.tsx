@@ -64,7 +64,7 @@ function AppContent() {
 
     setVerifyProcessing(true);
 
-    fetch('https://centraldedados.dev.br/api/verification/confirm', {
+    fetch(pb.baseURL + '/api/verification/confirm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ token }).toString(),

@@ -68,16 +68,10 @@ export function AuthScreen() {
       window.history.replaceState({}, '', window.location.pathname);
     }
 
-    const baseUrl = 'https://centraldedados.dev.br';
-
-    // PocketBase Go backend espera POST com token no body (form-urlencoded)
-    const body = new URLSearchParams();
-    body.append('token', verifyToken);
-
-    fetch(`${baseUrl}/api/verification/confirm`, {
+    fetch(pb.baseURL + '/api/verification/confirm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
+      body: new URLSearchParams({ token: verifyToken }).toString(),
     })
       .then(async (resp) => {
         const text = await resp.text();
