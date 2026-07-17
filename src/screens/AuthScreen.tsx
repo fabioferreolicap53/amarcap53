@@ -51,16 +51,17 @@ export function AuthScreen() {
     setIsLoading(true);
     clearMessages();
     try {
-      await pb.collection('amarcap53_users').authWithPassword(email, password);
+      const authData = await pb.collection('amarcap53_users').authWithPassword(email, password);
+
+      // Verifica se o e-mail foi confirmado (campo verified do PocketBase)
+      if (authData && authData.record && authData.record.verified === false) {
+        pb.authStore.clear();
+        setError('E-mail não confirmado. Verifique sua caixa de entrada (e SPAM) e confirme o link antes de fazer login.');
+        return;
+      }
     } catch (err: any) {
       console.error(err);
-      // Extrai mensagem do hook server-side (e-mail não confirmado)
-      const serverMsg = err?.data?.message || err?.message || '';
-      if (serverMsg.toLowerCase().includes('e-mail não confirmado') || serverMsg.toLowerCase().includes('email') && serverMsg.toLowerCase().includes('confirm')) {
-        setError(serverMsg);
-      } else {
-        setError('Credenciais inválidas. Verifique seu e-mail e senha.');
-      }
+      setError('Credenciais inválidas. Verifique seu e-mail e senha.');
     } finally {
       submittingRef.current = false;
       setIsLoading(false);
