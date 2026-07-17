@@ -105,7 +105,50 @@ export function AuthScreen() {
       const finalEquipe = (perfil === 'cap' || perfil === 'unidade') ? '' : equipe.trim();
       const finalMicroarea = perfil === 'microarea' ? microarea.trim() : 'N/A';
 
-      // Criação via SDK padrão — validação de unicidade no hook server-side (onRecordBeforeCreateRequest)
+      // Escapa aspas duplas para filtro PocketBase
+      const esc = (v: string) => v.replace(/"/g, '\\"');
+
+      // Verifica duplicidade via query leve (getFirstListItem com fields:'id')
+      const checkDuplicate = async (filter: string) => {
+        try {
+          const existing = await pb.collection('amarcap53_users').getFirstListItem(filter, { fields: 'id', requestKey: null });
+          return !!existing;
+        } catch {
+          return false; // 404 = não encontrado = não duplicado
+        }
+      };
+
+      // 1. Verifica email duplicado
+      if (await checkDuplicate(`email="${esc(email)}"`)) {
+        setError('Este e-mail já está sendo utilizado por outro usuário.');
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Verifica combinação role + unidade + equipe + microárea
+      let comboFilter = '';
+      if (perfil === 'cap') {
+        comboFilter = 'role="cap"';
+      } else if (perfil === 'unidade') {
+        comboFilter = `role="unidade" && unidade_saude="${esc(finalUnidade)}"`;
+      } else if (perfil === 'equipe') {
+        comboFilter = `role="equipe" && unidade_saude="${esc(finalUnidade)}" && equipe="${esc(finalEquipe)}"`;
+      } else if (perfil === 'microarea') {
+        comboFilter = `role="microarea" && unidade_saude="${esc(finalUnidade)}" && equipe="${esc(finalEquipe)}" && microarea="${esc(finalMicroarea)}"`;
+      }
+
+      if (comboFilter && await checkDuplicate(comboFilter)) {
+        let msg = 'Já existe um cadastro com esta combinação.';
+        if (perfil === 'cap') msg = 'Já existe um usuário cadastrado para a Coordenação (CAP).';
+        else if (perfil === 'unidade') msg = `Já existe um gestor cadastrado para a unidade "${finalUnidade}".`;
+        else if (perfil === 'equipe') msg = `Já existe um enfermeiro/médico cadastrado para a equipe "${finalEquipe}" da unidade "${finalUnidade}".`;
+        else if (perfil === 'microarea') msg = `Já existe um agente cadastrado para a microárea "${finalMicroarea}" da equipe "${finalEquipe}" na unidade "${finalUnidade}".`;
+        setError(msg);
+        setIsLoading(false);
+        return;
+      }
+
+      // Criação via SDK padrão
       const data: Record<string, any> = {
         username: email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') + Math.floor(Math.random() * 10000),
         email,
