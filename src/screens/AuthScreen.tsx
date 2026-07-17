@@ -47,6 +47,7 @@ export function AuthScreen() {
   // Processa verificação de e-mail via token na URL
   // Template de e-mail: {APP_URL}/?verify={TOKEN}
   const verifyProcessed = useRef(false);
+  const [verifying, setVerifying] = useState(false);
   useEffect(() => {
     if (verifyProcessed.current) return;
 
@@ -56,28 +57,43 @@ export function AuthScreen() {
     if (!verifyToken) return;
 
     verifyProcessed.current = true;
+    setVerifying(true);
     // Limpa a URL imediatamente para evitar reprocessamento
     window.history.replaceState({}, '', window.location.pathname);
 
-    console.log('[verify] Token encontrado, chamando API...');
+    const baseUrl = 'https://centraldedados.dev.br';
 
-    pb.collection('amarcap53_users').confirmVerification(verifyToken)
-      .then((result) => {
-        console.log('[verify] Sucesso:', result);
-        setSuccessMsg('E-mail verificado com sucesso! Agora você pode fazer login.');
-      })
-      .catch((err: any) => {
-        console.error('[verify] Erro completo:', JSON.stringify(err));
-        const msg = err?.data?.message || err?.message || String(err);
-        console.error('[verify] Mensagem:', msg);
-        if (msg.includes('expired') || msg.includes('expirado')) {
-          setError('O link de verificação expirou. Solicite um novo cadastro.');
-        } else if (msg.includes('already') || msg.includes('verificado') || msg.includes('Invalid')) {
-          setSuccessMsg('E-mail já verificado. Você pode fazer login.');
+    // PocketBase Go backend espera POST com token no body (form-urlencoded)
+    const body = new URLSearchParams();
+    body.append('token', verifyToken);
+
+    fetch(`${baseUrl}/api/verification/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+      .then(async (resp) => {
+        const text = await resp.text();
+        console.log('[verify] Status:', resp.status, 'Body:', text);
+        if (resp.ok || resp.status === 204) {
+          setSuccessMsg('E-mail verificado com sucesso! Agora você pode fazer login.');
         } else {
-          setError('Erro ao verificar e-mail: ' + msg);
+          let msg = '';
+          try { msg = JSON.parse(text).message; } catch { msg = text; }
+          if (msg.includes('expired') || msg.includes('expirado')) {
+            setError('O link de verificação expirou. Solicite um novo cadastro.');
+          } else if (msg.includes('already') || msg.includes('verificado') || msg.includes('Invalid')) {
+            setSuccessMsg('E-mail já verificado. Você pode fazer login.');
+          } else {
+            setError('Erro ao verificar: ' + (msg || resp.statusText));
+          }
         }
-      });
+      })
+      .catch((err) => {
+        console.error('[verify] Erro de rede:', err);
+        setError('Erro de conexão ao verificar e-mail.');
+      })
+      .finally(() => setVerifying(false));
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -371,6 +387,13 @@ export function AuthScreen() {
                     <span className="text-white text-[10px] sm:text-[11px] font-black">!</span>
                   </div>
                   <p className="text-[11px] sm:text-xs font-bold text-rose-700 leading-snug sm:leading-relaxed">{error}</p>
+                </div>
+              )}
+
+              {verifying && (
+                <div className="mb-3 sm:mb-6 p-3 sm:p-4 bg-blue-50/80 backdrop-blur-sm border border-blue-100 rounded-xl sm:rounded-2xl flex items-center gap-2.5 sm:gap-3">
+                  <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-[11px] sm:text-xs font-bold text-blue-700">Verificando e-mail...</p>
                 </div>
               )}
 
