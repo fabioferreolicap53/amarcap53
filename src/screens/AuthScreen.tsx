@@ -44,33 +44,38 @@ export function AuthScreen() {
   const toggleShowPassword = () => setShowPassword(!showPassword);
   const toggleShowPasswordConfirm = () => setShowPasswordConfirm(!showPasswordConfirm);
 
-  // Processa token de verificação de e-mail via URL (?verify=TOKEN ou #/?verify=TOKEN)
+  // Processa token de verificação de e-mail via URL (?verify=TOKEN)
+  const verifyProcessed = useRef(false);
   useEffect(() => {
-    const url = new URL(window.location.href);
-    const hash = window.location.hash || '';
-    // Verifica query string (?verify=...) OU hash (#/?verify=...)
-    const token = url.searchParams.get('verify') || (hash.includes('verify=') ? hash.match(/verify=([^&]+)/)?.[1] : null);
+    if (verifyProcessed.current) return;
 
-    if (token) {
-      // Limpa a URL imediatamente
-      window.history.replaceState({}, '', window.location.pathname);
+    // Extrai token da query string: ?verify=TOKEN
+    const search = window.location.search;
+    const match = search.match(/[?&]verify=([^&#]+)/);
 
-      pb.collection('amarcap53_users').confirmVerification(token)
-        .then(() => {
-          setSuccessMsg('E-mail verificado com sucesso! Agora você pode fazer login.');
-        })
-        .catch((err: any) => {
-          console.error('Erro na verificação:', err);
-          const msg = err?.data?.message || err?.message || '';
-          if (msg.includes('expired') || msg.includes('expirado')) {
-            setError('O link de verificação expirou. Solicite um novo.');
-          } else if (msg.includes('already') || msg.includes('já verificado') || msg.includes('Invalid')) {
-            setSuccessMsg('E-mail já verificado. Você pode fazer login.');
-          } else {
-            setError('Erro ao verificar e-mail. O link pode ter expirado.');
-          }
-        });
-    }
+    if (!match) return;
+
+    verifyProcessed.current = true;
+    const token = decodeURIComponent(match[1]);
+
+    // Limpa query string e hash da URL
+    window.history.replaceState({}, '', window.location.pathname);
+
+    pb.collection('amarcap53_users').confirmVerification(token)
+      .then(() => {
+        setSuccessMsg('E-mail verificado com sucesso! Agora você pode fazer login.');
+      })
+      .catch((err: any) => {
+        console.error('Erro na verificação:', err);
+        const msg = err?.data?.message || err?.message || '';
+        if (msg.includes('expired') || msg.includes('expirado')) {
+          setError('O link de verificação expirou. Solicite um novo cadastro.');
+        } else if (msg.includes('already') || msg.includes('já verificado') || msg.includes('Invalid')) {
+          setSuccessMsg('E-mail já verificado. Você pode fazer login.');
+        } else {
+          setError('Erro ao verificar e-mail. Solicite um novo cadastro.');
+        }
+      });
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
