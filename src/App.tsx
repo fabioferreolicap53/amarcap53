@@ -37,7 +37,8 @@ function AppContent() {
     if (earlyToken) {
       delete (window as any).__verifyToken;
     }
-    const token = earlyToken || params.get('verify');
+    const fallbackToken = params.get('verify_fallback');
+    const token = earlyToken || params.get('verify') || fallbackToken;
 
     // Se o script inline já processou e redirecionou com ?verified=1
     if (verified === '1') {
@@ -66,7 +67,10 @@ function AppContent() {
 
     fetch(pb.baseURL + '/api/verification/confirm', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+      },
       body: new URLSearchParams({ token }).toString(),
     })
       .then(async (resp) => {

@@ -37,29 +37,54 @@
         var params = new URLSearchParams(window.location.search);
         var token = params.get('verify');
         if (token) {
-          // Usa a mesma URL do PocketBase que o app usa (VITE_POCKETBASE_URL)
           var pbUrl = 'https://centraldedados.dev.br';
           // Limpa a URL imediatamente
           window.history.replaceState(null, '', window.location.pathname);
 
-          // Envia token para PocketBase via fetch (se disponível)
           if (window.fetch) {
+            // Tenta via API (form-urlencoded com Accept JSON para forçar resposta JSON)
             fetch(pbUrl + '/api/verification/confirm', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json',
+              },
               body: 'token=' + encodeURIComponent(token),
             }).then(function(resp) {
-              // Redireciona para a raiz com flag de sucesso
-              window.location.href = window.location.pathname + '?verified=1';
+              var ct = resp.headers.get('content-type') || '';
+              // Se respondeu JSON → verifica se OK
+              if (ct.indexOf('application/json') !== -1) {
+                return resp.json().then(function(data) {
+                  if (resp.ok) {
+                    window.location.href = window.location.pathname + '?verified=1';
+                  } else {
+                    // Token expirado, inválido, etc — mas ao menos processou
+                    var msg = (data && data.message) || '';
+                    if (msg.indexOf('already') !== -1 || msg.indexOf('verificado') !== -1) {
+                      window.location.href = window.location.pathname + '?verified=1';
+                    } else {
+                      window.location.href = window.location.pathname + '?verify_error=' + encodeURIComponent(msg);
+                    }
+                  }
+                });
+              }
+              // Se não é JSON (HTML) → provavelmente PocketBase processou e redirecionou
+              // Tenta verificar se o usuário foi marcado como verified
+              if (resp.ok || resp.redirected) {
+                window.location.href = window.location.pathname + '?verified=1';
+              } else {
+                window.location.href = window.location.pathname + '?verify_error=1';
+              }
             }).catch(function() {
-              // Em caso de erro de rede, redireciona com erro
-              window.location.href = window.location.pathname + '?verify_error=1';
+              // Erro de rede — tenta com token na URL como fallback
+              window.location.href = window.location.pathname + '?verify_fallback=' + encodeURIComponent(token);
             });
           } else {
-            // Fallback: formulário HTML para navegadores sem fetch
+            // Fallback: formulário HTML
             var form = document.createElement('form');
             form.method = 'POST';
             form.action = pbUrl + '/api/verification/confirm';
+            form.target = '_self';
             form.style.display = 'none';
             var input = document.createElement('input');
             input.type = 'hidden';

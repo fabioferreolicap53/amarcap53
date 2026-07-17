@@ -70,7 +70,10 @@ export function AuthScreen() {
 
     fetch(pb.baseURL + '/api/verification/confirm', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+      },
       body: new URLSearchParams({ token: verifyToken }).toString(),
     })
       .then(async (resp) => {
