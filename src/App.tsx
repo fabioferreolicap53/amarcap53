@@ -30,12 +30,30 @@ function AppContent() {
   // Processa verificação de e-mail ANTES de qualquer renderização
   // Funciona mesmo se o usuário já estiver logado
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const verified = params.get('verified');
+    const verifyError = params.get('verify_error');
     const earlyToken = (window as any).__verifyToken as string | undefined;
     if (earlyToken) {
       delete (window as any).__verifyToken;
     }
-    const params = new URLSearchParams(window.location.search);
     const token = earlyToken || params.get('verify');
+
+    // Se o script inline já processou e redirecionou com ?verified=1
+    if (verified === '1') {
+      window.history.replaceState({}, '', window.location.pathname);
+      setVerifyMsg('E-mail verificado com sucesso! Agora você pode fazer login.');
+      setVerifyProcessing(false);
+      return;
+    }
+
+    // Se houve erro na verificação pelo script inline
+    if (verifyError === '1') {
+      window.history.replaceState({}, '', window.location.pathname);
+      setVerifyMsg('Erro ao verificar e-mail. Tente novamente.');
+      setVerifyProcessing(false);
+      return;
+    }
 
     if (!token) return;
 

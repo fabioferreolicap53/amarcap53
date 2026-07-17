@@ -1,4 +1,4 @@
-const CACHE_NAME = 'amar-saude-v5';
+const CACHE_NAME = 'amar-saude-v6';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

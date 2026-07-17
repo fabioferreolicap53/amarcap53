@@ -31,6 +31,43 @@
         if (isAuthAction && isLoginHash) {
           window.history.replaceState(null, '', window.location.pathname + search);
         }
+
+        // Verificação de e-mail: processa ?verify=TOKEN ANTES de qualquer framework
+        // Funciona mesmo se o JavaScript do React não carregar
+        var params = new URLSearchParams(window.location.search);
+        var token = params.get('verify');
+        if (token) {
+          // Limpa a URL imediatamente
+          window.history.replaceState(null, '', window.location.pathname);
+
+          // Envia token para PocketBase via fetch (se disponível)
+          if (window.fetch) {
+            fetch('https://centraldedados.dev.br/api/verification/confirm', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: 'token=' + encodeURIComponent(token),
+            }).then(function(resp) {
+              // Redireciona para a raiz com flag de sucesso
+              window.location.href = window.location.pathname + '?verified=1';
+            }).catch(function() {
+              // Em caso de erro de rede, redireciona com erro
+              window.location.href = window.location.pathname + '?verify_error=1';
+            });
+          } else {
+            // Fallback: formulário HTML para navegadores sem fetch
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'https://centraldedados.dev.br/api/verification/confirm';
+            form.style.display = 'none';
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'token';
+            input.value = token;
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+          }
+        }
       })();
     </script>
   </head>
