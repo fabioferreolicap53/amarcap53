@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { pb } from '../lib/pocketbase';
 import { Activity, Mail, Lock, Building, Users, MapPin, ArrowRight, ArrowLeft, Eye, EyeOff, Shield, Heart, BadgeCheck } from 'lucide-react';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
@@ -43,6 +43,35 @@ export function AuthScreen() {
 
   const toggleShowPassword = () => setShowPassword(!showPassword);
   const toggleShowPasswordConfirm = () => setShowPasswordConfirm(!showPasswordConfirm);
+
+  // Processa token de verificação de e-mail via URL (?verify=TOKEN ou #/?verify=TOKEN)
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const hash = window.location.hash || '';
+    // Verifica query string (?verify=...) OU hash (#/?verify=...)
+    const token = url.searchParams.get('verify') || (hash.includes('verify=') ? hash.match(/verify=([^&]+)/)?.[1] : null);
+
+    if (token) {
+      // Limpa a URL imediatamente
+      window.history.replaceState({}, '', window.location.pathname);
+
+      pb.collection('amarcap53_users').confirmVerification(token)
+        .then(() => {
+          setSuccessMsg('E-mail verificado com sucesso! Agora você pode fazer login.');
+        })
+        .catch((err: any) => {
+          console.error('Erro na verificação:', err);
+          const msg = err?.data?.message || err?.message || '';
+          if (msg.includes('expired') || msg.includes('expirado')) {
+            setError('O link de verificação expirou. Solicite um novo.');
+          } else if (msg.includes('already') || msg.includes('já verificado') || msg.includes('Invalid')) {
+            setSuccessMsg('E-mail já verificado. Você pode fazer login.');
+          } else {
+            setError('Erro ao verificar e-mail. O link pode ter expirado.');
+          }
+        });
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
