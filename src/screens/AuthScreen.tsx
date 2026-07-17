@@ -174,14 +174,7 @@ export function AuthScreen() {
         }
       };
 
-      // 1. Verifica email duplicado
-      if (await checkDuplicate(`email="${esc(email)}"`)) {
-        setError('Este e-mail já está sendo utilizado por outro usuário.');
-        setIsLoading(false);
-        return;
-      }
-
-      // 2. Verifica combinação role + unidade + equipe + microárea
+      // Verifica combinação role + unidade + equipe + microárea (sem checar e-mail)
       let comboFilter = '';
       if (perfil === 'cap') {
         comboFilter = 'role="cap"';
