@@ -43,7 +43,7 @@
 
           if (window.fetch) {
             // Tenta via API (form-urlencoded com Accept JSON para forçar resposta JSON)
-            fetch(pbUrl + '/api/verification/confirm', {
+            fetch(pbUrl + '/api/collections/amarcap53_users/confirm-verification', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -83,7 +83,7 @@
             // Fallback: formulário HTML
             var form = document.createElement('form');
             form.method = 'POST';
-            form.action = pbUrl + '/api/verification/confirm';
+            form.action = pbUrl + '/api/collections/amarcap53_users/confirm-verification';
             form.target = '_self';
             form.style.display = 'none';
             var input = document.createElement('input');

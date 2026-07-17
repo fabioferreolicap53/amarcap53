@@ -68,7 +68,7 @@ export function AuthScreen() {
       window.history.replaceState({}, '', window.location.pathname);
     }
 
-    fetch(pb.baseURL + '/api/verification/confirm', {
+    fetch(pb.baseURL + '/api/collections/amarcap53_users/confirm-verification', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
