@@ -88,3 +88,16 @@ onRecordBeforeUpdateRequest(function(e) {
     throw new Error(400, 'Erro ao validar combinação. Tente novamente.');
   }
 });
+
+// ─── Bloqueia login de usuários com e-mail não confirmado ───
+onRecordBeforeAuthRequest(function(e) {
+  if (e.collection.name !== 'amarcap53_users') return;
+
+  var record = e.record;
+  if (!record) return;
+
+  var verified = record.get('verified');
+  if (verified === false || verified === 0 || verified === 'false' || verified === null || verified === undefined) {
+    throw new Error(403, 'E-mail não confirmado. Verifique sua caixa de entrada (e SPAM) e confirme o link antes de fazer login.');
+  }
+});

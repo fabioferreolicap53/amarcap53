@@ -54,7 +54,13 @@ export function AuthScreen() {
       await pb.collection('amarcap53_users').authWithPassword(email, password);
     } catch (err: any) {
       console.error(err);
-      setError('Credenciais inválidas. Verifique seu e-mail e senha.');
+      // Extrai mensagem do hook server-side (e-mail não confirmado)
+      const serverMsg = err?.data?.message || err?.message || '';
+      if (serverMsg.toLowerCase().includes('e-mail não confirmado') || serverMsg.toLowerCase().includes('email') && serverMsg.toLowerCase().includes('confirm')) {
+        setError(serverMsg);
+      } else {
+        setError('Credenciais inválidas. Verifique seu e-mail e senha.');
+      }
     } finally {
       submittingRef.current = false;
       setIsLoading(false);
