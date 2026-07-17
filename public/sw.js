@@ -1,4 +1,4 @@
-const CACHE_NAME = 'amar-saude-v4';
+const CACHE_NAME = 'amar-saude-v5';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -26,6 +26,12 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/') || url.pathname.includes('/collections/')) return;
   if (url.search && url.search.includes('v=')) return;
+
+  // NUNCA cacheia navegações com query string (verificação de e-mail, etc)
+  if (request.mode === 'navigate' && url.search) {
+    event.respondWith(fetch(request));
+    return;
+  }
 
   event.respondWith(
     caches.match(request).then(cached => {

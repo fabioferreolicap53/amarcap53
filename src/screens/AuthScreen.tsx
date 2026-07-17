@@ -46,20 +46,27 @@ export function AuthScreen() {
 
   // Processa verificação de e-mail via token na URL
   // Template de e-mail: {APP_URL}/?verify={TOKEN}
+  // Token pode vir de: 1) window.__verifyToken (capturado antes do React)  2) URL query string
   const verifyProcessed = useRef(false);
   const [verifying, setVerifying] = useState(false);
   useEffect(() => {
     if (verifyProcessed.current) return;
 
+    // Lê token de window.__verifyToken (capturado no main.tsx) ou da URL
+    const earlyToken = (window as any).__verifyToken as string | undefined;
+    delete (window as any).__verifyToken;
+
     const params = new URLSearchParams(window.location.search);
-    const verifyToken = params.get('verify');
+    const verifyToken = earlyToken || params.get('verify');
 
     if (!verifyToken) return;
 
     verifyProcessed.current = true;
     setVerifying(true);
     // Limpa a URL imediatamente para evitar reprocessamento
-    window.history.replaceState({}, '', window.location.pathname);
+    if (window.location.search) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
 
     const baseUrl = 'https://centraldedados.dev.br';
 
