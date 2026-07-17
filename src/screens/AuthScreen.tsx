@@ -165,12 +165,20 @@ export function AuthScreen() {
       const esc = (v: string) => v.replace(/"/g, '\\"');
 
       // Verifica duplicidade via query leve (getFirstListItem com fields:'id')
-      const checkDuplicate = async (filter: string) => {
+      const checkDuplicate = async (filter: string): Promise<boolean> => {
         try {
-          const existing = await pb.collection('amarcap53_users').getFirstListItem(filter, { fields: 'id', requestKey: null });
+          const existing = await pb.collection('amarcap53_users').getFirstListItem(filter, {
+            fields: 'id',
+            requestKey: null,
+          });
           return !!existing;
-        } catch {
-          return false; // 404 = não encontrado = não duplicado
+        } catch (err: any) {
+          // Se for erro de permissão (403), relança — não ignora
+          if (err?.status === 403 || err?.statusCode === 403) {
+            throw new Error('Erro de permissão ao verificar duplicidade.');
+          }
+          // 404 = não encontrado = OK, não é duplicata
+          return false;
         }
       };
 
