@@ -74,7 +74,6 @@ export function AuthScreen() {
     setIsLoading(true);
     clearMessages();
     try {
-      // Validações básicas no client
       if (password !== passwordConfirm) {
         setError('As senhas não coincidem.');
         setIsLoading(false);
@@ -101,30 +100,26 @@ export function AuthScreen() {
         return;
       }
 
-      // Toda validação de unicidade acontece no servidor via endpoint customizado
-      const resp = await fetch(`${pb.baseURL}/api/custom/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          password,
-          passwordConfirm,
-          role: perfil,
-          unidade_saude: perfil === 'cap' ? '' : unidadeSaude.trim(),
-          equipe: (perfil === 'cap' || perfil === 'unidade') ? '' : equipe.trim(),
-          microarea: perfil === 'microarea' ? microarea.trim() : 'N/A',
-        }),
-      });
+      const finalUnidade = perfil === 'cap' ? '' : unidadeSaude.trim();
+      const finalEquipe = (perfil === 'cap' || perfil === 'unidade') ? '' : equipe.trim();
+      const finalMicroarea = perfil === 'microarea' ? microarea.trim() : 'N/A';
 
-      const result = await resp.json();
+      // Criação via SDK padrão — validação de unicidade no hook server-side (onRecordBeforeCreateRequest)
+      const data: Record<string, any> = {
+        username: email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') + Math.floor(Math.random() * 10000),
+        email,
+        emailVisibility: true,
+        password,
+        passwordConfirm,
+        unidade_saude: finalUnidade,
+        equipe: finalEquipe,
+        role: perfil,
+        microarea: finalMicroarea
+      };
 
-      if (!resp.ok || !result.record) {
-        setError(result.message || 'Erro ao criar conta. Verifique os dados.');
-        setIsLoading(false);
-        return;
-      }
+      await pb.collection('amarcap53_users').create(data);
 
-      // Cadastro OK — envia verificação de e-mail
+      // Envio de verificação de e-mail
       try {
         await pb.collection('amarcap53_users').requestVerification(email);
       } catch (verifyErr) {
@@ -134,11 +129,26 @@ export function AuthScreen() {
       setSuccessMsg('Cadastro realizado! Verifique seu e-mail (e a caixa de SPAM) para ativar a conta.');
       setAuthState('login');
     } catch (err: any) {
-      console.error('Erro no registro:', err);
-      if (err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')) {
-        setError('Erro de conexão. Verifique sua internet e tente novamente.');
+      console.error('Erro detalhado:', err?.data || err);
+
+      const msg = err?.data?.message || err?.message || '';
+
+      // Erro de duplicata do hook server-side
+      if (msg.includes('combinação') || msg.includes('Coordenação') || msg.includes('gestor') || msg.includes('enfermeiro') || msg.includes('agente')) {
+        setError(msg);
+      } else if (err?.status === 400 && err?.data?.data) {
+        const firstField = Object.keys(err.data.data)[0];
+        const fieldError = err.data.data[firstField];
+        const fieldMsg = String(fieldError?.message || '').toLowerCase();
+        if (fieldMsg.includes('unique') || fieldMsg.includes('unique')) {
+          setError('Já existe um cadastro com esta combinação de perfil e localização.');
+        } else {
+          setError(`Erro no campo ${firstField}: ${fieldError.message}`);
+        }
+      } else if (msg.includes('unique') || msg.includes('Unique')) {
+        setError('Já existe um cadastro com esta combinação de perfil e localização.');
       } else {
-        setError('Erro ao criar conta. Tente novamente.');
+        setError(msg || 'Erro ao criar conta. Verifique os dados.');
       }
     } finally {
       submittingRef.current = false;
