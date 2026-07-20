@@ -2,7 +2,6 @@
 // Enforce unique combination of role + unidade + equipe + microarea
 // PocketBase JS API: onRecordCreate / onRecordUpdate / onRecordAuthRequest
 // Goja engine (ES5) — no modern JS features
-// ALL hooks MUST call e.next() to proceed, or throw to block
 
 function esc(v) {
   return String(v || '').replace(/"/g, '\\"');
@@ -39,22 +38,35 @@ function hasDuplicate(dao, filter) {
   if (!filter) return false;
   try {
     var rows = dao.findRecordsByFilter('amarcap53_users', filter, '-created', 1, 0);
-    return rows && rows.length > 0;
+    var found = rows && rows.length > 0;
+    console.log('[unique_user] hasDuplicate=' + found + ' filter=' + filter + ' rows=' + (rows ? rows.length : 0));
+    return found;
   } catch (e) {
+    console.error('[unique_user] hasDuplicate ERRO filter=' + filter + ' err=' + String(e));
     return true; // fail-closed
   }
 }
 
 // ─── CREATE — check duplicate combo ───────────────────
 onRecordCreate(function(e) {
+  var role = getField(e.record, 'role');
+  var unidade = getField(e.record, 'unidade_saude');
+  var equipe = getField(e.record, 'equipe');
+  var microarea = getField(e.record, 'microarea');
+  console.log('[unique_user] CREATE role=' + role + ' unidade=' + unidade + ' equipe=' + equipe + ' microarea=' + microarea);
+
   var dao = $app.dao();
-  if (!dao) { e.next(); return; }
+  if (!dao) { console.log('[unique_user] DAO null, skip'); e.next(); return; }
 
   var filter = buildFilter(e.record);
+  console.log('[unique_user] CREATE filter=' + filter);
+
   if (hasDuplicate(dao, filter)) {
+    console.log('[unique_user] CREATE BLOQUEADO');
     throw new Error('Ja existe um cadastro com esta combinacao de perfil e localizacao.');
   }
 
+  console.log('[unique_user] CREATE OK');
   e.next();
 }, "amarcap53_users");
 
