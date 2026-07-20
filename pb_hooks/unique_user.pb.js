@@ -1,155 +1,96 @@
 // unique_user.pb.js
-// Enforce unique combination of role + unidade + equipe + microarea on user create/update
+// Enforce unique combination of role + unidade + equipe + microarea
+// PocketBase JS API: onRecordCreate / onRecordUpdate / onRecordAuthRequest
+// Goja engine (ES5) — no modern JS features
+// ALL hooks MUST call e.next() to proceed, or throw to block
 
-// Escapa valores para uso seguro em filtros PocketBase
 function esc(v) {
   return String(v || '').replace(/"/g, '\\"');
 }
 
-// Lê dados do request body como fallback
-function getRequestBody(e) {
+function getField(record, name) {
   try {
-    var info = e.httpContext.requestInfo();
-    return info && info.body ? info.body : {};
-  } catch (err) {
-    console.error('[unique_user] Erro ao ler request body:', err);
-    return {};
-  }
-}
-
-// Lê campo do record com fallback para request body
-function getFieldValue(record, body, field) {
-  // Tenta record.get primeiro
-  try {
-    var val = record.get(field);
-    if (val !== undefined && val !== null && val !== '') return val;
-  } catch (err) {
-    // ignora
-  }
-  // Fallback: request body
-  if (body && body[field] !== undefined && body[field] !== null) {
-    return body[field];
-  }
+    var val = record.get(name);
+    if (val !== undefined && val !== null && val !== '') return String(val);
+  } catch (_) {}
   return '';
 }
 
-function buildUniqueFilter(record, body) {
-  var role = getFieldValue(record, body, 'role') || '';
-  var unidade = getFieldValue(record, body, 'unidade_saude') || '';
-  var equipe = getFieldValue(record, body, 'equipe') || '';
-  var microarea = getFieldValue(record, body, 'microarea') || '';
+function buildFilter(record) {
+  var role = getField(record, 'role');
+  var unidade = getField(record, 'unidade_saude');
+  var equipe = getField(record, 'equipe');
+  var microarea = getField(record, 'microarea');
 
-  console.log('[unique_user] buildUniqueFilter:', { role: role, unidade: unidade, equipe: equipe, microarea: microarea });
-
-  if (role === 'cap') {
-    return 'role = "cap"';
-  } else if (role === 'unidade') {
-    return 'role = "unidade" && unidade_saude = "' + esc(unidade) + '"';
-  } else if (role === 'equipe') {
-    return 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '"';
-  } else if (role === 'microarea') {
-    // microarea pode ser string "1"-"7", number, ou null
-    var mVal = String(microarea).trim();
-    if (mVal && mVal !== '0' && mVal !== 'N/A') {
-      return 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "' + esc(mVal) + '" || microarea = ' + parseInt(mVal, 10) + ')';
+  if (role === 'cap') return 'role = "cap"';
+  if (role === 'unidade') return 'role = "unidade" && unidade_saude = "' + esc(unidade) + '"';
+  if (role === 'equipe') return 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '"';
+  if (role === 'microarea') {
+    var m = String(microarea).trim();
+    if (m && m !== '0' && m !== 'N/A') {
+      return 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "' + esc(m) + '" || microarea = ' + parseInt(m, 10) + ')';
     }
-    // microarea vazia: casa com vazio, null ou N/A
     return 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "" || microarea = null || microarea = "N/A")';
   }
   return '';
 }
 
-function checkDuplicate(dao, filter) {
-  if (!filter) {
-    console.log('[unique_user] Filtro vazio, ignorando verificação');
-    return false;
-  }
+function hasDuplicate(dao, filter) {
+  if (!filter) return false;
   try {
-    console.log('[unique_user] Executando filtro:', filter);
-    var existing = dao.findRecordsByFilter(
-      'amarcap53_users',
-      filter,
-      '-created',
-      1,
-      0
-    );
-    console.log('[unique_user] Resultado:', existing ? existing.length : 0, 'registros encontrados');
-    return existing && existing.length > 0;
+    var rows = dao.findRecordsByFilter('amarcap53_users', filter, '-created', 1, 0);
+    return rows && rows.length > 0;
   } catch (e) {
-    // Se o filtro falhar por qualquer motivo, assume duplicata (fail-closed)
-    console.error('[unique_user] ERRO ao verificar duplicata:', e, 'Filtro:', filter);
-    return true;
+    return true; // fail-closed
   }
 }
 
-onRecordBeforeCreateRequest(function(e) {
-  if (e.collection.name !== 'amarcap53_users') return;
-
+// ─── CREATE — check duplicate combo ───────────────────
+onRecordCreate(function(e) {
   var dao = $app.dao();
-  if (!dao) {
-    console.error('[unique_user] DAO não disponível');
-    return;
-  }
+  if (!dao) { e.next(); return; }
 
-  var body = getRequestBody(e);
-  var filter = buildUniqueFilter(e.record, body);
-
-  if (checkDuplicate(dao, filter)) {
-    console.error('[unique_user] BLOQUEANDO criação - duplicata detectada');
+  var filter = buildFilter(e.record);
+  if (hasDuplicate(dao, filter)) {
     throw new Error(400, 'Já existe um cadastro com esta combinação de perfil e localização.');
   }
 
-  console.log('[unique_user] Criação permitida - nenhuma duplicata');
-});
+  e.next();
+}, "amarcap53_users");
 
-onRecordBeforeUpdateRequest(function(e) {
-  if (e.collection.name !== 'amarcap53_users') return;
-
+// ─── UPDATE — check duplicate combo ───────────────────
+onRecordUpdate(function(e) {
   var dao = $app.dao();
-  if (!dao) {
-    console.error('[unique_user] DAO não disponível no update');
-    return;
-  }
+  if (!dao) { e.next(); return; }
 
-  var body = getRequestBody(e);
-  var filter = buildUniqueFilter(e.record, body);
+  var filter = buildFilter(e.record);
+  if (!filter) { e.next(); return; }
 
-  if (!filter) return;
-
-  // Para updates, busca até 10 registros e exclui o próprio
   try {
-    var existing = dao.findRecordsByFilter(
-      'amarcap53_users',
-      filter,
-      '-created',
-      10,
-      0
-    );
-
-    var recordId = e.record.id;
-    var duplicate = existing.filter(function(r) { return r.id !== recordId; });
-
-    if (duplicate.length > 0) {
-      console.error('[unique_user] BLOQUEANDO update - duplicata detectada');
-      throw new Error(400, 'Já existe um cadastro com esta combinação de perfil e localização.');
+    var rows = dao.findRecordsByFilter('amarcap53_users', filter, '-created', 10, 0);
+    var selfId = e.record.id;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].id !== selfId) {
+        throw new Error(400, 'Já existe um cadastro com esta combinação de perfil e localização.');
+      }
     }
   } catch (err) {
-    if (err && err.status === 400) throw err; // Re-throw our own validation error
-    // Se o filtro falhar por outro motivo, bloqueia (fail-closed)
-    console.error('[unique_user] Erro ao verificar duplicata no update:', err);
+    if (err && err.status === 400) throw err;
     throw new Error(400, 'Erro ao validar combinação. Tente novamente.');
   }
-});
 
-// ─── Bloqueia login de usuários com e-mail não confirmado ───
-onRecordBeforeAuthRequest(function(e) {
-  if (e.collection.name !== 'amarcap53_users') return;
+  e.next();
+}, "amarcap53_users");
 
+// ─── AUTH — block unverified users ────────────────────
+onRecordAuthRequest(function(e) {
   var record = e.record;
-  if (!record) return;
+  if (!record) { e.next(); return; }
 
   var verified = record.get('verified');
   if (verified === false || verified === 0 || verified === 'false' || verified === null || verified === undefined) {
     throw new Error(403, 'E-mail não confirmado. Verifique sua caixa de entrada (e SPAM) e confirme o link antes de fazer login.');
   }
-});
+
+  e.next();
+}, "amarcap53_users");
