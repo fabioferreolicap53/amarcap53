@@ -112,18 +112,30 @@ export function EmailActionPage({ action, token, onError, onSuccess }: EmailActi
     if (!password) { setError('Digite sua senha atual para confirmar.'); return; }
     setStatus('loading');
     try {
-      await pb.collection('amarcap53_users').confirmEmailChange(token, password);
-      setStatus('success');
-      onSuccess?.(config.successDesc);
-    } catch (err: any) {
-      const msg = String(err?.message || '');
-      if (msg.includes('expired') || msg.includes('expirado')) {
-        setError('O link de confirmação expirou. Solicite a alteração novamente.');
-      } else if (msg.includes('invalid') || msg.includes('inválid')) {
-        setError('Senha incorreta. Tente novamente.');
+      // Fetch direto — SDK pode não ter confirmEmailChange nesta versão
+      const resp = await fetch(pb.baseURL + '/api/collections/amarcap53_users/confirm-email-change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      });
+      const text = await resp.text();
+      let msg = '';
+      try { msg = JSON.parse(text).message; } catch { msg = text; }
+      if (resp.ok) {
+        setStatus('success');
+        onSuccess?.(config.successDesc);
       } else {
-        setError(msg || 'Erro ao confirmar alteração de e-mail.');
+        if (msg.includes('expired') || msg.includes('expirado')) {
+          setError('O link de confirmação expirou. Solicite a alteração novamente.');
+        } else if (msg.includes('invalid') || msg.includes('inválid') || msg.includes('password')) {
+          setError('Senha incorreta. Tente novamente.');
+        } else {
+          setError(msg || 'Erro ao confirmar alteração de e-mail.');
+        }
+        setStatus('error');
       }
+    } catch (err: any) {
+      setError('Erro de conexão. Tente novamente.');
       setStatus('error');
     }
   };
