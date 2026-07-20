@@ -165,6 +165,7 @@ export function AuthScreen() {
       const esc = (v: string) => v.replace(/"/g, '\\"');
 
       // Verifica duplicidade via query leve (getFirstListItem com fields:'id')
+      // Fail-closed: qualquer erro inesperado BLOQUEIA o cadastro
       const checkDuplicate = async (filter: string): Promise<boolean> => {
         try {
           const existing = await pb.collection('amarcap53_users').getFirstListItem(filter, {
@@ -173,12 +174,12 @@ export function AuthScreen() {
           });
           return !!existing;
         } catch (err: any) {
-          // Se for erro de permissão (403), relança — não ignora
-          if (err?.status === 403 || err?.statusCode === 403) {
-            throw new Error('Erro de permissão ao verificar duplicidade.');
-          }
+          const status = err?.status || err?.statusCode;
           // 404 = não encontrado = OK, não é duplicata
-          return false;
+          if (status === 404) return false;
+          // Qualquer outro erro → BLOQUEIA (fail-closed)
+          console.error('[checkDuplicate] Erro ao verificar duplicidade:', err);
+          throw new Error('Erro ao verificar duplicidade. Tente novamente.');
         }
       };
 
