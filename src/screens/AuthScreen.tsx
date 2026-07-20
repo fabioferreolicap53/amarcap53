@@ -164,55 +164,110 @@ export function AuthScreen() {
       // Escapa aspas duplas para filtro PocketBase
       const esc = (v: string) => v.replace(/"/g, '\\"');
 
-      // Verifica duplicidade via query leve (getFirstListItem com fields:'id')
-      // Fail-closed: qualquer erro inesperado BLOQUEIA o cadastro
-      const checkDuplicate = async (filter: string): Promise<boolean> => {
+      // ─── Verificação dupla de duplicidade ───
+      // 1) Filtro PocketBase (rápido)
+      // 2) Fetch manual de todos os do role + comparação JS (garantido)
+      const checkDuplicateCombo = async (
+        role: string,
+        unidade: string,
+        equipe: string,
+        microarea: string
+      ): Promise<{ found: boolean; via: string }> => {
+        // ── Camada 1: filtro PocketBase ──
+        let pbFilter = '';
+        if (role === 'cap') {
+          pbFilter = 'role="cap"';
+        } else if (role === 'unidade') {
+          pbFilter = `role="unidade" && unidade_saude="${esc(unidade)}"`;
+        } else if (role === 'equipe') {
+          pbFilter = `role="equipe" && unidade_saude="${esc(unidade)}" && equipe="${esc(equipe)}"`;
+        } else if (role === 'microarea') {
+          const mVal = microarea.trim();
+          pbFilter = `role="microarea" && unidade_saude="${esc(unidade)}" && equipe="${esc(equipe)}" && (microarea="${esc(mVal)}" || microarea=${parseInt(mVal, 10)})`;
+        }
+
+        if (pbFilter) {
+          try {
+            const pbResult = await pb.collection('amarcap53_users').getList(1, 1, {
+              filter: pbFilter,
+              fields: 'id',
+              requestKey: null,
+            });
+            if (pbResult.totalItems > 0) {
+              console.log('[checkDuplicate] PB filter encontrou duplicata:', pbResult.totalItems);
+              return { found: true, via: 'pb_filter' };
+            }
+          } catch (pbErr: any) {
+            console.warn('[checkDuplicate] PB filter falhou, fallback manual:', pbErr?.message);
+          }
+        }
+
+        // ── Camada 2: busca todos do role + compara JS (garantido) ──
         try {
-          const existing = await pb.collection('amarcap53_users').getFirstListItem(filter, {
-            fields: 'id',
+          const all = await pb.collection('amarcap53_users').getFullList({
+            filter: `role="${esc(role)}"`,
+            fields: 'id,unidade_saude,equipe,microarea',
             requestKey: null,
           });
-          return !!existing;
-        } catch (err: any) {
-          const status = err?.status || err?.statusCode;
-          // 404 = não encontrado = OK, não é duplicata
-          if (status === 404) return false;
-          // Qualquer outro erro → BLOQUEIA (fail-closed)
-          console.error('[checkDuplicate] Erro ao verificar duplicidade:', err);
+          console.log(`[checkDuplicate] ${all.length} registros com role="${role}"`);
+
+          const norm = (v: any) => String(v ?? '').trim().toLowerCase();
+          const dup = all.find((r: any) => {
+            if (norm(r.unidade_saude) !== norm(unidade)) return false;
+            if (role === 'cap') return true;
+            if (norm(r.equipe) !== norm(equipe)) return false;
+            if (role === 'unidade') return true;
+            if (role === 'microarea') {
+              const dbMicro = norm(r.microarea);
+              const reqMicro = norm(microarea);
+              return dbMicro === reqMicro || dbMicro === String(parseInt(reqMicro, 10));
+            }
+            return true; // equipe
+          });
+
+          if (dup) {
+            console.log('[checkDuplicate] Fallback manual encontrou duplicata:', dup.id);
+            return { found: true, via: 'manual_fallback' };
+          }
+        } catch (manualErr: any) {
+          console.error('[checkDuplicate] Fallback manual falhou:', manualErr);
           throw new Error('Erro ao verificar duplicidade. Tente novamente.');
         }
+
+        return { found: false, via: 'none' };
       };
 
-      // Verifica combinação role + unidade + equipe + microárea (sem checar e-mail)
-      let comboFilter = '';
-      if (perfil === 'cap') {
-        comboFilter = 'role="cap"';
-      } else if (perfil === 'unidade') {
-        comboFilter = `role="unidade" && unidade_saude="${esc(finalUnidade)}"`;
-      } else if (perfil === 'equipe') {
-        comboFilter = `role="equipe" && unidade_saude="${esc(finalUnidade)}" && equipe="${esc(finalEquipe)}"`;
-      } else if (perfil === 'microarea') {
-        // microarea pode ser string "1"-"7" ou number — casa com ambos
-        const mVal = finalMicroarea.trim();
-        comboFilter = `role="microarea" && unidade_saude="${esc(finalUnidade)}" && equipe="${esc(finalEquipe)}" && (microarea="${esc(mVal)}" || microarea=${parseInt(mVal, 10)})`;
-      }
-
-      if (comboFilter && await checkDuplicate(comboFilter)) {
+      // Verifica combinação role + unidade + equipe + microárea
+      const comboResult = await checkDuplicateCombo(perfil, finalUnidade, finalEquipe, finalMicroarea);
+      if (comboResult.found) {
         let msg = 'Já existe um cadastro com esta combinação.';
         if (perfil === 'cap') msg = 'Já existe um usuário cadastrado para a Coordenação (CAP).';
         else if (perfil === 'unidade') msg = `Já existe um gestor cadastrado para a unidade "${finalUnidade}".`;
         else if (perfil === 'equipe') msg = `Já existe um enfermeiro/médico cadastrado para a equipe "${finalEquipe}" da unidade "${finalUnidade}".`;
         else if (perfil === 'microarea') msg = `Já existe um agente cadastrado para a microárea "${finalMicroarea}" da equipe "${finalEquipe}" na unidade "${finalUnidade}".`;
+        console.log('[handleRegister] Bloqueado por:', comboResult.via);
         setError(msg);
         setIsLoading(false);
         return;
       }
 
       // Verifica se o e-mail já está cadastrado
-      if (await checkDuplicate(`email="${esc(email)}"`)) {
-        setError('Este e-mail já está cadastrado. Use outro e-mail ou faça login.');
-        setIsLoading(false);
-        return;
+      try {
+        const emailCheck = await pb.collection('amarcap53_users').getList(1, 1, {
+          filter: `email="${esc(email)}"`,
+          fields: 'id',
+          requestKey: null,
+        });
+        if (emailCheck.totalItems > 0) {
+          setError('Este e-mail já está cadastrado. Use outro e-mail ou faça login.');
+          setIsLoading(false);
+          return;
+        }
+      } catch (emailErr: any) {
+        if (emailErr?.status !== 404 && emailErr?.statusCode !== 404) {
+          console.error('[checkDuplicate] Email check falhou:', emailErr);
+          throw new Error('Erro ao verificar e-mail. Tente novamente.');
+        }
       }
 
       // Criação via SDK padrão
