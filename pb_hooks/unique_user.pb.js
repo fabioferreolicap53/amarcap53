@@ -52,7 +52,7 @@ onRecordCreate(function(e) {
 
   var filter = buildFilter(e.record);
   if (hasDuplicate(dao, filter)) {
-    throw new Error(400, 'Já existe um cadastro com esta combinação de perfil e localização.');
+    throw new Error('Ja existe um cadastro com esta combinacao de perfil e localizacao.');
   }
 
   e.next();
@@ -71,12 +71,12 @@ onRecordUpdate(function(e) {
     var selfId = e.record.id;
     for (var i = 0; i < rows.length; i++) {
       if (rows[i].id !== selfId) {
-        throw new Error(400, 'Já existe um cadastro com esta combinação de perfil e localização.');
+        throw new Error('Ja existe um cadastro com esta combinacao de perfil e localizacao.');
       }
     }
   } catch (err) {
     if (err && err.status === 400) throw err;
-    throw new Error(400, 'Erro ao validar combinação. Tente novamente.');
+    throw new Error('Erro ao validar combinacao. Tente novamente.');
   }
 
   e.next();
@@ -89,7 +89,7 @@ onRecordAuthRequest(function(e) {
 
   var verified = record.get('verified');
   if (verified === false || verified === 0 || verified === 'false' || verified === null || verified === undefined) {
-    throw new Error(403, 'E-mail não confirmado. Verifique sua caixa de entrada (e SPAM) e confirme o link antes de fazer login.');
+    throw new Error('E-mail nao confirmado. Verifique sua caixa de entrada e confirme o link antes de fazer login.');
   }
 
   e.next();
