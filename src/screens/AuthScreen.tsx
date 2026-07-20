@@ -207,6 +207,13 @@ export function AuthScreen() {
         return;
       }
 
+      // Verifica se o e-mail já está cadastrado
+      if (await checkDuplicate(`email="${esc(email)}"`)) {
+        setError('Este e-mail já está cadastrado. Use outro e-mail ou faça login.');
+        setIsLoading(false);
+        return;
+      }
+
       // Criação via SDK padrão
       const data: Record<string, any> = {
         username: email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') + Math.floor(Math.random() * 10000),
@@ -243,7 +250,9 @@ export function AuthScreen() {
         const firstField = Object.keys(err.data.data)[0];
         const fieldError = err.data.data[firstField];
         const fieldMsg = String(fieldError?.message || '').toLowerCase();
-        if (fieldMsg.includes('unique') || fieldMsg.includes('unique')) {
+        if (firstField === 'email' && (fieldMsg.includes('unique') || fieldMsg.includes('already'))) {
+          setError('Este e-mail já está cadastrado. Use outro e-mail ou faça login.');
+        } else if (fieldMsg.includes('unique')) {
           setError('Já existe um cadastro com esta combinação de perfil e localização.');
         } else {
           setError(`Erro no campo ${firstField}: ${fieldError.message}`);
