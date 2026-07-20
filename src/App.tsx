@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { DashboardScreen } from './screens/DashboardScreen';
 import { PatientsScreen } from './screens/PatientsScreen';
@@ -15,6 +15,7 @@ import { InstallBanner } from './components/InstallBanner';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthScreen } from './screens/AuthScreen';
+import { EmailActionPage } from './components/EmailActionPage';
 import { pb } from './lib/pocketbase';
 
 function AppContent() {
@@ -26,6 +27,26 @@ function AppContent() {
   const { user, isLoading } = useAuth();
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const [verifyProcessing, setVerifyProcessing] = useState(false);
+  const [emailAction, setEmailAction] = useState<{ action: 'verify' | 'reset_password' | 'confirm_email_change'; token: string } | null>(() => {
+    // Lê token síncrono no mount — antes do auth check
+    const token = (window as any).__authToken as string | undefined;
+    const action = (window as any).__authAction as string | undefined;
+    delete (window as any).__authToken;
+    delete (window as any).__authAction;
+    if (token && token.length >= 10) {
+      return { action: (action === 'confirm_email_change' ? 'confirm_email_change' : 'reset_password'), token };
+    }
+    return null;
+  });
+
+  // Para confirmação de troca de e-mail: desloga o usuário para mostrar a página "deslogado"
+  const emailChangeLogoutRef = useRef(false);
+  useEffect(() => {
+    if (emailAction?.action === 'confirm_email_change' && !emailChangeLogoutRef.current && pb.authStore.isValid) {
+      emailChangeLogoutRef.current = true;
+      pb.authStore.clear();
+    }
+  }, [emailAction]);
 
   // Processa verificação de e-mail ANTES de qualquer renderização
   // Funciona mesmo se o usuário já estiver logado
@@ -140,6 +161,12 @@ function AppContent() {
         )}
       </div>
     );
+  }
+
+  // Email action (verify/reset/change) — renderiza ANTES do auth check
+  // Garante que o link de troca de e-mail abra a página de senha, mesmo logado
+  if (emailAction) {
+    return <EmailActionPage action={emailAction.action} token={emailAction.token} />;
   }
 
   if (!user) {
