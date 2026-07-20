@@ -21,6 +21,8 @@ function buildFilter(record) {
   var equipe = getField(record, 'equipe');
   var microarea = getField(record, 'microarea');
 
+  console.log('[unique_user] buildFilter role=' + role + ' unidade=' + unidade + ' equipe=' + equipe + ' microarea=' + microarea);
+
   if (role === 'cap') return 'role = "cap"';
   if (role === 'unidade') return 'role = "unidade" && unidade_saude = "' + esc(unidade) + '"';
   if (role === 'equipe') return 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '"';
@@ -37,24 +39,31 @@ function buildFilter(record) {
 function hasDuplicate(dao, filter) {
   if (!filter) return false;
   try {
+    console.log('[unique_user] hasDuplicate filter=' + filter);
     var rows = dao.findRecordsByFilter('amarcap53_users', filter, '-created', 1, 0);
-    return rows && rows.length > 0;
+    var found = rows && rows.length > 0;
+    console.log('[unique_user] hasDuplicate found=' + found + ' count=' + (rows ? rows.length : 0));
+    return found;
   } catch (e) {
-    console.error('[unique_user] hasDuplicate ERRO: ' + String(e));
-    return true; // fail-closed
+    // fail-open: log error but don't block registration
+    console.error('[unique_user] hasDuplicate ERRO (fail-open): ' + String(e));
+    return false;
   }
 }
 
 // ─── CREATE — check duplicate combo ───────────────────
 onRecordCreate(function(e) {
+  console.log('[unique_user] CREATE hook triggered');
   var dao = $app.dao();
-  if (!dao) { e.next(); return; }
+  if (!dao) { console.log('[unique_user] DAO null, skip'); e.next(); return; }
 
   var filter = buildFilter(e.record);
   if (hasDuplicate(dao, filter)) {
+    console.log('[unique_user] CREATE BLOQUEADO');
     throw new Error('Ja existe um cadastro com esta combinacao de perfil e localizacao.');
   }
 
+  console.log('[unique_user] CREATE OK, proceeding');
   e.next();
 }, "amarcap53_users");
 
@@ -76,7 +85,8 @@ onRecordUpdate(function(e) {
     }
   } catch (err) {
     if (err && err.status === 400) throw err;
-    throw new Error('Erro ao validar combinacao. Tente novamente.');
+    // fail-open on unexpected errors
+    console.error('[unique_user] UPDATE ERRO (fail-open): ' + String(err));
   }
 
   e.next();
