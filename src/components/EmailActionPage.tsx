@@ -49,7 +49,7 @@ const ACTION_CONFIG = {
 };
 
 export function EmailActionPage({ action, token, onError, onSuccess }: EmailActionPageProps) {
-  const [status, setStatus] = useState<Status>(action === 'reset_password' ? 'form' : 'loading');
+  const [status, setStatus] = useState<Status>((action === 'reset_password' || action === 'confirm_email_change') ? 'form' : 'loading');
   const [error, setError] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -60,37 +60,37 @@ export function EmailActionPage({ action, token, onError, onSuccess }: EmailActi
   const config = ACTION_CONFIG[action];
   const Icon = config.icon;
 
-  // Auto-process verify and confirm_email_change
+  // Auto-process verify (não precisa de senha)
   useEffect(() => {
-    if (action === 'reset_password') return;
+    if (action !== 'verify') return;
     if (processed.current) return;
     processed.current = true;
+    setStatus('loading');
 
-    const promise = action === 'verify'
-      ? fetch(pb.baseURL + '/api/collections/amarcap53_users/confirm-verification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
-          body: new URLSearchParams({ token }).toString(),
-        }).then(async (resp) => {
-          const text = await resp.text();
-          let msg = '';
-          try { msg = JSON.parse(text).message; } catch { msg = text; }
-          if (resp.ok || msg.includes('already') || msg.includes('verificado') || msg.includes('Invalid')) {
-            return 'ok';
-          }
-          throw new Error(msg || 'Erro ao verificar');
-        })
-      : pb.collection('amarcap53_users').confirmEmailChange(token, '');
-
-    promise
-      .then(() => { setStatus('success'); onSuccess?.(config.successDesc); })
-      .catch((err: any) => {
-        const msg = String(err?.message || '');
-        setError(msg);
+    fetch(pb.baseURL + '/api/collections/amarcap53_users/confirm-verification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+      body: new URLSearchParams({ token }).toString(),
+    }).then(async (resp) => {
+      const text = await resp.text();
+      let msg = '';
+      try { msg = JSON.parse(text).message; } catch { msg = text; }
+      if (resp.ok || msg.includes('already') || msg.includes('verificado') || msg.includes('Invalid')) {
+        setStatus('success');
+        onSuccess?.(config.successDesc);
+      } else {
+        setError(msg || 'Erro ao verificar');
         setStatus('error');
         onError?.(config.errorDesc);
-      });
+      }
+    }).catch(() => {
+      setError('Erro de conexão.');
+      setStatus('error');
+    });
   }, [action, token]);
+
+  // confirm_email_change: mostra formulário de senha (PocketBase exige senha)
+  // reset_password: mostra formulário de nova senha
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,6 +103,27 @@ export function EmailActionPage({ action, token, onError, onSuccess }: EmailActi
       onSuccess?.(config.successDesc);
     } catch (err: any) {
       setError(String(err?.message || 'Erro ao redefinir senha.'));
+      setStatus('error');
+    }
+  };
+
+  const handleConfirmEmailChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password) { setError('Digite sua senha atual para confirmar.'); return; }
+    setStatus('loading');
+    try {
+      await pb.collection('amarcap53_users').confirmEmailChange(token, password);
+      setStatus('success');
+      onSuccess?.(config.successDesc);
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      if (msg.includes('expired') || msg.includes('expirado')) {
+        setError('O link de confirmação expirou. Solicite a alteração novamente.');
+      } else if (msg.includes('invalid') || msg.includes('inválid')) {
+        setError('Senha incorreta. Tente novamente.');
+      } else {
+        setError(msg || 'Erro ao confirmar alteração de e-mail.');
+      }
       setStatus('error');
     }
   };
@@ -263,6 +284,51 @@ export function EmailActionPage({ action, token, onError, onSuccess }: EmailActi
                   <button type="submit" disabled={status === 'loading'}
                     className="w-full py-3.5 min-h-[52px] bg-gradient-to-r from-[#001b3d] to-[#002b5c] text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
                     Redefinir Senha
+                  </button>
+                </form>
+              )}
+
+              {/* Confirm Email Change Form — precisa de senha atual */}
+              {status === 'form' && action === 'confirm_email_change' && (
+                <form className="space-y-4" onSubmit={handleConfirmEmailChange}>
+                  <p className="text-[13px] text-slate-500 font-medium leading-relaxed bg-slate-50/80 p-4 rounded-xl border border-slate-100">
+                    Para confirmar a alteração do seu e-mail, digite sua senha atual.
+                  </p>
+
+                  {error && (
+                    <div className="p-3 bg-rose-50/80 border border-rose-100 rounded-xl flex items-start gap-2.5 animate-[shakeIn_0.4s_ease-out]">
+                      <div className="w-5 h-5 rounded-md bg-rose-500 flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="text-white text-[9px] font-black">!</span>
+                      </div>
+                      <p className="text-[11px] font-bold text-rose-700 leading-snug">{error}</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-[0.15em] ml-1">Senha atual</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Lock className="w-4 h-4 text-slate-400" />
+                      </div>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        autoComplete="current-password"
+                        value={password}
+                        onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                        className="w-full pl-10 pr-12 py-3 min-h-[48px] bg-slate-50/80 border-2 border-slate-100 rounded-xl text-[0.9375rem] font-bold text-slate-700 outline-none focus:border-blue-500/30 focus:bg-white focus:ring-4 focus:ring-blue-500/5 transition-all duration-200 placeholder:text-slate-300"
+                        placeholder="Digite sua senha"
+                      />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center justify-center w-11 min-h-[48px] text-slate-400 hover:text-slate-600 transition-colors">
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button type="submit" disabled={status === 'loading'}
+                    className="w-full py-3.5 min-h-[52px] bg-gradient-to-r from-[#001b3d] to-[#002b5c] text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
+                    Confirmar Alteração
                   </button>
                 </form>
               )}
