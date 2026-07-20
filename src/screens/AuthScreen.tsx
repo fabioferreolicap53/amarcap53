@@ -230,8 +230,7 @@ export function AuthScreen() {
             return { found: true, via: 'manual_fallback' };
           }
         } catch (manualErr: any) {
-          console.error('[checkDuplicate] Fallback manual falhou:', manualErr);
-          throw new Error('Erro ao verificar duplicidade. Tente novamente.');
+          console.warn('[checkDuplicate] Fallback manual falhou, server vai validar:', manualErr?.message);
         }
 
         return { found: false, via: 'none' };
@@ -302,8 +301,8 @@ export function AuthScreen() {
       const is400 = err?.status === 400 || err?.data?.code === 400 || msg.includes('failed to create');
       const errorData = err?.data?.data || null;
 
-      // Erro de duplicata do hook server-side
-      if (msg.includes('combinacao') || msg.includes('combinção') || msg.includes('coordenacao') || msg.includes('coordenação') || msg.includes('gestor') || msg.includes('enfermeiro') || msg.includes('agente')) {
+      // Erro de duplicata do hook server-side (unique_user.pb.js)
+      if (msg.includes('combinacao') || msg.includes('combinção') || msg.includes('ja existe') || msg.includes('já existe') || msg.includes('coordenacao') || msg.includes('coordenação') || msg.includes('gestor') || msg.includes('enfermeiro') || msg.includes('agente')) {
         setError(rawMsg || 'Já existe um cadastro com esta combinação de perfil e localização.');
       } else if (is400 && errorData && typeof errorData === 'object' && Object.keys(errorData).length > 0) {
         const firstField = Object.keys(errorData)[0];
@@ -317,8 +316,8 @@ export function AuthScreen() {
           setError(`Erro no campo ${firstField}: ${fieldError?.message || 'valor inválido'}`);
         }
       } else if (is400) {
-        // 400 com data vazio — pode ser hook ou validação do server
-        setError('Não foi possível criar o cadastro. Verifique os dados ou entre em contato com o administrador.');
+        // 400 com data vazio — hook engoliu mensagem ou validação do server
+        setError(rawMsg || 'Não foi possível criar o cadastro. Verifique os dados ou entre em contato com o administrador.');
       } else if (msg.includes('unique') || msg.includes('already') || msg.includes('taken')) {
         setError('Este e-mail já está cadastrado ou combinação duplicada.');
       } else {
