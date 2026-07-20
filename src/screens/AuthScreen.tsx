@@ -251,23 +251,23 @@ export function AuthScreen() {
         return;
       }
 
-      // Verifica se o e-mail já está cadastrado
+      // Verifica se o e-mail já está cadastrado (fetch manual garantido)
       try {
-        const emailCheck = await pb.collection('amarcap53_users').getList(1, 1, {
-          filter: `email="${esc(email)}"`,
-          fields: 'id',
+        const allUsers = await pb.collection('amarcap53_users').getFullList({
+          filter: `email != ""`,
+          fields: 'id,email',
           requestKey: null,
         });
-        if (emailCheck.totalItems > 0) {
+        const emailLower = email.trim().toLowerCase();
+        const exists = allUsers.some((u: any) => String(u.email || '').trim().toLowerCase() === emailLower);
+        if (exists) {
           setError('Este e-mail já está cadastrado. Use outro e-mail ou faça login.');
           setIsLoading(false);
           return;
         }
       } catch (emailErr: any) {
-        if (emailErr?.status !== 404 && emailErr?.statusCode !== 404) {
-          console.error('[checkDuplicate] Email check falhou:', emailErr);
-          throw new Error('Erro ao verificar e-mail. Tente novamente.');
-        }
+        console.warn('[checkDuplicate] Email check fallback:', emailErr?.message);
+        // Se falhar, continua — o server vai bloquear se duplicado
       }
 
       // Criação via SDK padrão
@@ -300,19 +300,26 @@ export function AuthScreen() {
       const msg = String(err?.data?.message || err?.message || err || '').toLowerCase();
       const rawMsg = String(err?.data?.message || err?.message || '');
 
+      // Detecta erro 400 (status pode estar em err.status ou err.data.code)
+      const is400 = err?.status === 400 || err?.data?.code === 400 || msg.includes('failed to create');
+      // Dados do erro podem estar em err.data.data ou err.data diretamente
+      const errorData = err?.data?.data || (is400 && typeof err?.data === 'object' ? err.data : null);
+
       // Erro de duplicata do hook server-side
-      if (msg.includes('combinacao') || msg.includes('combinção') || msg.includes('coordenação') || msg.includes('gestor') || msg.includes('enfermeiro') || msg.includes('agente')) {
+      if (msg.includes('combinacao') || msg.includes('combinacao') || msg.includes('coordenacao') || msg.includes('gestor') || msg.includes('enfermeiro') || msg.includes('agente')) {
         setError(rawMsg || 'Já existe um cadastro com esta combinação de perfil e localização.');
-      } else if (err?.status === 400 && err?.data?.data && typeof err.data.data === 'object') {
-        const keys = Object.keys(err.data.data);
+      } else if (is400 && errorData && typeof errorData === 'object') {
+        const keys = Object.keys(errorData);
         if (keys.length > 0) {
           const firstField = keys[0];
-          const fieldError = err.data.data[firstField];
+          const fieldError = errorData[firstField];
           const fieldMsg = String(fieldError?.message || '').toLowerCase();
           if (firstField === 'email' && (fieldMsg.includes('unique') || fieldMsg.includes('already') || fieldMsg.includes('taken'))) {
             setError('Este e-mail já está cadastrado. Use outro e-mail ou faça login.');
           } else if (fieldMsg.includes('unique')) {
             setError('Já existe um cadastro com esta combinação de perfil e localização.');
+          } else if (firstField === 'email') {
+            setError('Este e-mail já está cadastrado. Use outro e-mail ou faça login.');
           } else {
             setError(`Erro no campo ${firstField}: ${fieldError?.message || fieldMsg || 'valor inválido'}`);
           }
