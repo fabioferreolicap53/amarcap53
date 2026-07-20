@@ -295,37 +295,30 @@ export function AuthScreen() {
       setSuccessMsg('Cadastro realizado! Verifique seu e-mail (e a caixa de SPAM) para ativar a conta.');
       setAuthState('login');
     } catch (err: any) {
-      console.error('Erro detalhado:', err?.data || err);
+      console.error('Erro completo:', JSON.stringify(err?.data || err));
 
-      const msg = String(err?.data?.message || err?.message || err || '').toLowerCase();
       const rawMsg = String(err?.data?.message || err?.message || '');
-
-      // Detecta erro 400 (status pode estar em err.status ou err.data.code)
+      const msg = rawMsg.toLowerCase();
       const is400 = err?.status === 400 || err?.data?.code === 400 || msg.includes('failed to create');
-      // Dados do erro podem estar em err.data.data ou err.data diretamente
-      const errorData = err?.data?.data || (is400 && typeof err?.data === 'object' ? err.data : null);
+      const errorData = err?.data?.data || null;
 
       // Erro de duplicata do hook server-side
-      if (msg.includes('combinacao') || msg.includes('combinacao') || msg.includes('coordenacao') || msg.includes('gestor') || msg.includes('enfermeiro') || msg.includes('agente')) {
+      if (msg.includes('combinacao') || msg.includes('combinção') || msg.includes('coordenacao') || msg.includes('coordenação') || msg.includes('gestor') || msg.includes('enfermeiro') || msg.includes('agente')) {
         setError(rawMsg || 'Já existe um cadastro com esta combinação de perfil e localização.');
-      } else if (is400 && errorData && typeof errorData === 'object') {
-        const keys = Object.keys(errorData);
-        if (keys.length > 0) {
-          const firstField = keys[0];
-          const fieldError = errorData[firstField];
-          const fieldMsg = String(fieldError?.message || '').toLowerCase();
-          if (firstField === 'email' && (fieldMsg.includes('unique') || fieldMsg.includes('already') || fieldMsg.includes('taken'))) {
-            setError('Este e-mail já está cadastrado. Use outro e-mail ou faça login.');
-          } else if (fieldMsg.includes('unique')) {
-            setError('Já existe um cadastro com esta combinação de perfil e localização.');
-          } else if (firstField === 'email') {
-            setError('Este e-mail já está cadastrado. Use outro e-mail ou faça login.');
-          } else {
-            setError(`Erro no campo ${firstField}: ${fieldError?.message || fieldMsg || 'valor inválido'}`);
-          }
+      } else if (is400 && errorData && typeof errorData === 'object' && Object.keys(errorData).length > 0) {
+        const firstField = Object.keys(errorData)[0];
+        const fieldError = errorData[firstField];
+        const fieldMsg = String(fieldError?.message || '').toLowerCase();
+        if (firstField === 'email') {
+          setError('Este e-mail já está cadastrado. Use outro e-mail ou faça login.');
+        } else if (fieldMsg.includes('unique')) {
+          setError('Já existe um cadastro com esta combinação de perfil e localização.');
         } else {
-          setError(rawMsg || 'Erro ao criar conta. Verifique os dados.');
+          setError(`Erro no campo ${firstField}: ${fieldError?.message || 'valor inválido'}`);
         }
+      } else if (is400) {
+        // 400 com data vazio — pode ser hook ou validação do server
+        setError('Não foi possível criar o cadastro. Verifique os dados ou entre em contato com o administrador.');
       } else if (msg.includes('unique') || msg.includes('already') || msg.includes('taken')) {
         setError('Este e-mail já está cadastrado ou combinação duplicada.');
       } else {
