@@ -19,7 +19,13 @@ function buildUniqueFilter(record) {
   } else if (role === 'equipe') {
     return 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '"';
   } else if (role === 'microarea') {
-    return 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && microarea = "' + esc(microarea) + '"';
+    // microarea pode ser string "1"-"7", number, ou null
+    var mVal = String(microarea).trim();
+    if (mVal && mVal !== '0') {
+      return 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "' + esc(mVal) + '" || microarea = ' + parseInt(mVal, 10) + ')';
+    }
+    // microarea vazia: casa com vazio, null ou N/A
+    return 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "" || microarea = null || microarea = "N/A")';
   }
   return '';
 }
@@ -81,10 +87,10 @@ onRecordBeforeUpdateRequest(function(e) {
     if (duplicate.length > 0) {
       throw new Error(400, 'Já existe um cadastro com esta combinação de perfil e localização.');
     }
-  } catch (e) {
-    if (e.status === 400) throw e; // Re-throw our own validation error
+  } catch (err) {
+    if (err && err.status === 400) throw err; // Re-throw our own validation error
     // Se o filtro falhar por outro motivo, bloqueia (fail-closed)
-    console.error('[unique_user] Erro ao verificar duplicata no update:', e);
+    console.error('[unique_user] Erro ao verificar duplicata no update:', err);
     throw new Error(400, 'Erro ao validar combinação. Tente novamente.');
   }
 });

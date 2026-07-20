@@ -191,7 +191,9 @@ export function AuthScreen() {
       } else if (perfil === 'equipe') {
         comboFilter = `role="equipe" && unidade_saude="${esc(finalUnidade)}" && equipe="${esc(finalEquipe)}"`;
       } else if (perfil === 'microarea') {
-        comboFilter = `role="microarea" && unidade_saude="${esc(finalUnidade)}" && equipe="${esc(finalEquipe)}" && microarea="${esc(finalMicroarea)}"`;
+        // microarea pode ser string "1"-"7" ou number — casa com ambos
+        const mVal = finalMicroarea.trim();
+        comboFilter = `role="microarea" && unidade_saude="${esc(finalUnidade)}" && equipe="${esc(finalEquipe)}" && (microarea="${esc(mVal)}" || microarea=${parseInt(mVal, 10)})`;
       }
 
       if (comboFilter && await checkDuplicate(comboFilter)) {
