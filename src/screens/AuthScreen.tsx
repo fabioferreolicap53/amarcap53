@@ -3,7 +3,7 @@ import { pb } from '../lib/pocketbase';
 import { Activity, Mail, Lock, Building, Users, MapPin, ArrowRight, ArrowLeft, Eye, EyeOff, Shield, Heart, BadgeCheck } from 'lucide-react';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 
-type AuthState = 'login' | 'register' | 'forgot_password';
+type AuthState = 'login' | 'register' | 'forgot_password' | 'reset_password' | 'confirm_email_change';
 
 export function AuthScreen() {
   const [authState, setAuthState] = useState<AuthState>('login');
@@ -98,6 +98,40 @@ export function AuthScreen() {
         setError('Erro de conexão ao verificar e-mail.');
       })
       .finally(() => setVerifying(false));
+  }, []);
+
+  // Detecta token de reset password ou confirm email change (capturado no index.html)
+  useEffect(() => {
+    const token = (window as any).__authToken as string | undefined;
+    const action = (window as any).__authAction as string | undefined;
+    delete (window as any).__authToken;
+    delete (window as any).__authAction;
+    if (!token || token.length < 10) return;
+
+    if (action === 'confirm_email_change') {
+      // Confirma automaticamente (sem input do usuário)
+      setAuthState('confirm_email_change');
+      setVerifying(true);
+      pb.collection('amarcap53_users').confirmEmailChange(token)
+        .then(() => {
+          setSuccessMsg('E-mail alterado com sucesso! Faça login com o novo e-mail.');
+        })
+        .catch((err: any) => {
+          const msg = String(err?.message || '');
+          if (msg.includes('expired') || msg.includes('expirado')) {
+            setError('O link de confirmação expirou. Solicite a alteração novamente.');
+          } else if (msg.includes('already') || msg.includes('utilizado')) {
+            setSuccessMsg('E-mail já confirmado. Faça login.');
+          } else {
+            setError('Erro ao confirmar: ' + (msg || 'tente novamente.'));
+          }
+        })
+        .finally(() => setVerifying(false));
+    } else {
+      // Reset password — mostra formulário de nova senha
+      setAuthState('reset_password');
+      (window as any).__resetToken = token;
+    }
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -347,6 +381,52 @@ export function AuthScreen() {
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setIsLoading(true);
+    clearMessages();
+    const token = (window as any).__resetToken as string;
+    if (!token) {
+      setError('Token inválido ou expirado. Solicite uma nova recuperação de senha.');
+      setIsLoading(false);
+      submittingRef.current = false;
+      return;
+    }
+    if (password.length < 8) {
+      setError('A senha deve ter pelo menos 8 caracteres.');
+      setIsLoading(false);
+      submittingRef.current = false;
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError('As senhas não conferem.');
+      setIsLoading(false);
+      submittingRef.current = false;
+      return;
+    }
+    try {
+      await pb.collection('amarcap53_users').confirmPasswordReset(token, password, passwordConfirm);
+      delete (window as any).__resetToken;
+      setSuccessMsg('Senha redefinida com sucesso! Agora você pode fazer login.');
+      setAuthState('login');
+      setEmail('');
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      if (msg.includes('expired') || msg.includes('expirado')) {
+        setError('O link de recuperação expirou. Solicite uma nova recuperação de senha.');
+      } else if (msg.includes('invalid') || msg.includes('inválido')) {
+        setError('Token inválido. Solicite uma nova recuperação de senha.');
+      } else {
+        setError('Erro ao redefinir senha. Tente novamente.');
+      }
+    } finally {
+      submittingRef.current = false;
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-dvh min-h-[100dvh] flex flex-col font-sans bg-[#f0f2f5]">
       {/* Brand Panel — Desktop */}
@@ -449,11 +529,15 @@ export function AuthScreen() {
                   {authState === 'login' && 'Bem-vindo de volta'}
                   {authState === 'register' && 'Solicitar Acesso'}
                   {authState === 'forgot_password' && 'Recuperar Senha'}
+                  {authState === 'reset_password' && 'Redefinir Senha'}
+                  {authState === 'confirm_email_change' && 'Confirmando novo e-mail'}
                 </h2>
                 <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1.5 sm:mt-2 leading-snug sm:leading-relaxed">
                   {authState === 'login' && 'Acesse sua conta'}
                   {authState === 'register' && 'Preencha os dados para criar sua conta'}
                   {authState === 'forgot_password' && 'Enviaremos um link de recuperação'}
+                  {authState === 'reset_password' && 'Digite sua nova senha'}
+                  {authState === 'confirm_email_change' && 'Aguarde...'}
                 </p>
               </div>
 
@@ -806,6 +890,82 @@ export function AuthScreen() {
                   </button>
                 </form>
               )}
+
+              {/* Reset Password Form */}
+              {authState === 'reset_password' && (
+                <form className="space-y-5" onSubmit={handleResetPassword}>
+                  <p className="text-[13px] text-slate-500 font-medium leading-relaxed bg-slate-50/80 p-4 rounded-xl sm:rounded-2xl border border-slate-100">
+                    Digite sua nova senha. Ela deve ter pelo menos 8 caracteres.
+                  </p>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-[0.15em] ml-1">Nova senha</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Lock className="w-3.5 h-3.5 text-slate-400" />
+                      </div>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        autoComplete="new-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full pl-9 pr-9 py-3 min-h-[48px] bg-slate-50/80 border-2 border-slate-100 rounded-xl sm:rounded-2xl text-[0.8125rem] sm:text-[0.9375rem] font-bold text-slate-700 outline-none focus:border-blue-500/30 focus:bg-white focus:ring-4 focus:ring-blue-500/5 transition-all duration-200 placeholder:text-slate-300"
+                        placeholder="Mín. 8"
+                        minLength={8}
+                      />
+                      <button
+                        type="button"
+                        onClick={toggleShowPassword}
+                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center justify-center w-10 min-h-[48px] text-slate-400 hover:text-slate-600 active:text-slate-700 transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-[0.15em] ml-1">Repetir senha</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Lock className="w-3.5 h-3.5 text-slate-400" />
+                      </div>
+                      <input
+                        type={showPasswordConfirm ? 'text' : 'password'}
+                        required
+                        autoComplete="new-password"
+                        value={passwordConfirm}
+                        onChange={(e) => setPasswordConfirm(e.target.value)}
+                        className="w-full pl-9 pr-9 py-3 min-h-[48px] bg-slate-50/80 border-2 border-slate-100 rounded-xl sm:rounded-2xl text-[0.8125rem] sm:text-[0.9375rem] font-bold text-slate-700 outline-none focus:border-blue-500/30 focus:bg-white focus:ring-4 focus:ring-blue-500/5 transition-all duration-200 placeholder:text-slate-300"
+                        placeholder="Repetir"
+                        minLength={8}
+                      />
+                      <button
+                        type="button"
+                        onClick={toggleShowPasswordConfirm}
+                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center justify-center w-10 min-h-[48px] text-slate-400 hover:text-slate-600 active:text-slate-700 transition-colors"
+                      >
+                        {showPasswordConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-3.5 min-h-[52px] bg-gradient-to-r from-[#001b3d] to-[#002b5c] text-white rounded-xl sm:rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                  >
+                    {isLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Redefinindo...
+                      </span>
+                    ) : 'Redefinir Senha'}
+                  </button>
+                </form>
+              )}
+
+              {/* Confirm Email Change — sem formulário, processa automático */}
 
               {/* Footer Nav */}
               <div className="mt-5 sm:mt-8 pt-4 sm:pt-6 border-t border-slate-100">

@@ -32,33 +32,44 @@
           window.history.replaceState(null, '', window.location.pathname + search);
         }
 
+        var params = new URLSearchParams(window.location.search);
+        var verifyToken = params.get('verify');
+        var authToken = params.get('token');
+
+        // Captura token para React (reset password / confirm email change)
+        if (authToken) {
+          var actionPath = window.location.pathname.toLowerCase();
+          if (actionPath.indexOf('/confirm-email-change') !== -1) {
+            window.__authAction = 'confirm_email_change';
+          } else {
+            window.__authAction = 'reset_password';
+          }
+          window.__authToken = authToken;
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+
         // Verificação de e-mail: processa ?verify=TOKEN ANTES de qualquer framework
         // Funciona mesmo se o JavaScript do React não carregar
-        var params = new URLSearchParams(window.location.search);
-        var token = params.get('verify');
-        if (token) {
+        if (verifyToken) {
           var pbUrl = 'https://centraldedados.dev.br';
           // Limpa a URL imediatamente
           window.history.replaceState(null, '', window.location.pathname);
 
           if (window.fetch) {
-            // Tenta via API (form-urlencoded com Accept JSON para forçar resposta JSON)
             fetch(pbUrl + '/api/collections/amarcap53_users/confirm-verification', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json',
               },
-              body: 'token=' + encodeURIComponent(token),
+              body: 'token=' + encodeURIComponent(verifyToken),
             }).then(function(resp) {
               var ct = resp.headers.get('content-type') || '';
-              // Se respondeu JSON → verifica se OK
               if (ct.indexOf('application/json') !== -1) {
                 return resp.json().then(function(data) {
                   if (resp.ok) {
                     window.location.href = window.location.pathname + '?verified=1';
                   } else {
-                    // Token expirado, inválido, etc — mas ao menos processou
                     var msg = (data && data.message) || '';
                     if (msg.indexOf('already') !== -1 || msg.indexOf('verificado') !== -1) {
                       window.location.href = window.location.pathname + '?verified=1';
@@ -68,19 +79,15 @@
                   }
                 });
               }
-              // Se não é JSON (HTML) → provavelmente PocketBase processou e redirecionou
-              // Tenta verificar se o usuário foi marcado como verified
               if (resp.ok || resp.redirected) {
                 window.location.href = window.location.pathname + '?verified=1';
               } else {
                 window.location.href = window.location.pathname + '?verify_error=1';
               }
             }).catch(function() {
-              // Erro de rede — tenta com token na URL como fallback
-              window.location.href = window.location.pathname + '?verify_fallback=' + encodeURIComponent(token);
+              window.location.href = window.location.pathname + '?verify_fallback=' + encodeURIComponent(verifyToken);
             });
           } else {
-            // Fallback: formulário HTML
             var form = document.createElement('form');
             form.method = 'POST';
             form.action = pbUrl + '/api/collections/amarcap53_users/confirm-verification';
@@ -89,7 +96,7 @@
             var input = document.createElement('input');
             input.type = 'hidden';
             input.name = 'token';
-            input.value = token;
+            input.value = verifyToken;
             form.appendChild(input);
             document.body.appendChild(form);
             form.submit();
