@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { pb } from '../lib/pocketbase';
 import { Activity, Mail, Lock, Building, Users, MapPin, ArrowRight, ArrowLeft, Eye, EyeOff, Shield, Heart, BadgeCheck } from 'lucide-react';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
+import { EmailActionPage } from '../components/EmailActionPage';
 
 type AuthState = 'login' | 'register' | 'forgot_password' | 'reset_password' | 'confirm_email_change';
 
@@ -21,6 +22,9 @@ export function AuthScreen() {
 
   const authCollection = appConfig.collection;
   const showRegister = true;
+
+  // Email action pages (verify / reset / confirm)
+  const [emailAction, setEmailAction] = useState<{ action: 'verify' | 'reset_password' | 'confirm_email_change'; token: string } | null>(null);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,93 +48,38 @@ export function AuthScreen() {
   const toggleShowPassword = () => setShowPassword(!showPassword);
   const toggleShowPasswordConfirm = () => setShowPasswordConfirm(!showPasswordConfirm);
 
-  // Processa verificação de e-mail via token na URL
-  // Template de e-mail: {APP_URL}/?verify={TOKEN}
-  // Token pode vir de: 1) window.__verifyToken (capturado antes do React)  2) URL query string
-  const verifyProcessed = useRef(false);
-  const [verifying, setVerifying] = useState(false);
+  // Detecta token de verificação de e-mail na URL
+  const actionDetected = useRef(false);
   useEffect(() => {
-    if (verifyProcessed.current) return;
+    if (actionDetected.current) return;
 
-    // Lê token de window.__verifyToken (capturado no main.tsx) ou da URL
+    // Verifica token de verificação (via URL ou window.__verifyToken)
     const earlyToken = (window as any).__verifyToken as string | undefined;
     delete (window as any).__verifyToken;
-
     const params = new URLSearchParams(window.location.search);
     const verifyToken = earlyToken || params.get('verify');
 
-    if (!verifyToken) return;
-
-    verifyProcessed.current = true;
-    setVerifying(true);
-    // Limpa a URL imediatamente para evitar reprocessamento
-    if (window.location.search) {
-      window.history.replaceState({}, '', window.location.pathname);
+    if (verifyToken) {
+      actionDetected.current = true;
+      if (window.location.search) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+      setEmailAction({ action: 'verify', token: verifyToken });
+      return;
     }
 
-    fetch(pb.baseURL + '/api/collections/amarcap53_users/confirm-verification', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
-      },
-      body: new URLSearchParams({ token: verifyToken }).toString(),
-    })
-      .then(async (resp) => {
-        const text = await resp.text();
-        console.log('[verify] Status:', resp.status, 'Body:', text);
-        if (resp.ok || resp.status === 204) {
-          setSuccessMsg('E-mail verificado com sucesso! Agora você pode fazer login.');
-        } else {
-          let msg = '';
-          try { msg = JSON.parse(text).message; } catch { msg = text; }
-          if (msg.includes('expired') || msg.includes('expirado')) {
-            setError('O link de verificação expirou. Solicite um novo cadastro.');
-          } else if (msg.includes('already') || msg.includes('verificado') || msg.includes('Invalid')) {
-            setSuccessMsg('E-mail já verificado. Você pode fazer login.');
-          } else {
-            setError('Erro ao verificar: ' + (msg || resp.statusText));
-          }
-        }
-      })
-      .catch((err) => {
-        console.error('[verify] Erro de rede:', err);
-        setError('Erro de conexão ao verificar e-mail.');
-      })
-      .finally(() => setVerifying(false));
-  }, []);
-
-  // Detecta token de reset password ou confirm email change (capturado no index.html)
-  useEffect(() => {
-    const token = (window as any).__authToken as string | undefined;
-    const action = (window as any).__authAction as string | undefined;
+    // Verifica token de reset/confirm (capturado no index.html)
+    const authToken = (window as any).__authToken as string | undefined;
+    const authAction = (window as any).__authAction as string | undefined;
     delete (window as any).__authToken;
     delete (window as any).__authAction;
-    if (!token || token.length < 10) return;
 
-    if (action === 'confirm_email_change') {
-      // Confirma automaticamente (sem input do usuário)
-      setAuthState('confirm_email_change');
-      setVerifying(true);
-      pb.collection('amarcap53_users').confirmEmailChange(token)
-        .then(() => {
-          setSuccessMsg('E-mail alterado com sucesso! Faça login com o novo e-mail.');
-        })
-        .catch((err: any) => {
-          const msg = String(err?.message || '');
-          if (msg.includes('expired') || msg.includes('expirado')) {
-            setError('O link de confirmação expirou. Solicite a alteração novamente.');
-          } else if (msg.includes('already') || msg.includes('utilizado')) {
-            setSuccessMsg('E-mail já confirmado. Faça login.');
-          } else {
-            setError('Erro ao confirmar: ' + (msg || 'tente novamente.'));
-          }
-        })
-        .finally(() => setVerifying(false));
-    } else {
-      // Reset password — mostra formulário de nova senha
-      setAuthState('reset_password');
-      (window as any).__resetToken = token;
+    if (authToken && authToken.length >= 10) {
+      actionDetected.current = true;
+      setEmailAction({
+        action: (authAction === 'confirm_email_change' ? 'confirm_email_change' : 'reset_password'),
+        token: authToken,
+      });
     }
   }, []);
 
@@ -427,6 +376,11 @@ export function AuthScreen() {
     }
   };
 
+  // Renderiza página de ação de e-mail (verificação / reset / confirmação)
+  if (emailAction) {
+    return <EmailActionPage action={emailAction.action} token={emailAction.token} />;
+  }
+
   return (
     <div className="min-h-dvh min-h-[100dvh] flex flex-col font-sans bg-[#f0f2f5]">
       {/* Brand Panel — Desktop */}
@@ -551,12 +505,7 @@ export function AuthScreen() {
                 </div>
               )}
 
-              {verifying && (
-                <div className="mb-3 sm:mb-6 p-3 sm:p-4 bg-blue-50/80 backdrop-blur-sm border border-blue-100 rounded-xl sm:rounded-2xl flex items-center gap-2.5 sm:gap-3">
-                  <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                  <p className="text-[11px] sm:text-xs font-bold text-blue-700">Verificando e-mail...</p>
-                </div>
-              )}
+
 
               {successMsg && (
                 <div className="mb-3 sm:mb-6 p-3 sm:p-4 bg-emerald-50/80 backdrop-blur-sm border border-emerald-100 rounded-xl sm:rounded-2xl flex items-start gap-2.5 sm:gap-3 animate-[fadeSlideIn_0.4s_ease-out]">
