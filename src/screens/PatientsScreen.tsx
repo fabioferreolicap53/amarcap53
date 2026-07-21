@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck, Upload, Loader2 } from 'lucide-react';
+import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck, Upload, Loader2, Printer, Download } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import Papa from 'papaparse';
@@ -740,6 +740,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   // Versão do fetch — previne race condition (fetch antigo não fecha loading)
   const fetchVersionRef = useRef(0);
   const loadedOnceRef = useRef(false);
+  const filterStringRef = useRef('');
 
   useEffect(() => {
     let cancelled = false;
@@ -969,6 +970,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
         // Finaliza construção do filtro
         const finalFilter = filterParts.join(' && ').trim();
+        filterStringRef.current = finalFilter;
         if (finalFilter) {
           options.filter = finalFilter;
         }
@@ -1260,6 +1262,184 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     return dateOnly;
   };
 
+  const handlePrint = async () => {
+    try {
+      const allRecords = await pb.collection('amarcap53_pacientes').getFullList({
+        sort: 'nome',
+        filter: filterStringRef.current || undefined,
+      });
+
+      // Buscar acompanhamentos para contagem
+      const patientIds = allRecords.map(r => r.id).filter(Boolean);
+      let acompResults: any[] = [];
+      if (patientIds.length > 0) {
+        try {
+          const raw: any = await pb.collection('amarcap53_acompanhamentos').getFullList({
+            filter: `(${patientIds.slice(0, 200).map(id => `paciente = "${id}"`).join(' || ')})`,
+            fields: 'id,paciente',
+            requestKey: null
+          });
+          acompResults = Array.isArray(raw) ? raw : (raw?.items ?? []);
+        } catch { acompResults = []; }
+      }
+      const countMap = new Map<string, number>();
+      acompResults.forEach((r: any) => {
+        countMap.set(r.paciente, (countMap.get(r.paciente) || 0) + 1);
+      });
+
+      const pacientesFormatados = allRecords.map(record => {
+        const count = countMap.get(record.id) || 0;
+        const p: any = {
+          id: record.id,
+          unidade: record.unidade || '--',
+          equipe: record.equipe || '--',
+          microarea: Number(record.microarea) || 0,
+          nome: record.nome || '--',
+          cns: record.cns || '--',
+          data_nascimento: record.data_nascimento || '--',
+          idade: Number(record.idade) || calcularIdade(record.data_nascimento),
+          grupo: record.grupo || '--',
+          cito_lab: record.cito_lab || '--',
+          cito_pep: record.cito_pep || '--',
+          dna_hpv_gal: record.dna_hpv_gal || '--',
+          dna_hpv_pep: record.dna_hpv_pep || '--',
+        };
+        p.alertas = determinarAlerta(p);
+        return p;
+      });
+
+      const showUnitColumns = isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea';
+      const dataAtual = new Date().toLocaleDateString('pt-BR');
+      const hasFilter = !!filterStringRef.current;
+
+      const rows = pacientesFormatados.map(p => {
+        const alertConfig = ALERT_CONFIGS[p.alertas];
+        const statusLabel = alertConfig ? alertConfig.label : p.alertas;
+        return `
+          <tr>
+            <td>${p.nome}</td>
+            <td>${p.cns}</td>
+            <td>${formatarData(p.data_nascimento)}</td>
+            <td>${statusLabel}</td>
+            <td>${formatarData(p.dna_hpv_pep)}</td>
+            ${showUnitColumns ? `<td>${p.unidade}</td><td>${p.equipe}</td><td>${p.microarea}</td>` : ''}
+            <td>${p.idade}</td>
+            <td>${p.grupo}</td>
+            <td>${formatarData(p.cito_lab)}</td>
+            <td>${formatarData(p.cito_pep)}</td>
+            <td>${formatarData(p.dna_hpv_gal)}</td>
+          </tr>`;
+      }).join('');
+
+      const unitHeaders = showUnitColumns
+        ? '<th>Unidade</th><th>Equipe</th><th>Microárea</th>'
+        : '';
+
+      const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>AMAR - Listagem de Pacientes</title>
+  <style>
+    @page { size: A4 landscape; margin: 8mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #1a1a2e; padding: 0; }
+    .header { text-align: center; margin-bottom: 12px; border-bottom: 2px solid #001b3d; padding-bottom: 8px; }
+    .header h1 { font-size: 16pt; color: #001b3d; margin-bottom: 4px; }
+    .header p { font-size: 9pt; color: #555; }
+    .header .filter-info { font-size: 8pt; color: #c0392b; font-weight: bold; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    th { background-color: #001b3d; color: #fff; padding: 5px 4px; text-align: left; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.03em; }
+    td { padding: 4px 4px; border-bottom: 1px solid #e0e0e0; font-size: 7pt; vertical-align: top; }
+    tr:nth-child(even) { background-color: #f7f9fc; }
+    tr:hover { background-color: #eef3fb; }
+    .footer { text-align: center; margin-top: 10px; font-size: 7pt; color: #999; border-top: 1px solid #e0e0e0; padding-top: 6px; }
+    @media print { .no-print { display: none !important; } body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>AMAR - Listagem de Pacientes</h1>
+    <p>Gerado em: ${dataAtual} | Total: ${pacientesFormatados.length} paciente(s)</p>
+    ${hasFilter ? `<div class="filter-info">Filtro aplicado</div>` : ''}
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Paciente</th>
+        <th>CNS</th>
+        <th>Data Nasc.</th>
+        <th>Status</th>
+        <th>DNA-HPV (PEP)</th>
+        ${unitHeaders}
+        <th>Idade</th>
+        <th>Grupo</th>
+        <th>Cito (Lab)</th>
+        <th>Cito (PEP)</th>
+        <th>DNA-HPV (GAL)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+    </tbody>
+  </table>
+  <div class="footer">Documento gerado automaticamente pelo sistema AMAR CAP 53</div>
+</body>
+</html>`;
+
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => { printWindow.print(); }, 500);
+      }
+    } catch (error) {
+      console.error('Erro ao gerar impressão:', error);
+      alert('Erro ao gerar impressão. Tente novamente.');
+    }
+  };
+
+  const handleDownloadCsv = async () => {
+    try {
+      const allRecords = await pb.collection('amarcap53_pacientes').getFullList({
+        sort: 'nome',
+        filter: filterStringRef.current || undefined,
+      });
+
+      const data = allRecords.map(record => ({
+        'Nome': record.nome || '--',
+        'CNS': record.cns || '--',
+        'Data Nascimento': formatarData(record.data_nascimento),
+        'Idade': Number(record.idade) || calcularIdade(record.data_nascimento),
+        'Grupo': record.grupo || '--',
+        'Status': ALERT_CONFIGS[determinarAlerta(record)]?.label || determinarAlerta(record),
+        'Unidade': record.unidade || '--',
+        'Equipe': record.equipe || '--',
+        'Microárea': Number(record.microarea) || 0,
+        'DNA-HPV PEP': formatarData(record.dna_hpv_pep),
+        'DNA-HPV GAL': formatarData(record.dna_hpv_gal),
+        'Cito Lab': formatarData(record.cito_lab),
+        'Cito PEP': formatarData(record.cito_pep),
+      }));
+
+      const csvContent = '\uFEFF' + Papa.unparse(data, { delimiter: ';' });
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const today = new Date().toISOString().slice(0, 10);
+      link.href = url;
+      link.download = `pacientes_${today}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erro ao gerar CSV:', error);
+      alert('Erro ao gerar CSV. Tente novamente.');
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-surface">
       <Header 
@@ -1291,6 +1471,22 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
               {/* Botões de Ação */}
               <div className="relative z-10 flex items-center gap-3 md:gap-4 w-full md:w-auto justify-center md:justify-end">
+                <button
+                  onClick={handlePrint}
+                  className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-2xl transition-all duration-500 border bg-white/10 text-white border-white/20 hover:bg-white/20"
+                  title="Imprimir Listagem"
+                >
+                  <Printer className="w-5 h-5 md:w-6 md:h-6" />
+                </button>
+
+                <button
+                  onClick={handleDownloadCsv}
+                  className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-2xl transition-all duration-500 border bg-white/10 text-white border-white/20 hover:bg-white/20"
+                  title="Baixar CSV"
+                >
+                  <Download className="w-5 h-5 md:w-6 md:h-6" />
+                </button>
+
                 <button
                   onClick={() => setIsSearchVisible(!isSearchVisible)}
                   className={`w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-2xl transition-all duration-500 border ${

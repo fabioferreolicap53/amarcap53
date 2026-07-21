@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck } from 'lucide-react';
+import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck, Printer, Download } from 'lucide-react';
 import { AcompButton } from '../components/AcompButton';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
@@ -20,6 +20,7 @@ import {
   getCanonicalSelectValue,
   matchesSelectFilter
 } from '../constants/followUpOptions';
+import Papa from 'papaparse';
 
 // Remove acentos via Unicode NFD decomposition (ex: "ESPERANÇA" → "ESPERANCA")
 const normalizeText = (str: string) =>
@@ -699,6 +700,122 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     }
   };
 
+  const showUnidadeColumns = isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea';
+
+  const handlePrint = () => {
+    if (filteredPacientes.length === 0) {
+      alert('Não há pacientes para imprimir.');
+      return;
+    }
+
+    const now = new Date();
+    const dateStr = formatarData(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
+
+    const unidadeHeader = showUnidadeColumns ? '<th style="padding:10px 12px;text-align:left;background:#002b5c;color:white;font-weight:700;font-size:13px;border:1px solid #001b3d;">Unidade / Equipe / Microárea</th>' : '';
+
+    const rows = filteredPacientes.map(p => {
+      const statusKey = determinarAlerta(p);
+      const statusLabel = ALERT_CONFIGS[statusKey]?.label || '--';
+      const unidadeCell = showUnidadeColumns
+        ? `<td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:12px;white-space:nowrap;">${p.unidade || '--'} / ${p.equipe || '--'} / ${p.microarea || '--'}</td>`
+        : '';
+      return `<tr>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:12px;white-space:nowrap;">${p.nome || '--'}<br/><span style="font-size:10px;color:#64748b;">CNS: ${p.cns || '--'} | Nasc: ${formatarData(p.data_nascimento)}</span></td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:11px;max-width:200px;word-wrap:break-word;">${statusLabel}</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:12px;white-space:nowrap;">${p.dna_hpv_pep || '--'}</td>
+        ${unidadeCell}
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:12px;white-space:nowrap;">${p.idade || '--'} / ${p.grupo || '--'}</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:12px;white-space:nowrap;">${p.cito_lab || '--'}</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:12px;white-space:nowrap;">${p.cito_pep || '--'}</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:12px;white-space:nowrap;">${p.dna_hpv_gal || '--'}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>AMAR - Pacientes Favoritos</title>
+  <style>
+    @page { size: A4 landscape; margin: 8mm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; padding: 20px; }
+    .header { text-align: center; margin-bottom: 20px; border-bottom: 3px solid #002b5c; padding-bottom: 16px; }
+    .header h1 { font-size: 22px; color: #002b5c; margin-bottom: 4px; }
+    .header p { font-size: 12px; color: #64748b; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    tr:nth-child(even) { background-color: #f8fafc; }
+    tr:hover { background-color: #f1f5f9; }
+    @media print { body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>AMAR - Pacientes Favoritos</h1>
+    <p>Gerado em: ${dateStr} | Total: ${filteredPacientes.length} paciente(s)</p>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="padding:10px 12px;text-align:left;background:#002b5c;color:white;font-weight:700;font-size:13px;border:1px solid #001b3d;">Paciente</th>
+        <th style="padding:10px 12px;text-align:left;background:#002b5c;color:white;font-weight:700;font-size:13px;border:1px solid #001b3d;">Status</th>
+        <th style="padding:10px 12px;text-align:left;background:#002b5c;color:white;font-weight:700;font-size:13px;border:1px solid #001b3d;">DNA-HPV (PEP)</th>
+        ${unidadeHeader}
+        <th style="padding:10px 12px;text-align:left;background:#002b5c;color:white;font-weight:700;font-size:13px;border:1px solid #001b3d;">Idade / Grupo</th>
+        <th style="padding:10px 12px;text-align:left;background:#002b5c;color:white;font-weight:700;font-size:13px;border:1px solid #001b3d;">Cito (Lab)</th>
+        <th style="padding:10px 12px;text-align:left;background:#002b5c;color:white;font-weight:700;font-size:13px;border:1px solid #001b3d;">Cito (PEP)</th>
+        <th style="padding:10px 12px;text-align:left;background:#002b5c;color:white;font-weight:700;font-size:13px;border:1px solid #001b3d;">DNA-HPV (GAL)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+    </tbody>
+  </table>
+</body>
+</html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
+
+  const handleDownloadCsv = () => {
+    if (filteredPacientes.length === 0) {
+      alert('Não há pacientes para exportar.');
+      return;
+    }
+
+    const data = filteredPacientes.map(p => ({
+      'Nome': p.nome || '--',
+      'CNS': p.cns || '--',
+      'Data Nascimento': formatarData(p.data_nascimento),
+      'Idade': p.idade || '--',
+      'Grupo': p.grupo || '--',
+      'Status': ALERT_CONFIGS[determinarAlerta(p)]?.label || '--',
+      'Unidade': p.unidade || '--',
+      'Equipe': p.equipe || '--',
+      'Microárea': p.microarea || '--',
+      'DNA-HPV PEP': p.dna_hpv_pep || '--',
+      'DNA-HPV GAL': p.dna_hpv_gal || '--',
+      'Cito Lab': p.cito_lab || '--',
+      'Cito PEP': p.cito_pep || '--',
+    }));
+
+    const now = new Date();
+    const csv = Papa.unparse(data, { delimiter: ';' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    link.href = url;
+    link.download = `favoritos_${dateStr}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-surface">
       <Header title="Favoritos" pageTitle="Pacientes Favoritos" activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -724,6 +841,22 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
 
               {/* Botões de Busca e Filtro */}
               <div className="relative z-10 flex items-center gap-3 md:gap-4 w-full md:w-auto justify-center md:justify-end">
+                <button
+                  onClick={handlePrint}
+                  className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-2xl transition-all duration-500 border bg-white/10 text-white border-white/20 hover:bg-white/20"
+                  title="Imprimir Listagem"
+                >
+                  <Printer className="w-5 h-5 md:w-6 md:h-6" />
+                </button>
+
+                <button
+                  onClick={handleDownloadCsv}
+                  className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-2xl transition-all duration-500 border bg-white/10 text-white border-white/20 hover:bg-white/20"
+                  title="Baixar CSV"
+                >
+                  <Download className="w-5 h-5 md:w-6 md:h-6" />
+                </button>
+
                 <button
                   onClick={() => setIsSearchVisible(!isSearchVisible)}
                   className={`w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-2xl transition-all duration-500 border ${
