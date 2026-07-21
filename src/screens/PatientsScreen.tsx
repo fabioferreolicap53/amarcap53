@@ -1262,35 +1262,27 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     return dateOnly;
   };
 
-  const handlePrint = async () => {
-    try {
-      const allRecords = await pb.collection('amarcap53_pacientes').getFullList({
-        sort: 'nome',
-        filter: filterStringRef.current || undefined,
-      });
+  const handlePrint = () => {
+    // Abre a JANELA IMEDIATAMENTE no clique (evita popup blocker)
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Bloqueador de popup ativo. Permita popups para este site.');
+      return;
+    }
+    printWindow.document.write('<html><head><title>AMAR</title><style>body{font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f1f5f9;}h2{color:#001b3d;}</style></head><body><h2>Carregando listagem...</h2></body></html>');
+    printWindow.document.close();
 
-      // Buscar acompanhamentos para contagem
-      const patientIds = allRecords.map(r => r.id).filter(Boolean);
-      let acompResults: any[] = [];
-      if (patientIds.length > 0) {
-        try {
-          const raw: any = await pb.collection('amarcap53_acompanhamentos').getFullList({
-            filter: `(${patientIds.slice(0, 200).map(id => `paciente = "${id}"`).join(' || ')})`,
-            fields: 'id,paciente',
-            requestKey: null
-          });
-          acompResults = Array.isArray(raw) ? raw : (raw?.items ?? []);
-        } catch { acompResults = []; }
-      }
-      const countMap = new Map<string, number>();
-      acompResults.forEach((r: any) => {
-        countMap.set(r.paciente, (countMap.get(r.paciente) || 0) + 1);
-      });
+    // Agora busca os dados em background
+    pb.collection('amarcap53_pacientes').getFullList({
+      sort: 'nome',
+      filter: filterStringRef.current || undefined,
+    }).then(allRecords => {
+      const showUnitColumns = isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea';
+      const dataAtual = new Date().toLocaleDateString('pt-BR');
+      const hasFilter = !!filterStringRef.current;
 
-      const pacientesFormatados = allRecords.map(record => {
-        const count = countMap.get(record.id) || 0;
+      const rows = allRecords.map(record => {
         const p: any = {
-          id: record.id,
           unidade: record.unidade || '--',
           equipe: record.equipe || '--',
           microarea: Number(record.microarea) || 0,
@@ -1305,18 +1297,9 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           dna_hpv_pep: record.dna_hpv_pep || '--',
         };
         p.alertas = determinarAlerta(p);
-        return p;
-      });
-
-      const showUnitColumns = isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea';
-      const dataAtual = new Date().toLocaleDateString('pt-BR');
-      const hasFilter = !!filterStringRef.current;
-
-      const rows = pacientesFormatados.map(p => {
         const alertConfig = ALERT_CONFIGS[p.alertas];
         const statusLabel = alertConfig ? alertConfig.label : p.alertas;
-        return `
-          <tr>
+        return `<tr>
             <td>${p.nome}</td>
             <td>${p.cns}</td>
             <td>${formatarData(p.data_nascimento)}</td>
@@ -1352,16 +1335,15 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     th { background-color: #001b3d; color: #fff; padding: 5px 4px; text-align: left; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.03em; }
     td { padding: 4px 4px; border-bottom: 1px solid #e0e0e0; font-size: 7pt; vertical-align: top; }
     tr:nth-child(even) { background-color: #f7f9fc; }
-    tr:hover { background-color: #eef3fb; }
     .footer { text-align: center; margin-top: 10px; font-size: 7pt; color: #999; border-top: 1px solid #e0e0e0; padding-top: 6px; }
-    @media print { .no-print { display: none !important; } body { padding: 0; } }
+    @media print { body { padding: 0; } }
   </style>
 </head>
 <body>
   <div class="header">
     <h1>AMAR - Listagem de Pacientes</h1>
-    <p>Gerado em: ${dataAtual} | Total: ${pacientesFormatados.length} paciente(s)</p>
-    ${hasFilter ? `<div class="filter-info">Filtro aplicado</div>` : ''}
+    <p>Gerado em: ${dataAtual} | Total: ${allRecords.length} paciente(s)</p>
+    ${hasFilter ? '<div class="filter-info">Filtro aplicado</div>' : ''}
   </div>
   <table>
     <thead>
@@ -1379,34 +1361,28 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         <th>DNA-HPV (GAL)</th>
       </tr>
     </thead>
-    <tbody>
-      ${rows}
-    </tbody>
+    <tbody>${rows}</tbody>
   </table>
   <div class="footer">Documento gerado automaticamente pelo sistema AMAR CAP 53</div>
 </body>
 </html>`;
 
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(html);
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => { printWindow.print(); }, 500);
-      }
-    } catch (error) {
-      console.error('Erro ao gerar impressão:', error);
-      alert('Erro ao gerar impressão. Tente novamente.');
-    }
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => { printWindow.print(); }, 500);
+    }).catch(err => {
+      console.error('Erro ao buscar dados para impressão:', err);
+      printWindow.document.write('<html><body><h2>Erro ao carregar dados.</h2><p>Feche esta janela e tente novamente.</p></body></html>');
+      printWindow.document.close();
+    });
   };
 
-  const handleDownloadCsv = async () => {
-    try {
-      const allRecords = await pb.collection('amarcap53_pacientes').getFullList({
-        sort: 'nome',
-        filter: filterStringRef.current || undefined,
-      });
-
+  const handleDownloadCsv = () => {
+    pb.collection('amarcap53_pacientes').getFullList({
+      sort: 'nome',
+      filter: filterStringRef.current || undefined,
+    }).then(allRecords => {
       const data = allRecords.map(record => ({
         'Nome': record.nome || '--',
         'CNS': record.cns || '--',
@@ -1434,10 +1410,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Erro ao gerar CSV:', error);
+    }).catch(err => {
+      console.error('Erro ao gerar CSV:', err);
       alert('Erro ao gerar CSV. Tente novamente.');
-    }
+    });
   };
 
   return (
