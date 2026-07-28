@@ -310,7 +310,7 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
           onFocus={handleOpen}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full p-3 pr-10 bg-surface-container-low border-2 border-transparent rounded-xl text-xs font-bold text-on-surface outline-none focus:border-primary/20 transition-all hover:bg-surface-container placeholder:text-on-surface/20 shadow-sm focus:shadow-md"
+          className="w-full h-[56px] px-4 pr-10 bg-white border border-slate-200/60 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all hover:border-slate-300 placeholder:text-slate-300 shadow-sm"
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {displayValue && (

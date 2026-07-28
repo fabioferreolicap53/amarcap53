@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck, Upload, Loader2, Printer, Download, Activity } from 'lucide-react';
+import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck, Upload, Loader2, Printer, Download, Activity } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import Papa from 'papaparse';
@@ -2172,32 +2172,48 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   </div>
                 </div>
 
-                {/* Divider */}
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-                  <span className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">Dados do Acompanhamento</span>
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+                {/* Bloco 1 — Quando & Como */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#1c2e4a] text-white text-[9px] font-black shrink-0">01</div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Quando &amp; Como</span>
+                  <div className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <DatePickerPTBR label="Data da Busca" value={selectedDate} isISO={false} onChange={(val) => setSelectedDate(val)} />
+                  <SingleSelect label="Tipo de Busca" placeholder="Selecione" options={TIPO_BUSCA_OPTIONS} value={modalTipoBusca} onChange={setModalTipoBusca} required icon={<Search className="w-3.5 h-3.5" />} showSearch={false} />
+                  <SingleSelect label="Tipo de Contato" placeholder="Selecione" options={TIPO_CONTATO_OPTIONS} value={modalTipoContato} onChange={setModalTipoContato} required icon={<Phone className="w-3.5 h-3.5" />} showSearch={false} />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-                  <div className="space-y-2">
-                    <DatePickerPTBR label="Data da Busca" value={selectedDate} isISO={false} onChange={(val) => setSelectedDate(val)} />
-                  </div>
-                  <SingleSelect label="Tipo de Busca" placeholder="Selecione" options={TIPO_BUSCA_OPTIONS} value={modalTipoBusca} onChange={setModalTipoBusca} required icon={<Search className="w-3.5 h-3.5" />} showSearch={false} />
-                  <SingleSelect label="Tipo de Contato" placeholder="Selecione uma modalidade" options={TIPO_CONTATO_OPTIONS} value={modalTipoContato} onChange={setModalTipoContato} required icon={<Phone className="w-3.5 h-3.5" />} showSearch={false} />
-                  <SingleSelect label="Entrave(s) Informado Por" placeholder="Selecione" options={ENTRAVES_INFORMADO_POR_OPTIONS} value={modalEntravesInformadoPor} onChange={setModalEntravesInformadoPor} icon={<Info className="w-3.5 h-3.5" />} showSearch={false} />
-                  <SingleSelect label="Situação Pós Busca Ativa" placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={modalSituacao} onChange={setModalSituacao} required icon={<Info className="w-3.5 h-3.5" />} showSearch={false} />
+                {/* Bloco 2 — Desfecho */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#1c2e4a] text-white text-[9px] font-black shrink-0">02</div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Desfecho</span>
+                  <div className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent" />
                 </div>
-                <div className="mt-4">
+                <div className="mb-6">
+                  <SingleSelect label="Situação Pós Busca Ativa" placeholder="Selecione o desfecho da busca" options={SITUACAO_POS_BUSCA_OPTIONS} value={modalSituacao} onChange={setModalSituacao} required icon={<Info className="w-3.5 h-3.5" />} showSearch={false} />
+                </div>
+
+                {/* Bloco 3 — Entraves */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#1c2e4a] text-white text-[9px] font-black shrink-0">03</div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Entraves</span>
+                  <div className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <SingleSelect label="Entrave(s) Informado Por" placeholder="Selecione" options={ENTRAVES_INFORMADO_POR_OPTIONS} value={modalEntravesInformadoPor} onChange={setModalEntravesInformadoPor} icon={<Info className="w-3.5 h-3.5" />} showSearch={false} />
                   <MultiSelect label="Entraves Identificados" placeholder="Selecione" options={ENTRAVES_IDENTIFICADOS_OPTIONS} value={modalEntraves} onChange={setModalEntraves} showSearch={false} />
                 </div>
-                <div className="mt-4 space-y-2">
-                  <label className="flex items-center gap-2 text-[0.65rem] font-bold text-slate-400 uppercase tracking-[0.15em]">
-                    <div className="p-1 rounded-lg bg-slate-100"><MessageSquare className="w-3.5 h-3.5" /></div>
-                    Observações Detalhadas
-                  </label>
+
+                {/* Bloco 4 — Observações */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#1c2e4a] text-white text-[9px] font-black shrink-0">04</div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Observações</span>
+                  <div className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent" />
+                </div>
+                <div className="space-y-2">
                   <textarea name="observacoes" value={modalObservacoes} onChange={(e) => setModalObservacoes(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200/60 rounded-2xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 focus:bg-white p-4 resize-none transition-all outline-none placeholder:text-slate-300 shadow-sm hover:border-slate-300 min-h-[100px]"
+                    className="w-full h-[88px] px-4 py-3 bg-white border border-slate-200/60 rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none transition-all outline-none placeholder:text-slate-300 shadow-sm hover:border-slate-300"
                     rows={3} placeholder="Informações adicionais relevantes..."
                   ></textarea>
                 </div>

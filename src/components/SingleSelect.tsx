@@ -142,7 +142,7 @@ export const SingleSelect: React.FC<SingleSelectProps> = ({
   return (
     <div className={`space-y-2 flex-1 relative ${className}`} ref={containerRef}>
       {label && (
-        <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em]">
+        <label className="flex items-center gap-2 text-[0.65rem] font-bold text-slate-400 uppercase tracking-[0.15em]">
           {icon && (
             <div className="p-1 rounded bg-primary/5 group-focus-within:bg-primary/10 transition-colors">
               {icon}
@@ -158,8 +158,8 @@ export const SingleSelect: React.FC<SingleSelectProps> = ({
         onClick={handleOpen}
         disabled={disabled}
         className={`
-          h-[56px] w-full px-4 bg-white border border-outline-variant/30 rounded-xl transition-all cursor-pointer flex items-center justify-between
-          ${isOpen ? 'ring-2 ring-primary/20 border-primary shadow-md' : 'hover:border-primary/40 shadow-sm'}
+          h-[56px] w-full px-4 bg-white border border-slate-200/60 rounded-xl transition-all cursor-pointer flex items-center justify-between
+          ${isOpen ? 'ring-2 ring-primary/20 border-primary shadow-md' : 'hover:border-slate-300 shadow-sm'}
           ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''}
         `}
       >

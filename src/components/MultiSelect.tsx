@@ -153,8 +153,8 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       <div 
         onClick={handleOpen}
         className={`
-          min-h-[56px] w-full p-2 pl-4 pr-10 bg-surface-container-low border-2 rounded-2xl transition-all cursor-pointer flex flex-wrap gap-2 items-center
-          ${isOpen ? 'border-primary/20 bg-white shadow-md' : 'border-transparent hover:bg-surface-container'}
+          min-h-[56px] w-full px-4 pr-10 bg-white border border-slate-200/60 rounded-xl transition-all cursor-pointer flex flex-wrap gap-2 items-center
+          ${isOpen ? 'ring-2 ring-primary/20 border-primary bg-white shadow-md' : 'hover:border-slate-300 shadow-sm'}
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         `}
       >
