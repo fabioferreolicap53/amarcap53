@@ -105,6 +105,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
   const deleteFlagsRef = useRef({ paused: false, cancelled: false });
   const deleteStartTimeRef = useRef(0);
   const deleteEtaTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const deleteSnapRef = useRef({ deleted: 0, total: 0, errors: 0, running: false });
 
   // Sincroniza o estado do input com o usuário do contexto sempre que ele mudar
   useEffect(() => {
@@ -509,17 +510,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     deleteFlagsRef.current = { paused: false, cancelled: false };
     deleteStartTimeRef.current = Date.now();
 
-    // Interval pra atualizar ETA a cada 2s
+    // Snap ref — usado pelo setInterval para evitar stale closure
+    deleteSnapRef.current = { deleted: 0, total: 0, errors: 0, running: true };
+
+    // ETA a cada 2s — lê do ref, nunca fica stale
     deleteEtaTimerRef.current = setInterval(() => {
-      var p = deleteProgress;
-      if (p.total > 0 && p.deleted > 0 && deleteControl === 'running') {
+      var s = deleteSnapRef.current;
+      if (s.total > 0 && s.deleted > 0 && s.running) {
         var elapsed = (Date.now() - deleteStartTimeRef.current) / 1000;
-        var rate = p.deleted / elapsed;
-        var remaining = (p.total - p.deleted) / rate;
+        var rate = s.deleted / elapsed;
+        var remaining = (s.total - s.deleted) / rate;
         if (rate > 0 && remaining > 0 && remaining < 3600) {
           var mins = Math.floor(remaining / 60);
           var secs = Math.floor(remaining % 60);
-          setDeleteEta(`${mins}m ${secs}s`);
+          setDeleteEta(mins + 'm ' + secs + 's');
         } else if (rate > 0 && remaining >= 3600) {
           setDeleteEta('> 1h');
         } else {
@@ -529,58 +533,81 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     }, 2000);
 
     try {
-      const records = await pb.collection('amarcap53_pacientes').getFullList({ fields: 'id' });
-      const total = records.length;
+      // Obtém total rapidamente via getList(1,1) — sem carregar todos os IDs
+      var firstPage = await pb.collection('amarcap53_pacientes').getList(1, 1, { fields: 'id' });
+      var total = firstPage.totalItems;
 
       if (total === 0) {
+        deleteSnapRef.current.running = false;
         if (deleteEtaTimerRef.current) clearInterval(deleteEtaTimerRef.current);
         setDeleteSummary({ elapsedSec: 0, errors: 0, total: 0, cancelled: false });
         setDeleteStatus({ message: 'Nenhum registro para excluir. Base já vazia.', type: 'completed' });
         setDeleteControl('idle');
+        setIsDeleting(false);
         fetchStats();
         return;
       }
 
       setDeleteProgress({ deleted: 0, total, errors: 0 });
-      setDeleteStatus({ message: `Excluindo ${total} registros...`, type: 'deleting' });
+      deleteSnapRef.current.total = total;
+      setDeleteStatus({ message: 'Excluindo ' + total + ' registros...', type: 'deleting' });
 
-      var BATCH = 100;
+      var BATCH_SIZE = 100;
+      var PB_PAGE = 30000;
       var deleted = 0;
       var errorsCount = 0;
       var wasCancelled = false;
-      for (var i = 0; i < total; i += BATCH) {
+
+      // Busca IDs em páginas de 30K e deleta em batches de 100
+      for (var page = 1; deleted + errorsCount < total; page++) {
         if (deleteFlagsRef.current.cancelled) { wasCancelled = true; break; }
         while (deleteFlagsRef.current.paused && !deleteFlagsRef.current.cancelled) {
-          await new Promise(r => setTimeout(r, 200));
+          await new Promise(function(r) { setTimeout(r, 200); });
         }
         if (deleteFlagsRef.current.cancelled) { wasCancelled = true; break; }
 
-        var batch = records.slice(i, i + BATCH);
-        var results = await Promise.allSettled(
-          batch.map(r => pb.collection('amarcap53_pacientes').delete(r.id))
-        );
-        results.forEach(r => r.status === 'fulfilled' ? deleted++ : errorsCount++);
-        setDeleteProgress({ deleted, total, errors: errorsCount });
+        var pageRecords = await pb.collection('amarcap53_pacientes').getList(page, PB_PAGE, { fields: 'id' });
+        if (pageRecords.items.length === 0) break;
+
+        // Deleta esta página em batches de 100
+        for (var j = 0; j < pageRecords.items.length; j += BATCH_SIZE) {
+          if (deleteFlagsRef.current.cancelled) { wasCancelled = true; break; }
+          while (deleteFlagsRef.current.paused && !deleteFlagsRef.current.cancelled) {
+            await new Promise(function(r) { setTimeout(r, 200); });
+          }
+          if (deleteFlagsRef.current.cancelled) { wasCancelled = true; break; }
+
+          var batch = pageRecords.items.slice(j, j + BATCH_SIZE);
+          var results = await Promise.allSettled(
+            batch.map(function(r) { return pb.collection('amarcap53_pacientes').delete(r.id); })
+          );
+          results.forEach(function(r) { r.status === 'fulfilled' ? deleted++ : errorsCount++; });
+          deleteSnapRef.current.deleted = deleted;
+          deleteSnapRef.current.errors = errorsCount;
+          setDeleteProgress({ deleted: deleted, total: total, errors: errorsCount });
+        }
       }
 
+      deleteSnapRef.current.running = false;
       if (deleteEtaTimerRef.current) clearInterval(deleteEtaTimerRef.current);
       var elapsed = Math.round((Date.now() - deleteStartTimeRef.current) / 1000);
 
       if (wasCancelled) {
         setDeleteSummary({ elapsedSec: elapsed, errors: errorsCount, total: deleted, cancelled: true });
-        setDeleteStatus({ message: `${deleted} registros excluídos. Operação interrompida.`, type: 'completed' });
+        setDeleteStatus({ message: deleted + ' registros excluídos. Operação interrompida.', type: 'completed' });
       } else {
         setDeleteSummary({ elapsedSec: elapsed, errors: errorsCount, total: deleted, cancelled: false });
-        setDeleteStatus({ message: `${deleted} registros excluídos com sucesso!`, type: 'completed' });
+        setDeleteStatus({ message: deleted + ' registros excluídos com sucesso!', type: 'completed' });
       }
       setDeleteControl('idle');
       fetchStats();
     } catch (err: any) {
+      deleteSnapRef.current.running = false;
       if (deleteEtaTimerRef.current) clearInterval(deleteEtaTimerRef.current);
       var elapsedErr = Math.round((Date.now() - deleteStartTimeRef.current) / 1000);
       setDeleteSummary({ elapsedSec: elapsedErr, errors: 0, total: 0, cancelled: false });
       console.error('Erro ao excluir registros:', err);
-      setDeleteStatus({ message: `Erro: ${err.message || 'Falha na comunicação'}`, type: 'error' });
+      setDeleteStatus({ message: 'Erro: ' + (err.message || 'Falha na comunicação'), type: 'error' });
       setDeleteControl('idle');
     } finally {
       setIsDeleting(false);
