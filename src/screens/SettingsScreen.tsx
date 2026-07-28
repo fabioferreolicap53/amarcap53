@@ -533,45 +533,35 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     }, 2000);
 
     try {
-      // Busca TODOS os IDs de uma vez — leve pois retorna só {id}
-      setDeleteStatus({ message: 'Carregando IDs dos registros...', type: 'deleting' });
-      var allRecords = await pb.collection('amarcap53_pacientes').getFullList({ fields: 'id' });
-      var total = allRecords.length;
-
-      if (total === 0) {
-        deleteSnapRef.current.running = false;
-        if (deleteEtaTimerRef.current) clearInterval(deleteEtaTimerRef.current);
-        setDeleteSummary({ elapsedSec: 0, errors: 0, total: 0, cancelled: false });
-        setDeleteStatus({ message: 'Nenhum registro para excluir. Base já vazia.', type: 'completed' });
-        setDeleteControl('idle');
-        setIsDeleting(false);
-        fetchStats();
-        return;
-      }
-
-      setDeleteProgress({ deleted: 0, total, errors: 0 });
-      deleteSnapRef.current.total = total;
-      setDeleteStatus({ message: 'Excluindo ' + total + ' registros...', type: 'deleting' });
-
+      // Estratégia "sempre página 1": busca 100, deleta, repete até esvaziar
+      // Não precisa carregar todos os IDs — cada fetch é rápido e seguro
       var BATCH_SIZE = 100;
+      var total = 0;
       var deleted = 0;
       var errorsCount = 0;
       var wasCancelled = false;
 
-      // Deleta em batches de 100 — todos os IDs já carregados
-      for (var i = 0; i < allRecords.length; i += BATCH_SIZE) {
+      setDeleteStatus({ message: 'Iniciando exclusão...', type: 'deleting' });
+
+      // Loop principal — continua até a coleção ficar vazia
+      while (true) {
         if (deleteFlagsRef.current.cancelled) { wasCancelled = true; break; }
         while (deleteFlagsRef.current.paused && !deleteFlagsRef.current.cancelled) {
           await new Promise(function(r) { setTimeout(r, 200); });
         }
         if (deleteFlagsRef.current.cancelled) { wasCancelled = true; break; }
 
-        var batch = allRecords.slice(i, i + BATCH_SIZE);
+        // Sempre busca a página 1 — após deletar, os próximos sobem pra página 1
+        var page = await pb.collection('amarcap53_pacientes').getList(1, BATCH_SIZE, { fields: 'id' });
+        if (total === 0) total = page.totalItems;
+        if (page.items.length === 0) break;
+
         var results = await Promise.allSettled(
-          batch.map(function(r) { return pb.collection('amarcap53_pacientes').delete(r.id); })
+          page.items.map(function(r) { return pb.collection('amarcap53_pacientes').delete(r.id); })
         );
         results.forEach(function(r) { r.status === 'fulfilled' ? deleted++ : errorsCount++; });
         deleteSnapRef.current.deleted = deleted;
+        deleteSnapRef.current.total = total;
         deleteSnapRef.current.errors = errorsCount;
         setDeleteProgress({ deleted: deleted, total: total, errors: errorsCount });
       }
