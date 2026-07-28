@@ -38,6 +38,7 @@ interface Paciente {
   cito_lab?: string; // Data
   cito_pep?: string; // Data
   dna_hpv_gal?: string;  // Data
+  unidade_solicitante?: string;
   dna_hpv_pep?: string; // Data (Novo campo)
   alertas_rastreamento?: string;
   alertas?: string; 
@@ -1294,6 +1295,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           cito_lab: record.cito_lab || '--',
           cito_pep: record.cito_pep || '--',
           dna_hpv_gal: record.dna_hpv_gal || '--',
+          unidade_solicitante: record.unidade_solicitante || '--',
           dna_hpv_pep: record.dna_hpv_pep || '--',
         };
         p.alertas = determinarAlerta(p);
@@ -1310,7 +1312,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             <td>${p.grupo}</td>
             <td>${formatarData(p.cito_lab)}</td>
             <td>${formatarData(p.cito_pep)}</td>
-            <td>${formatarData(p.dna_hpv_gal)}</td>
+            <td>${formatarData(p.dna_hpv_gal)}${p.unidade_solicitante && p.unidade_solicitante !== '--' ? '<br/><span style="font-size:6pt;color:#666;">' + p.unidade_solicitante + '</span>' : ''}</td>
           </tr>`;
       }).join('');
 
@@ -1395,6 +1397,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         'Microárea': Number(record.microarea) || 0,
         'DNA-HPV PEP': formatarData(record.dna_hpv_pep),
         'DNA-HPV GAL': formatarData(record.dna_hpv_gal),
+        'Unidade Solicitante': record.unidade_solicitante || '--',
         'Cito Lab': formatarData(record.cito_lab),
         'Cito PEP': formatarData(record.cito_pep),
       }));
@@ -2018,6 +2021,9 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           <span className={`inline-block px-3.5 py-2 rounded-lg text-[11px] md:text-[12px] font-black uppercase tracking-tight shadow-sm ${paciente.dna_hpv_gal !== '--' ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'text-slate-300 italic'}`}>
                             {formatarData(paciente.dna_hpv_gal)}
                           </span>
+                          {paciente.unidade_solicitante && paciente.unidade_solicitante !== '--' && (
+                            <div className="text-[10px] text-slate-500 mt-1 leading-tight">{paciente.unidade_solicitante}</div>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -2329,6 +2335,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         {activePatientForDetails.dna_hpv_gal !== '--' && (
                           <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase">DNA-HPV (GAL): {formatarData(activePatientForDetails.dna_hpv_gal)}</span>
                         )}
+                        {activePatientForDetails.unidade_solicitante && activePatientForDetails.unidade_solicitante !== '--' && (<span className="block text-xs text-slate-500 mt-0.5">Solicitante: {activePatientForDetails.unidade_solicitante}</span>)}
                         {activePatientForDetails.cito_pep !== '--' && (
                           <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase">CITO (PEP): {formatarData(activePatientForDetails.cito_pep)}</span>
                         )}

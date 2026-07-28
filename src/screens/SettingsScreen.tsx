@@ -290,6 +290,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       cito_lab: ['CITO LAB', 'CITO LABORATORIO', 'CITO_LAB', 'CITOLAB'],
       cito_pep: ['CITO PEP', 'CITO_PEP', 'CITOPEP'],
       dna_hpv_gal: ['DNA-HPV', 'DNA_HPV_GAL', 'DNA HPV', 'DNA HPV GAL'],
+      unidade_solicitante: ['UNIDADE SOLICITANTE', 'UNIDADE_SOLICITANTE', 'SOLICITANTE', 'UNID SOLICITANTE'],
       alertas_rastreamento: ['ALERTAS RASTREAMENTO', 'ALERTAS', 'OBSERVACOES'],
     };
 

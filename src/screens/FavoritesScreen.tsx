@@ -39,6 +39,7 @@ interface Paciente {
   cito_lab?: string;
   cito_pep?: string;
   dna_hpv_gal?: string;
+  unidade_solicitante?: string;
   dna_hpv_pep?: string;
   alertas_rastreamento?: string;
   alertas?: string; 
@@ -502,7 +503,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       const finalServerFilter = serverFilterParts.length > 0 ? serverFilterParts.join(' && ') : '';
       const resultList = await pb.collection('amarcap53_pacientes').getFullList({
         filter: finalServerFilter,
-        fields: 'id,nome,cns,unidade,equipe,microarea,idade,grupo,cito_pep,cito_lab,dna_hpv_pep,dna_hpv_gal,alertas_rastreamento',
+        fields: 'id,nome,cns,unidade,equipe,microarea,idade,grupo,cito_pep,cito_lab,dna_hpv_pep,dna_hpv_gal,unidade_solicitante,alertas_rastreamento',
         sort: 'nome',
         batch: 500,
         requestKey: null,
@@ -543,6 +544,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
           cito_lab: record.cito_lab || '--',
           cito_pep: record.cito_pep || '--',
           dna_hpv_gal: record.dna_hpv_gal || '--',
+          unidade_solicitante: record.unidade_solicitante || '--',
           dna_hpv_pep: formatarData(record.dna_hpv_pep) || '--',
           alertas_rastreamento: record.alertas_rastreamento || '--',
           total_acompanhamentos: total || 0,
@@ -727,7 +729,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
         <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:12px;white-space:nowrap;">${p.idade || '--'} / ${p.grupo || '--'}</td>
         <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:12px;white-space:nowrap;">${p.cito_lab || '--'}</td>
         <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:12px;white-space:nowrap;">${p.cito_pep || '--'}</td>
-        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:12px;white-space:nowrap;">${p.dna_hpv_gal || '--'}</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:12px;white-space:nowrap;">${p.dna_hpv_gal || '--'}${p.unidade_solicitante && p.unidade_solicitante !== '--' ? '<br/><span style="font-size:6pt;color:#666;">' + p.unidade_solicitante + '</span>' : ''}</td>
       </tr>`;
     }).join('');
 
@@ -800,6 +802,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       'Microárea': p.microarea || '--',
       'DNA-HPV PEP': p.dna_hpv_pep || '--',
       'DNA-HPV GAL': p.dna_hpv_gal || '--',
+      'Unidade Solicitante': p.unidade_solicitante || '--',
       'Cito Lab': p.cito_lab || '--',
       'Cito PEP': p.cito_pep || '--',
     }));
@@ -1273,6 +1276,9 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                           <span className={`inline-block px-3.5 py-2 rounded-lg text-[11px] md:text-[12px] font-black uppercase tracking-tight shadow-sm ${paciente.dna_hpv_gal !== '--' ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'text-slate-300 italic'}`}>
                             {formatarData(paciente.dna_hpv_gal)}
                           </span>
+                          {paciente.unidade_solicitante && paciente.unidade_solicitante !== '--' && (
+                            <div className="text-[10px] text-slate-500 mt-1 leading-tight">{paciente.unidade_solicitante}</div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -1515,6 +1521,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                         {activePatientForDetails.dna_hpv_gal !== '--' && (
                           <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase">DNA-HPV (GAL): {formatarData(activePatientForDetails.dna_hpv_gal)}</span>
                         )}
+                        {activePatientForDetails.unidade_solicitante && activePatientForDetails.unidade_solicitante !== '--' && (<span className="block text-xs text-slate-500 mt-0.5">Solicitante: {activePatientForDetails.unidade_solicitante}</span>)}
                         {activePatientForDetails.cito_pep !== '--' && (
                           <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase">CITO (PEP): {formatarData(activePatientForDetails.cito_pep)}</span>
                         )}

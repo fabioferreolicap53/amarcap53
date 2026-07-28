@@ -45,6 +45,7 @@ function findField(csvHeader) {
     'cito_lab': ['CITO LAB', 'CITO LABORATORIO', 'CITO_LAB', 'CITOLAB'],
     'cito_pep': ['CITO PEP', 'CITO_PEP', 'CITOPEP'],
     'dna_hpv_gal': ['DNA-HPV', 'DNA_HPV_GAL', 'DNA HPV', 'DNA HPV GAL'],
+    'unidade_solicitante': ['UNIDADE SOLICITANTE', 'UNIDADE_SOLICITANTE', 'SOLICITANTE', 'UNID SOLICITANTE'],
     'alertas_rastreamento': ['ALERTAS RASTREAMENTO', 'ALERTAS', 'OBSERVACOES']
   };
   var key, aliases, i;
@@ -190,6 +191,7 @@ function handleLegacyBody(c, body, auth) {
           if (r.cito_lab) rec.set('cito_lab', r.cito_lab);
           if (r.cito_pep) rec.set('cito_pep', r.cito_pep);
           if (r.dna_hpv_gal) rec.set('dna_hpv_gal', r.dna_hpv_gal);
+          if (r.unidade_solicitante) rec.set('unidade_solicitante', String(r.unidade_solicitante).trim());
           if (r.alertas_rastreamento) rec.set('alertas_rastreamento', r.alertas_rastreamento);
           txDao.saveRecord(rec);
           newCount++;
