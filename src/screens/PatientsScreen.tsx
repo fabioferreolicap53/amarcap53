@@ -753,7 +753,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       const version = ++fetchVersionRef.current;
       try {
         setIsLoading(true);
-        const options: any = { sort: 'nome' };
+        const options: any = { sort: (sortField === 'idade' || sortField === 'alertas') ? 'nome' : (sortDir === 'desc' ? '-' + sortField : sortField) };
         
         const filterParts = [];
         if (!isAdmin && user) {
@@ -1048,7 +1048,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
     fetchPacientes();
     return () => { cancelled = true; };
-  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, debouncedSearchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal, filterBuscaAtiva, filterVersion, filtersReady]);
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, currentPage, isAdmin, debouncedSearchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal, filterBuscaAtiva, filterVersion, filtersReady, sortField, sortDir]);
+
+  // Reset página ao mudar ordenação
+  useEffect(() => { setCurrentPage(1); }, [sortField, sortDir]);
 
   // CSV Import handlers
   const convertDateToISO = (value: string): string => {
