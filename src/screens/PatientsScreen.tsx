@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck, Upload, Loader2, Printer, Download } from 'lucide-react';
+import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, MessageSquare, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck, Upload, Loader2, Printer, Download, Activity } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import Papa from 'papaparse';
@@ -1456,47 +1456,47 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
               </div>
 
               {/* Botões de Ação */}
-              <div className="relative z-10 flex items-center gap-3 md:gap-4 w-full md:w-auto justify-center md:justify-end">
+              <div className="relative z-10 flex items-center gap-2 md:gap-2.5 w-full md:w-auto justify-center md:justify-end">
                 <button
                   onClick={handlePrint}
-                  className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-2xl transition-all duration-500 border bg-white/10 text-white border-white/20 hover:bg-white/20"
+                  className="group/btn w-11 h-11 md:w-[2.75rem] md:h-[2.75rem] flex items-center justify-center rounded-2xl bg-white/[0.08] backdrop-blur-md border border-white/[0.15] text-white/70 hover:bg-white/[0.18] hover:border-white/30 hover:text-white hover:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.1)] hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all duration-300"
                   title="Imprimir Listagem"
                 >
-                  <Printer className="w-5 h-5 md:w-6 md:h-6" />
+                  <Printer className="w-4 h-4 md:w-[1.125rem] md:h-[1.125rem] transition-transform duration-300 group-hover/btn:scale-110" />
                 </button>
 
                 <button
                   onClick={handleDownloadCsv}
-                  className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-2xl transition-all duration-500 border bg-white/10 text-white border-white/20 hover:bg-white/20"
+                  className="group/btn w-11 h-11 md:w-[2.75rem] md:h-[2.75rem] flex items-center justify-center rounded-2xl bg-white/[0.08] backdrop-blur-md border border-white/[0.15] text-white/70 hover:bg-white/[0.18] hover:border-white/30 hover:text-white hover:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.1)] hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all duration-300"
                   title="Baixar CSV"
                 >
-                  <Download className="w-5 h-5 md:w-6 md:h-6" />
+                  <Download className="w-4 h-4 md:w-[1.125rem] md:h-[1.125rem] transition-transform duration-300 group-hover/btn:scale-110" />
                 </button>
 
                 <button
                   onClick={() => setIsSearchVisible(!isSearchVisible)}
-                  className={`w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-2xl transition-all duration-500 border ${
+                  className={`group/btn w-11 h-11 md:w-[2.75rem] md:h-[2.75rem] flex items-center justify-center rounded-2xl backdrop-blur-md border transition-all duration-300 ${
                     isSearchVisible
-                      ? 'bg-white text-primary border-white shadow-[0_0_20px_rgba(255,255,255,0.3)]'
-                      : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+                      ? 'bg-white text-[#001b3d] border-white shadow-[0_0_24px_rgba(255,255,255,0.25)] scale-105'
+                      : 'bg-white/[0.08] border-white/[0.15] text-white/70 hover:bg-white/[0.18] hover:border-white/30 hover:text-white hover:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.1)] hover:-translate-y-0.5 active:translate-y-0 active:scale-95'
                   }`}
                   title="Ativar Busca"
                 >
-                  <Search className={`w-5 h-5 md:w-6 md:h-6 transition-transform duration-500 ${isSearchVisible ? 'scale-110' : ''}`} />
+                  <Search className={`w-4 h-4 md:w-[1.125rem] md:h-[1.125rem] transition-all duration-300 ${isSearchVisible ? 'scale-110' : 'group-hover/btn:scale-110'}`} />
                 </button>
 
                 <button
                   onClick={() => setIsFilterVisible(!isFilterVisible)}
-                  className={`flex items-center gap-2 md:gap-3 px-4 md:px-8 h-12 md:h-14 rounded-2xl text-[10px] md:text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
+                  className={`group/btn flex items-center gap-2 md:gap-2.5 px-4 md:px-5 h-11 md:h-[2.75rem] rounded-2xl backdrop-blur-md border text-[10px] md:text-xs font-bold uppercase tracking-[0.1em] transition-all duration-300 ${
                     isFilterVisible || filterStatus.length > 0 || filterGrupo.length > 0 || filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0
-                      ? 'bg-primary text-white border-primary shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]'
-                      : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+                      ? 'bg-white text-[#001b3d] border-white shadow-[0_0_24px_rgba(255,255,255,0.25)] scale-105'
+                      : 'bg-white/[0.08] border-white/[0.15] text-white/70 hover:bg-white/[0.18] hover:border-white/30 hover:text-white hover:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.1)] hover:-translate-y-0.5 active:translate-y-0 active:scale-95'
                   }`}
                 >
-                  <Filter className="w-4 h-4 md:w-5 md:h-5" />
+                  <Filter className="w-4 h-4 md:w-[1.125rem] md:h-[1.125rem] transition-transform duration-300 group-hover/btn:rotate-12" />
                   <span className="hidden sm:inline">Filtros</span>
                   {(filterStatus.length > 0 || filterGrupo.length > 0 || filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0) && (
-                    <div className="w-5 h-5 md:w-6 md:h-6 flex items-center justify-center bg-white text-primary text-[9px] md:text-[10px] rounded-full font-black animate-pulse">
+                    <div className="w-5 h-5 flex items-center justify-center bg-white text-[#001b3d] text-[9px] rounded-full font-black shadow-sm">
                       {[filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal].filter(f => f.length > 0).length}
                     </div>
                   )}
@@ -2276,126 +2276,147 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       )}
       {/* Modal de Detalhes do Paciente */}
       {isDetailsModalOpen && activePatientForDetails && (
-        <div className="fixed inset-0 bg-primary/20 backdrop-blur-md z-[110] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
-          <div className="bg-surface-container-lowest w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-[0px_24px_48px_rgba(0,0,0,0.15)] flex flex-col border border-white/20 animate-in zoom-in-95 duration-300">
-            <div className="bg-gradient-to-r from-[#001b3d] to-[#002b5c] px-6 py-5 flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-                  <Users className="w-6 h-6 text-white" />
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xl z-[110] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-2xl max-h-[92vh] rounded-3xl shadow-[0_32px_64px_-12px_rgba(0,0,0,0.25)] flex flex-col border border-slate-200/60 animate-in zoom-in-95 duration-300 overflow-hidden">
+            {/* Header com avatar e gradiente */}
+            <div className="relative bg-gradient-to-br from-[#001b3d] via-[#002b5c] to-[#0a3a6e] px-6 sm:px-8 py-7 shrink-0 overflow-hidden">
+              {/* Decoração de fundo */}
+              <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/4" />
+              <div className="absolute top-4 right-20 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+              <div className="absolute bottom-6 right-12 w-1.5 h-1.5 bg-blue-300 rounded-full animate-pulse delay-300" />
+
+              <div className="relative flex items-center gap-4 sm:gap-5">
+                {/* Avatar com iniciais */}
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center shadow-[inset_0_2px_4px_rgba(255,255,255,0.15)] text-white text-xl sm:text-2xl font-black">
+                  {activePatientForDetails.nome.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
                 </div>
-                <div>
-                  <h3 className="text-white text-lg font-black tracking-tight leading-tight">Detalhes do Paciente</h3>
-                  <p className="text-white/60 text-[10px] uppercase tracking-widest mt-1">Informações Cadastrais</p>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-white text-lg sm:text-xl font-black tracking-tight leading-tight truncate">{activePatientForDetails.nome}</h3>
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/10 text-white/70 text-[10px] font-bold uppercase tracking-wide">
+                      <span className="w-1 h-1 rounded-full bg-emerald-400" />
+                      CNS: {activePatientForDetails.cns}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/10 text-white/70 text-[10px] font-bold uppercase tracking-wide">
+                      {activePatientForDetails.idade} anos
+                    </span>
+                  </div>
                 </div>
               </div>
-              <button onClick={handleCloseDetails} className="p-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-all">
-                <X className="w-6 h-6" />
+              <button onClick={handleCloseDetails} className="absolute top-4 right-4 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all duration-300 hover:rotate-90 backdrop-blur-sm">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 sm:p-8 overflow-y-auto no-scrollbar">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Nome Completo</p>
-                    <p className="text-sm font-bold text-primary">{activePatientForDetails.nome}</p>
+            <div className="p-6 sm:p-8 overflow-y-auto no-scrollbar flex-1">
+              {/* Grid de informações */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+                <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-2xl p-4 border border-slate-200/60">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1.5">Grupo</p>
+                  <p className="text-sm font-black text-slate-800">{activePatientForDetails.grupo}</p>
+                </div>
+                <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-2xl p-4 border border-slate-200/60">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1.5">Nascimento</p>
+                  <p className="text-sm font-black text-slate-800">{formatarData(activePatientForDetails.data_nascimento)}</p>
+                </div>
+                <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-2xl p-4 border border-slate-200/60 col-span-2 sm:col-span-1">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1.5">Unidade</p>
+                  <p className="text-sm font-black text-slate-800 leading-tight">{activePatientForDetails.unidade}</p>
+                </div>
+              </div>
+
+              {/* Equipe / Microárea */}
+              <div className="flex gap-3 mb-6">
+                <div className="flex-1 bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-2xl p-4 border border-blue-100/60">
+                  <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.15em] mb-1">Equipe</p>
+                  <p className="text-sm font-bold text-blue-800">{activePatientForDetails.equipe}</p>
+                </div>
+                <div className="flex-1 bg-gradient-to-br from-violet-50 to-purple-50/50 rounded-2xl p-4 border border-violet-100/60">
+                  <p className="text-[9px] font-black text-violet-400 uppercase tracking-[0.15em] mb-1">Microárea</p>
+                  <p className="text-sm font-black text-violet-800">{activePatientForDetails.microarea}</p>
+                </div>
+              </div>
+
+              {/* Status de Rastreamento */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+                    <Activity className="w-3 h-3 text-primary" />
                   </div>
-                  <div>
-                    <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Cartão Nacional de Saúde (CNS)</p>
-                    <code className="text-xs font-bold text-on-surface-variant bg-surface-container-high px-2 py-1 rounded inline-block">{activePatientForDetails.cns}</code>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Data de Nascimento / Idade</p>
-                    <p className="text-sm font-bold text-primary">{formatarData(activePatientForDetails.data_nascimento)} ({activePatientForDetails.idade} anos)</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Grupo</p>
-                    <p className="text-sm font-bold text-primary">{activePatientForDetails.grupo}</p>
-                  </div>
+                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em]">Status de Rastreamento</h4>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Unidade de Saúde</p>
-                    <p className="text-sm font-bold text-primary">{activePatientForDetails.unidade}</p>
+                <div className="space-y-3">
+                  {/* DNA-HPV PEP */}
+                  <div className="bg-white rounded-xl border border-slate-200/60 p-3 shadow-sm">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-2">DNA-HPV (PEP)</p>
+                    <DatePickerPTBR
+                      value={activePatientForDetails.dna_hpv_pep || ''}
+                      isISO={false}
+                      onChange={(displayDate) => handleUpdateCitoLaboratorio(activePatientForDetails.id, displayDate)}
+                    />
                   </div>
-                  <div className="flex gap-8">
-                    <div>
-                      <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Equipe</p>
-                      <p className="text-sm font-bold text-primary">{activePatientForDetails.equipe}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-1">Microárea</p>
-                      <p className="text-sm font-bold text-primary">{activePatientForDetails.microarea}</p>
-                    </div>
-                  </div>
-                  <div className="pt-4 border-t border-outline-variant/10">
-                    <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest mb-2">Status de Rastreamento</p>
-                    <div className="flex flex-col gap-3">
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-black text-primary/50 uppercase tracking-widest">DNA-HPV (PEP)</p>
-                        <DatePickerPTBR
-                          value={activePatientForDetails.dna_hpv_pep || ''}
-                          isISO={false}
-                          onChange={(displayDate) => handleUpdateCitoLaboratorio(activePatientForDetails.id, displayDate)}
-                        />
-                      </div>
 
-                      {/* Badge de Status Principal */}
-                      {activePatientForDetails.alertas && ALERT_CONFIGS[activePatientForDetails.alertas] ? (
-                        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 shadow-lg ${ALERT_CONFIGS[activePatientForDetails.alertas].bg}`}>
-                          <div className="p-2 bg-white/20 rounded-lg">
-                            {React.createElement(ALERT_CONFIGS[activePatientForDetails.alertas].icon, { className: "w-4 h-4 text-white" })}
-                          </div>
-                          <span className="text-[10px] font-black uppercase leading-tight text-white">
-                            {ALERT_CONFIGS[activePatientForDetails.alertas].label}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="px-4 py-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-400 text-[10px] font-black uppercase italic">
-                          Status não identificado
-                        </div>
-                      )}
-
-                      {/* Datas de Exames */}
-                      <div className="flex flex-wrap gap-2">
-                        {activePatientForDetails.dna_hpv_pep && activePatientForDetails.dna_hpv_pep !== '--' && (
-                          <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-black uppercase">DNA-HPV (PEP): {formatarData(activePatientForDetails.dna_hpv_pep)}</span>
-                        )}
-                        {activePatientForDetails.dna_hpv_gal !== '--' && (
-                          <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase">DNA-HPV (GAL): {formatarData(activePatientForDetails.dna_hpv_gal)}</span>
-                        )}
-                        {activePatientForDetails.unidade_solicitante && activePatientForDetails.unidade_solicitante !== '--' && (<span className="block text-xs text-slate-500 mt-0.5">Solicitante: {activePatientForDetails.unidade_solicitante}</span>)}
-                        {activePatientForDetails.cito_pep !== '--' && (
-                          <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase">CITO (PEP): {formatarData(activePatientForDetails.cito_pep)}</span>
-                        )}
-                        {activePatientForDetails.cito_lab !== '--' && (
-                          <span className="px-2 py-1 rounded-md bg-yellow-50 text-yellow-700 border border-yellow-100 text-[9px] font-black uppercase">CITO (LAB): {formatarData(activePatientForDetails.cito_lab)}</span>
-                        )}
+                  {/* Badge de Status */}
+                  {activePatientForDetails.alertas && ALERT_CONFIGS[activePatientForDetails.alertas] ? (
+                    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl ${ALERT_CONFIGS[activePatientForDetails.alertas].bg} shadow-sm`}>
+                      <div className="p-1.5 bg-white/20 rounded-lg">
+                        {React.createElement(ALERT_CONFIGS[activePatientForDetails.alertas].icon, { className: "w-4 h-4 text-white" })}
                       </div>
+                      <span className="text-[10px] font-black uppercase leading-tight text-white">
+                        {ALERT_CONFIGS[activePatientForDetails.alertas].label}
+                      </span>
                     </div>
+                  ) : (
+                    <div className="px-4 py-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-400 text-[10px] font-black uppercase italic">
+                      Status não identificado
+                    </div>
+                  )}
+
+                  {/* Datas de Exames */}
+                  <div className="flex flex-wrap gap-2">
+                    {activePatientForDetails.dna_hpv_pep && activePatientForDetails.dna_hpv_pep !== '--' && (
+                      <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-black uppercase">DNA-HPV (PEP): {formatarData(activePatientForDetails.dna_hpv_pep)}</span>
+                    )}
+                    {activePatientForDetails.dna_hpv_gal !== '--' && (
+                      <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase">DNA-HPV (GAL): {formatarData(activePatientForDetails.dna_hpv_gal)}</span>
+                    )}
+                    {activePatientForDetails.unidade_solicitante && activePatientForDetails.unidade_solicitante !== '--' && (
+                      <span className="px-2.5 py-1 rounded-lg bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-100 text-[9px] font-black uppercase">Solicitante: {activePatientForDetails.unidade_solicitante}</span>
+                    )}
+                    {activePatientForDetails.cito_pep !== '--' && (
+                      <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase">CITO (PEP): {formatarData(activePatientForDetails.cito_pep)}</span>
+                    )}
+                    {activePatientForDetails.cito_lab !== '--' && (
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-100 text-[9px] font-black uppercase">CITO (LAB): {formatarData(activePatientForDetails.cito_lab)}</span>
+                    )}
                   </div>
                 </div>
               </div>
 
+              {/* Alertas de Rastreamento */}
               {activePatientForDetails.alertas_rastreamento && activePatientForDetails.alertas_rastreamento !== '--' && (
-                <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                  <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-1">Observações de Alerta (Coluna N)</p>
-                  <p className="text-xs font-bold text-amber-900">{activePatientForDetails.alertas_rastreamento}</p>
+                <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 rounded-2xl">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                    <p className="text-[9px] font-black text-amber-600 uppercase tracking-[0.15em]">Observações de Alerta</p>
+                  </div>
+                  <p className="text-xs font-bold text-amber-800 leading-relaxed">{activePatientForDetails.alertas_rastreamento}</p>
                 </div>
               )}
 
-              {/* Timeline de Buscas Realizadas */}
-              <div className="mt-8">
+              {/* Timeline de Buscas */}
+              <div>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center">
-                      <ClipboardList className="w-3.5 h-3.5 text-slate-500" />
+                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200/50 flex items-center justify-center">
+                      <ClipboardList className="w-3 h-3 text-slate-500" />
                     </div>
-                    <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest">Buscas Realizadas</h4>
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em]">Buscas Realizadas</h4>
                   </div>
                   {!detailsAcompsLoading && (
-                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">
                       {detailsAcomps.length} {detailsAcomps.length === 1 ? 'registro' : 'registros'}
                     </span>
                   )}
@@ -2406,45 +2427,41 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     <Loader2 className="w-5 h-5 text-slate-300 animate-spin" />
                   </div>
                 ) : detailsAcomps.length === 0 ? (
-                  <div className="text-center py-8 rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
+                  <div className="text-center py-8 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50">
                     <SearchX className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                     <p className="text-[11px] font-bold text-slate-400">Nenhuma busca registrada</p>
                   </div>
                 ) : (
                   <div className="relative">
-                    {/* Linha vertical do timeline */}
-                    <div className="absolute left-[15px] top-2 bottom-2 w-px bg-slate-200" />
-
+                    <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gradient-to-b from-slate-300 via-slate-200 to-transparent" />
                     <div className="space-y-1">
                       {detailsAcomps.map((acomp, idx) => {
                         const dataFormatada = acomp.data_busca
                           ? (() => { const p = acomp.data_busca.substring(0,10).split('-'); const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']; return `${p[2]}/${meses[parseInt(p[1])-1]}/${p[0]}`; })()
                           : '--';
                         return (
-                          <div key={acomp.id} className="relative flex items-start gap-4 py-3 px-1 group">
-                            {/* Dot */}
+                          <div key={acomp.id} className="relative flex items-start gap-4 py-3 px-1 group hover:bg-slate-50/50 rounded-xl transition-colors">
                             <div className="relative z-10 mt-0.5">
-                              <div className={`w-[11px] h-[11px] rounded-full border-2 border-white shadow-sm ${idx === 0 ? 'bg-slate-700' : 'bg-slate-300 group-hover:bg-slate-400'} transition-colors`} />
+                              <div className={`w-[11px] h-[11px] rounded-full border-2 border-white shadow-sm ${idx === 0 ? 'bg-gradient-to-br from-slate-600 to-slate-800' : 'bg-slate-300 group-hover:bg-slate-400'} transition-colors`} />
                             </div>
-                            {/* Conteúdo */}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className={`text-[11px] font-black tabular-nums ${idx === 0 ? 'text-slate-800' : 'text-slate-600'}`}>
                                   {dataFormatada}
                                 </span>
                                 {acomp.tipo_busca && (
-                                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[9px] font-bold uppercase tracking-wide">
+                                  <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[9px] font-bold uppercase tracking-wide">
                                     {acomp.tipo_busca}
                                   </span>
                                 )}
                                 {acomp.situacao_pos_busca && (
-                                  <span className="px-1.5 py-0.5 rounded bg-slate-50 text-slate-400 text-[9px] font-bold uppercase tracking-wide border border-slate-100">
+                                  <span className="px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-400 text-[9px] font-bold uppercase tracking-wide border border-slate-100">
                                     {acomp.situacao_pos_busca}
                                   </span>
                                 )}
                               </div>
                               {acomp.observacoes && (
-                                <p className="text-[10px] text-slate-400 mt-1 line-clamp-2">{acomp.observacoes}</p>
+                                <p className="text-[10px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">{acomp.observacoes}</p>
                               )}
                             </div>
                           </div>
@@ -2456,8 +2473,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
               </div>
             </div>
 
-            <div className="p-6 border-t border-outline-variant/10 bg-surface-container-lowest flex justify-end shrink-0">
-              <button onClick={handleCloseDetails} className="px-8 py-2.5 rounded-xl text-sm font-black text-white bg-[#001b3d] shadow-lg hover:shadow-xl transition-all active:scale-95 w-full sm:w-auto">
+            <div className="px-6 sm:px-8 py-5 border-t border-slate-100 bg-gradient-to-b from-white to-slate-50 flex justify-end shrink-0">
+              <button onClick={handleCloseDetails} className="px-8 py-2.5 rounded-xl text-sm font-black text-white bg-gradient-to-r from-[#001b3d] to-[#002b5c] shadow-lg shadow-slate-300/50 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all w-full sm:w-auto">
                 Fechar
               </button>
             </div>

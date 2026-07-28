@@ -978,16 +978,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               <div className="relative z-10">
                 <button
                   onClick={() => setIsFilterVisible(!isFilterVisible)}
-                  className={`flex items-center gap-2 md:gap-3 px-4 md:px-8 h-12 md:h-14 rounded-2xl text-[10px] md:text-sm font-black uppercase tracking-widest transition-all duration-500 border ${
+                  className={`group/btn flex items-center gap-2 md:gap-2.5 px-4 md:px-5 h-11 md:h-[2.75rem] rounded-2xl backdrop-blur-md border text-[10px] md:text-xs font-bold uppercase tracking-[0.1em] transition-all duration-300 ${
                     isFilterVisible || filterUnidade.length > 0 || filterEquipe.length > 0 || filterMicroarea.length > 0 || filterDataInicio || filterDataFim
-                      ? 'bg-primary text-white border-primary shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]'
-                      : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+                      ? 'bg-white text-[#001b3d] border-white shadow-[0_0_24px_rgba(255,255,255,0.25)] scale-105'
+                      : 'bg-white/[0.08] border-white/[0.15] text-white/70 hover:bg-white/[0.18] hover:border-white/30 hover:text-white hover:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.1)] hover:-translate-y-0.5 active:translate-y-0 active:scale-95'
                   }`}
                 >
-                  <Filter className="w-4 h-4 md:w-5 md:h-5" />
+                  <Filter className="w-4 h-4 md:w-[1.125rem] md:h-[1.125rem] transition-transform duration-300 group-hover/btn:rotate-12" />
                   <span className="hidden sm:inline">Filtros</span>
                   {(filterUnidade.length > 0 || filterEquipe.length > 0 || filterMicroarea.length > 0 || filterDataInicio || filterDataFim) && (
-                    <div className="w-5 h-5 md:w-6 md:h-6 flex items-center justify-center bg-white text-primary text-[9px] md:text-[10px] rounded-full font-black animate-pulse">
+                    <div className="w-5 h-5 flex items-center justify-center bg-white text-[#001b3d] text-[9px] rounded-full font-black shadow-sm">
                       {[filterUnidade, filterEquipe, filterMicroarea].filter(f => f.length > 0).length + (filterDataInicio || filterDataFim ? 1 : 0)}
                     </div>
                   )}
