@@ -287,6 +287,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [selectedDate, setSelectedDate] = useState('');
   const [sortField, setSortField] = useState<string>('nome');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [sortLoading, setSortLoading] = useState(false);
 
   // Garantir que os detalhes sejam sempre do dado mais recente no estado
   const activePatientForDetails = patientForDetails
@@ -1037,8 +1038,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       } catch (error) {
         console.error("Erro ao buscar pacientes:", error);
       } finally {
-        // Sempre desliga overlay de filtro (não importa versão)
         setIsFilterLoading(false);
+        setSortLoading(false);
         if (!cancelled && fetchVersionRef.current === version) {
           setIsLoading(false);
           loadedOnceRef.current = true;
@@ -1821,18 +1822,18 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
               <table className="w-full text-center border-collapse">
                 <thead>
                   <tr className="bg-[#001b3d] border-b border-white/10 shadow-sm">
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[240px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'nome') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('nome'); setSortDir('asc'); } }}>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[240px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'nome') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('nome'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Users className="w-4 h-4 text-blue-400/60" />
                         <span>Paciente</span>
-                        {sortField === 'nome' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
+                        {sortField === 'nome' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'alertas') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('alertas'); setSortDir('asc'); } }}>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'alertas') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('alertas'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Info className="w-4 h-4 text-blue-400/60" />
                         <span>Status</span>
-                        {sortField === 'alertas' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
+                        {sortField === 'alertas' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
                     <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[110px] border-r border-white/5">
@@ -1841,7 +1842,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         <span>Ação</span>
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[140px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'dna_hpv_pep') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('dna_hpv_pep'); setSortDir('asc'); } }}>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[140px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'dna_hpv_pep') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('dna_hpv_pep'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <TestTube className="w-4 h-4 text-blue-400/60" />
                         <div className="flex items-center gap-1.5">
@@ -1849,26 +1850,26 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           <InfoTooltip content="Data de registro do resultado do teste molecular de DNA-HPV no PEP." />
                         </div>
                         <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data do registro do resultado</span>
-                        {sortField === 'dna_hpv_pep' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
+                        {sortField === 'dna_hpv_pep' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
                       {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
-                        <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[240px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'unidade') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('unidade'); setSortDir('asc'); } }}>
+                        <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[240px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'unidade') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('unidade'); setSortDir('asc'); } }}>
                           <div className="flex flex-col items-center gap-1">
                             <Building className="w-4 h-4 text-blue-400/60" />
                             <span>Unidade<br/>Equipe<br/>Microárea</span>
-                            {sortField === 'unidade' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
+                            {sortField === 'unidade' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                           </div>
                         </th>
                       )}
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[110px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'idade') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('idade'); setSortDir('asc'); } }}>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[110px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'idade') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('idade'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Calendar className="w-4 h-4 text-blue-400/60" />
                         <span>Idade/Grupo</span>
-                        {sortField === 'idade' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
+                        {sortField === 'idade' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'cito_lab') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('cito_lab'); setSortDir('asc'); } }}>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'cito_lab') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('cito_lab'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Microscope className="w-4 h-4 text-blue-400/60" />
                         <div className="flex items-center gap-1.5">
@@ -1876,7 +1877,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           <InfoTooltip content="Data de cadastro do resultado do exame citopatológico realizado no laboratório." />
                         </div>
                         <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data do cadastro</span>
-                        {sortField === 'cito_lab' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
+                        {sortField === 'cito_lab' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
                     <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] cursor-pointer select-none" onClick={() => { if (sortField === 'cito_pep') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('cito_pep'); setSortDir('asc'); } }}>
@@ -1887,10 +1888,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           <InfoTooltip content="Data de coleta do exame citopatológico registrada no PEP." />
                         </div>
                         <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data da coleta dos resultados registrados</span>
-                        {sortField === 'cito_pep' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
+                        {sortField === 'cito_pep' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] cursor-pointer select-none" onClick={() => { if (sortField === 'dna_hpv_gal') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('dna_hpv_gal'); setSortDir('asc'); } }}>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'dna_hpv_gal') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('dna_hpv_gal'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <TestTube className="w-4 h-4 text-blue-400/60" />
                         <div className="flex items-center gap-1.5">
@@ -1898,7 +1899,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           <InfoTooltip content="Data do resultado do teste molecular de DNA-HPV registrada no GAL." />
                         </div>
                         <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data da coleta</span>
-                        {sortField === 'dna_hpv_gal' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
+                        {sortField === 'dna_hpv_gal' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
                   </tr>
