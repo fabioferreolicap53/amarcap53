@@ -20,8 +20,7 @@ import { pb } from './lib/pocketbase';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState(() => {
-    localStorage.removeItem('activeTab');
-    return 'resumo';
+    return localStorage.getItem('activeTab') || 'resumo';
   });
   const { isOpen, closeSidebar, isMobile, setIsMobile } = useSidebar();
   const { user, isLoading } = useAuth();

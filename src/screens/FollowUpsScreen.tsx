@@ -3,12 +3,13 @@ import { Header } from '../components/Header';
 import { ScrollIndicator } from '../components/ScrollIndicator';
 import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2, RotateCcw, Users, MapPin, Plus } from 'lucide-react';
+import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2, RotateCcw, Users, MapPin, Plus, Printer } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { MultiSelect } from '../components/MultiSelect';
 import { SingleSelect } from '../components/SingleSelect';
+import Papa from 'papaparse';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 import {
   TIPO_BUSCA_OPTIONS,
@@ -631,6 +632,126 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     }
   };
 
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) { alert('Bloqueador de popup ativo. Permita popups para este site.'); return; }
+    printWindow.document.write('<html><head><title>AMAR</title><style>body{font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f1f5f9;}h2{color:#001b3d;}</style></head><body><h2>Carregando listagem...</h2></body></html>');
+    printWindow.document.close();
+
+    const sortedRecords = [...filteredRecords].sort((a, b) => {
+      let va = '', vb = '';
+      switch (sortField) {
+        case 'nome': va = a.expand?.paciente?.nome || ''; vb = b.expand?.paciente?.nome || ''; break;
+        case 'data_busca': va = a.data_busca || ''; vb = b.data_busca || ''; break;
+        case 'tipo_contato': va = a.tipo_contato || ''; vb = b.tipo_contato || ''; break;
+        case 'situacao_pos_busca': va = a.situacao_pos_busca || ''; vb = b.situacao_pos_busca || ''; break;
+        case 'observacoes': va = a.observacoes || ''; vb = b.observacoes || ''; break;
+        default: va = a.data_busca || ''; vb = b.data_busca || '';
+      }
+      const cmp = va.localeCompare(vb, 'pt-BR', { sensitivity: 'base' });
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
+    const rows = sortedRecords.map(acomp => {
+      const dataFormatada = acomp.data_busca ? (() => { const p = acomp.data_busca.substring(0,10).split('-'); return `${p[2]}/${p[1]}/${p[0]}`; })() : '--';
+      return `<tr>
+        <td>${acomp.expand?.paciente?.nome || '--'}</td>
+        <td>${acomp.expand?.paciente?.cns || '--'}</td>
+        <td>${dataFormatada}</td>
+        <td>${acomp.tipo_contato || '--'}</td>
+        <td>${acomp.entraves_identificados || '--'}</td>
+        <td>${acomp.situacao_pos_busca || '--'}</td>
+        <td>${acomp.tipo_busca || '--'}</td>
+        <td>${acomp.observacoes || '--'}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>AMAR - Listagem de Acompanhamentos</title>
+  <style>
+    @page { size: A4 landscape; margin: 8mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #1a1a2e; padding: 0; }
+    .header { text-align: center; margin-bottom: 12px; border-bottom: 2px solid #001b3d; padding-bottom: 8px; }
+    .header h1 { font-size: 16pt; color: #001b3d; margin-bottom: 4px; }
+    .header p { font-size: 9pt; color: #555; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    th { background-color: #001b3d; color: #fff; padding: 5px 4px; text-align: left; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.03em; }
+    td { padding: 4px 4px; border-bottom: 1px solid #e0e0e0; font-size: 7pt; vertical-align: top; }
+    tr:nth-child(even) { background-color: #f7f9fc; }
+    .footer { text-align: center; margin-top: 10px; font-size: 7pt; color: #999; border-top: 1px solid #e0e0e0; padding-top: 6px; }
+    @media print { body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>AMAR - Listagem de Acompanhamentos</h1>
+    <p>Gerado em: ${dataAtual} | Total: ${sortedRecords.length} registro(s)</p>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Paciente</th><th>CNS</th><th>Data da Ação</th><th>Contato</th><th>Entraves</th><th>Desfecho</th><th>Tipo</th><th>Observações</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">Documento gerado automaticamente pelo sistema AMAR CAP 53</div>
+</body>
+</html>`;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); }, 500);
+  };
+
+  const handleDownloadCsv = () => {
+    const sortedRecords = [...filteredRecords].sort((a, b) => {
+      let va = '', vb = '';
+      switch (sortField) {
+        case 'nome': va = a.expand?.paciente?.nome || ''; vb = b.expand?.paciente?.nome || ''; break;
+        case 'data_busca': va = a.data_busca || ''; vb = b.data_busca || ''; break;
+        case 'tipo_contato': va = a.tipo_contato || ''; vb = b.tipo_contato || ''; break;
+        case 'situacao_pos_busca': va = a.situacao_pos_busca || ''; vb = b.situacao_pos_busca || ''; break;
+        case 'observacoes': va = a.observacoes || ''; vb = b.observacoes || ''; break;
+        default: va = a.data_busca || ''; vb = b.data_busca || '';
+      }
+      const cmp = va.localeCompare(vb, 'pt-BR', { sensitivity: 'base' });
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    const data = sortedRecords.map(acomp => ({
+      'Paciente': acomp.expand?.paciente?.nome || '--',
+      'CNS': acomp.expand?.paciente?.cns || '--',
+      'Data da Ação': acomp.data_busca ? (() => { const p = acomp.data_busca.substring(0,10).split('-'); return `${p[2]}/${p[1]}/${p[0]}`; })() : '--',
+      'Tipo Contato': acomp.tipo_contato || '--',
+      'Entraves': acomp.entraves_identificados || '--',
+      'Situação': acomp.situacao_pos_busca || '--',
+      'Tipo Busca': acomp.tipo_busca || '--',
+      'Observações': acomp.observacoes || '--',
+      'Unidade': acomp.expand?.paciente?.unidade || '--',
+      'Equipe': acomp.expand?.paciente?.equipe || '--',
+      'Microárea': acomp.expand?.paciente?.microarea || '--',
+    }));
+
+    const csvContent = '\uFEFF' + Papa.unparse(data, { delimiter: ';' });
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const today = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `acompanhamentos_${today}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-surface">
       <Header 
@@ -716,6 +837,22 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                       {[filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal].filter(f => f.length > 0).length + (filterDataInicio || filterDataFim ? 1 : 0)}
                     </div>
                   )}
+                </button>
+
+                <button
+                  onClick={handlePrint}
+                  className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-2xl transition-all duration-500 border bg-white/10 text-white border-white/20 hover:bg-white/20"
+                  title="Imprimir Listagem"
+                >
+                  <Printer className="w-5 h-5 md:w-6 md:h-6" />
+                </button>
+
+                <button
+                  onClick={handleDownloadCsv}
+                  className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-2xl transition-all duration-500 border bg-white/10 text-white border-white/20 hover:bg-white/20"
+                  title="Download CSV"
+                >
+                  <Download className="w-5 h-5 md:w-6 md:h-6" />
                 </button>
 
                 <button
