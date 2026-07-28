@@ -1017,6 +1017,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             cito_pep: record.cito_pep || '--',
             dna_hpv_gal: record.dna_hpv_gal || '--',
             dna_hpv_pep: formatarData(record.dna_hpv_pep) || '--',
+            unidade_solicitante: record.unidade_solicitante || '--',
             alertas_rastreamento: record.alertas_rastreamento || '--',
             total_acompanhamentos: count,
             isFavorite: favorites.includes(record.id),
@@ -2022,7 +2023,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                             {formatarData(paciente.dna_hpv_gal)}
                           </span>
                           {paciente.unidade_solicitante && paciente.unidade_solicitante !== '--' && (
-                            <div className="text-[10px] text-slate-500 mt-1 leading-tight">{paciente.unidade_solicitante}</div>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter mt-1">{paciente.unidade_solicitante}</p>
                           )}
                         </td>
                       </tr>

@@ -1277,7 +1277,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                             {formatarData(paciente.dna_hpv_gal)}
                           </span>
                           {paciente.unidade_solicitante && paciente.unidade_solicitante !== '--' && (
-                            <div className="text-[10px] text-slate-500 mt-1 leading-tight">{paciente.unidade_solicitante}</div>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter mt-1">{paciente.unidade_solicitante}</p>
                           )}
                         </td>
                       </tr>
