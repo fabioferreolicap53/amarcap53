@@ -89,7 +89,9 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const [acompanhamentos, setAcompanhamentos] = useState<Acompanhamento[]>(_fuInit ?? []);
   const [isLoading, setIsLoading] = useState(!_fuInit);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
-  const [filterVersion, setFilterVersion] = useState(0); // força refetch ao aplicar filtros
+  const [filterVersion, setFilterVersion] = useState(0);
+  const [sortField, setSortField] = useState<string>('data_busca');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const loadedOnceRef = useRef(false);
 
   // Modal de edição state
@@ -958,34 +960,39 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
               <table className="w-full text-center border-collapse min-w-[900px] lg:min-w-full">
                 <thead>
                   <tr className="bg-[#001b3d] border-b border-white/10 shadow-sm">
-                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5">
+                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'nome') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('nome'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Users className="w-4 h-4 text-blue-400/60" />
                         <span>Paciente</span>
+                        {sortField === 'nome' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                       </div>
                     </th>
-                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5">
+                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'data_busca') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('data_busca'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Calendar className="w-4 h-4 text-blue-400/60" />
                         <span>Data da Ação</span>
+                        {sortField === 'data_busca' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                       </div>
                     </th>
-                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5">
+                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'tipo_contato') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('tipo_contato'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Phone className="w-4 h-4 text-blue-400/60" />
                         <span>Contato / Entrave</span>
+                        {sortField === 'tipo_contato' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                       </div>
                     </th>
-                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5">
+                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'situacao_pos_busca') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('situacao_pos_busca'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <BadgeCheck className="w-4 h-4 text-blue-400/60" />
                         <span>Desfecho / Tipo</span>
+                        {sortField === 'situacao_pos_busca' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                       </div>
                     </th>
-                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5">
+                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'observacoes') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('observacoes'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <MessageSquare className="w-4 h-4 text-blue-400/60" />
                         <span>Observações</span>
+                        {sortField === 'observacoes' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                       </div>
                     </th>
                     <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center">
@@ -1007,7 +1014,19 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                       </td>
                     </tr>
                   ) : (
-                    filteredRecords.map((acomp) => {
+                    [...filteredRecords].sort((a, b) => {
+                      let va = '', vb = '';
+                      switch (sortField) {
+                        case 'nome': va = a.expand?.paciente?.nome || ''; vb = b.expand?.paciente?.nome || ''; break;
+                        case 'data_busca': va = a.data_busca || ''; vb = b.data_busca || ''; break;
+                        case 'tipo_contato': va = a.tipo_contato || ''; vb = b.tipo_contato || ''; break;
+                        case 'situacao_pos_busca': va = a.situacao_pos_busca || ''; vb = b.situacao_pos_busca || ''; break;
+                        case 'observacoes': va = a.observacoes || ''; vb = b.observacoes || ''; break;
+                        default: va = a.data_busca || ''; vb = b.data_busca || '';
+                      }
+                      const cmp = va.localeCompare(vb, 'pt-BR', { sensitivity: 'base' });
+                      return sortDir === 'asc' ? cmp : -cmp;
+                    }).map((acomp) => {
                         const p = acomp.expand?.paciente as any || {};
                         const pacienteNome = p.nome || 'Paciente Desconhecido';
                         const cns = p.cns || '--';

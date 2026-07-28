@@ -249,6 +249,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
   const [pacientes, setPacientes] = useState<Paciente[]>(_favInit ?? []);
   const [isLoading, setIsLoading] = useState(!_favInit);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
+  const [sortField, setSortField] = useState<string>('nome');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   // Estados de Busca e Filtro
   const [searchTerm, setSearchTerm] = useState('');
@@ -1120,16 +1122,18 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                 <table className="w-full text-center border-collapse">
                   <thead>
                     <tr className="bg-[#001b3d] border-b border-white/10 shadow-sm">
-                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[240px] border-r border-white/5">
+                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[240px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'nome') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('nome'); setSortDir('asc'); } }}>
                         <div className="flex flex-col items-center gap-1">
                           <Users className="w-4 h-4 text-blue-400/60" />
                           <span>Paciente</span>
+                          {sortField === 'nome' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                         </div>
                       </th>
-                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
+                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'alertas') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('alertas'); setSortDir('asc'); } }}>
                         <div className="flex flex-col items-center gap-1">
                           <Info className="w-4 h-4 text-blue-400/60" />
                           <span>Status</span>
+                          {sortField === 'alertas' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                         </div>
                       </th>
                       <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[110px] border-r border-white/5">
@@ -1138,7 +1142,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                           <span>Ação</span>
                         </div>
                       </th>
-                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[120px] border-r border-white/5">
+                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[120px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'dna_hpv_pep') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('dna_hpv_pep'); setSortDir('asc'); } }}>
                         <div className="flex flex-col items-center gap-1">
                           <TestTube className="w-4 h-4 text-blue-400/60" />
                           <div className="flex items-center gap-1.5">
@@ -1146,23 +1150,26 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                             <InfoTooltip content="Data de registro do resultado do teste molecular de DNA-HPV no PEP." />
                           </div>
                           <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data do registro do resultado</span>
+                          {sortField === 'dna_hpv_pep' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                         </div>
                       </th>
                       {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
-                        <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[220px] border-r border-white/5">
+                        <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[220px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'unidade') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('unidade'); setSortDir('asc'); } }}>
                           <div className="flex flex-col items-center gap-1">
                             <Building className="w-4 h-4 text-blue-400/60" />
                             <span>Unidade<br/>Equipe<br/>Microárea</span>
+                            {sortField === 'unidade' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                           </div>
                         </th>
                       )}
-                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[110px] border-r border-white/5">
+                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[110px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'idade') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('idade'); setSortDir('asc'); } }}>
                         <div className="flex flex-col items-center gap-1">
                           <Calendar className="w-4 h-4 text-blue-400/60" />
                           <span>Idade/Grupo</span>
+                          {sortField === 'idade' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                         </div>
                       </th>
-                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5">
+                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'cito_lab') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('cito_lab'); setSortDir('asc'); } }}>
                         <div className="flex flex-col items-center gap-1">
                           <Microscope className="w-4 h-4 text-blue-400/60" />
                           <div className="flex items-center gap-1.5">
@@ -1170,32 +1177,50 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                             <InfoTooltip content="Data de cadastro do resultado do exame citopatológico realizado no laboratório." />
                           </div>
                           <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data do cadastro</span>
+                          {sortField === 'cito_lab' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                         </div>
                       </th>
-                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px]">
+                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] cursor-pointer select-none" onClick={() => { if (sortField === 'cito_pep') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('cito_pep'); setSortDir('asc'); } }}>
                         <div className="flex flex-col items-center gap-1">
                           <FileText className="w-4 h-4 text-blue-400/60" />
                           <div className="flex items-center gap-1.5">
                             <span>Cito (PEP)</span>
-                          <InfoTooltip content="Data de coleta do exame citopatológico registrada no PEP." />
+                            <InfoTooltip content="Data de coleta do exame citopatológico registrada no PEP." />
+                          </div>
+                          <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data da coleta dos resultados registrados</span>
+                          {sortField === 'cito_pep' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                         </div>
-                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data da coleta dos resultados registrados</span>
-                      </div>
-                    </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px]">
-                      <div className="flex flex-col items-center gap-1">
-                        <TestTube className="w-4 h-4 text-blue-400/60" />
-                        <div className="flex items-center gap-1.5">
-                          <span>DNA-HPV (GAL)</span>
-                          <InfoTooltip content="Data do resultado do teste molecular de DNA-HPV registrada no GAL." />
+                      </th>
+                      <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] cursor-pointer select-none" onClick={() => { if (sortField === 'dna_hpv_gal') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('dna_hpv_gal'); setSortDir('asc'); } }}>
+                        <div className="flex flex-col items-center gap-1">
+                          <TestTube className="w-4 h-4 text-blue-400/60" />
+                          <div className="flex items-center gap-1.5">
+                            <span>DNA-HPV (GAL)</span>
+                            <InfoTooltip content="Data do resultado do teste molecular de DNA-HPV registrada no GAL." />
+                          </div>
+                          <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data da coleta</span>
+                          {sortField === 'dna_hpv_gal' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                         </div>
-                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data da coleta</span>
-                      </div>
-                    </th>
+                      </th>
                   </tr>
                 </thead>
                   <tbody className="divide-y divide-outline-variant/10">
-                    {filteredPacientes.map((paciente) => (
+                    {[...filteredPacientes].sort((a, b) => {
+                      let va = '', vb = '';
+                      switch (sortField) {
+                        case 'nome': va = a.nome || ''; vb = b.nome || ''; break;
+                        case 'alertas': va = a.alertas || ''; vb = b.alertas || ''; break;
+                        case 'dna_hpv_pep': va = a.dna_hpv_pep || ''; vb = b.dna_hpv_pep || ''; break;
+                        case 'unidade': va = a.unidade || ''; vb = b.unidade || ''; break;
+                        case 'idade': return sortDir === 'asc' ? (a.idade || 0) - (b.idade || 0) : (b.idade || 0) - (a.idade || 0);
+                        case 'cito_lab': va = a.cito_lab || ''; vb = b.cito_lab || ''; break;
+                        case 'cito_pep': va = a.cito_pep || ''; vb = b.cito_pep || ''; break;
+                        case 'dna_hpv_gal': va = a.dna_hpv_gal || ''; vb = b.dna_hpv_gal || ''; break;
+                        default: va = a.nome || ''; vb = b.nome || '';
+                      }
+                      const cmp = va.localeCompare(vb, 'pt-BR', { sensitivity: 'base' });
+                      return sortDir === 'asc' ? cmp : -cmp;
+                    }).map((paciente) => (
                       <tr key={paciente.id} className="hover:bg-primary/[0.03] transition-all group">
                         <td className="px-4 py-6 text-center relative">
                           <button 
