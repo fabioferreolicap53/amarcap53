@@ -885,17 +885,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {[
-                        { n: 'Unidade', t: 'texto', c: 'text-blue-600 bg-blue-50 border-blue-100' },
-                        { n: 'Equipe', t: 'texto', c: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
-                        { n: 'Microárea', t: 'número', c: 'text-violet-600 bg-violet-50 border-violet-100' },
-                        { n: 'CNS', t: 'número', c: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
-                        { n: 'Nome', t: 'texto', c: 'text-sky-600 bg-sky-50 border-sky-100' },
-                        { n: 'Nasc.', t: 'data', c: 'text-amber-600 bg-amber-50 border-amber-100' },
-                        { n: 'Idade', t: 'número', c: 'text-rose-600 bg-rose-50 border-rose-100' },
-                        { n: 'Grupo', t: 'texto', c: 'text-teal-600 bg-teal-50 border-teal-100' },
-                        { n: 'Cito Lab', t: 'data', c: 'text-orange-600 bg-orange-50 border-orange-100' },
-                        { n: 'Cito PEP', t: 'data', c: 'text-cyan-600 bg-cyan-50 border-cyan-100' },
-                        { n: 'DNA-HPV', t: 'data', c: 'text-purple-600 bg-purple-50 border-purple-100' }
+                        { n: 'unidade', t: 'texto', c: 'text-blue-600 bg-blue-50 border-blue-100' },
+                        { n: 'equipe', t: 'texto', c: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
+                        { n: 'microarea', t: 'número', c: 'text-violet-600 bg-violet-50 border-violet-100' },
+                        { n: 'cns', t: 'número', c: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+                        { n: 'nome', t: 'texto', c: 'text-sky-600 bg-sky-50 border-sky-100' },
+                        { n: 'data_nascimento', t: 'data', c: 'text-amber-600 bg-amber-50 border-amber-100' },
+                        { n: 'idade', t: 'número', c: 'text-rose-600 bg-rose-50 border-rose-100' },
+                        { n: 'grupo', t: 'texto', c: 'text-teal-600 bg-teal-50 border-teal-100' },
+                        { n: 'cito_lab', t: 'data', c: 'text-orange-600 bg-orange-50 border-orange-100' },
+                        { n: 'cito_pep', t: 'data', c: 'text-cyan-600 bg-cyan-50 border-cyan-100' },
+                        { n: 'dna_hpv_gal', t: 'data', c: 'text-purple-600 bg-purple-50 border-purple-100' },
+                        { n: 'unidade_solicitante', t: 'texto', c: 'text-fuchsia-600 bg-fuchsia-50 border-fuchsia-100' }
                       ].map((col, idx) => (
                         <div key={idx} className="flex flex-col items-center">
                           <span className={`px-3 py-1.5 border rounded-xl text-[9px] font-black uppercase tracking-tighter shadow-sm ${col.c} transition-transform hover:scale-105`}>
