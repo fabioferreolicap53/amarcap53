@@ -533,9 +533,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     }, 2000);
 
     try {
-      // Obtém total rapidamente via getList(1,1) — sem carregar todos os IDs
-      var firstPage = await pb.collection('amarcap53_pacientes').getList(1, 1, { fields: 'id' });
-      var total = firstPage.totalItems;
+      // Busca TODOS os IDs de uma vez — leve pois retorna só {id}
+      setDeleteStatus({ message: 'Carregando IDs dos registros...', type: 'deleting' });
+      var allRecords = await pb.collection('amarcap53_pacientes').getFullList({ fields: 'id' });
+      var total = allRecords.length;
 
       if (total === 0) {
         deleteSnapRef.current.running = false;
@@ -553,39 +554,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       setDeleteStatus({ message: 'Excluindo ' + total + ' registros...', type: 'deleting' });
 
       var BATCH_SIZE = 100;
-      var PB_PAGE = 30000;
       var deleted = 0;
       var errorsCount = 0;
       var wasCancelled = false;
 
-      // Busca IDs em páginas de 30K e deleta em batches de 100
-      for (var page = 1; deleted + errorsCount < total; page++) {
+      // Deleta em batches de 100 — todos os IDs já carregados
+      for (var i = 0; i < allRecords.length; i += BATCH_SIZE) {
         if (deleteFlagsRef.current.cancelled) { wasCancelled = true; break; }
         while (deleteFlagsRef.current.paused && !deleteFlagsRef.current.cancelled) {
           await new Promise(function(r) { setTimeout(r, 200); });
         }
         if (deleteFlagsRef.current.cancelled) { wasCancelled = true; break; }
 
-        var pageRecords = await pb.collection('amarcap53_pacientes').getList(page, PB_PAGE, { fields: 'id' });
-        if (pageRecords.items.length === 0) break;
-
-        // Deleta esta página em batches de 100
-        for (var j = 0; j < pageRecords.items.length; j += BATCH_SIZE) {
-          if (deleteFlagsRef.current.cancelled) { wasCancelled = true; break; }
-          while (deleteFlagsRef.current.paused && !deleteFlagsRef.current.cancelled) {
-            await new Promise(function(r) { setTimeout(r, 200); });
-          }
-          if (deleteFlagsRef.current.cancelled) { wasCancelled = true; break; }
-
-          var batch = pageRecords.items.slice(j, j + BATCH_SIZE);
-          var results = await Promise.allSettled(
-            batch.map(function(r) { return pb.collection('amarcap53_pacientes').delete(r.id); })
-          );
-          results.forEach(function(r) { r.status === 'fulfilled' ? deleted++ : errorsCount++; });
-          deleteSnapRef.current.deleted = deleted;
-          deleteSnapRef.current.errors = errorsCount;
-          setDeleteProgress({ deleted: deleted, total: total, errors: errorsCount });
-        }
+        var batch = allRecords.slice(i, i + BATCH_SIZE);
+        var results = await Promise.allSettled(
+          batch.map(function(r) { return pb.collection('amarcap53_pacientes').delete(r.id); })
+        );
+        results.forEach(function(r) { r.status === 'fulfilled' ? deleted++ : errorsCount++; });
+        deleteSnapRef.current.deleted = deleted;
+        deleteSnapRef.current.errors = errorsCount;
+        setDeleteProgress({ deleted: deleted, total: total, errors: errorsCount });
       }
 
       deleteSnapRef.current.running = false;
