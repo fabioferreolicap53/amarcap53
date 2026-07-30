@@ -3,7 +3,7 @@ import { Header } from '../components/Header';
 import { ScrollIndicator } from '../components/ScrollIndicator';
 import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2, RotateCcw, Users, MapPin, Plus, Printer } from 'lucide-react';
+import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2, RotateCcw, Users, MapPin, Plus, Printer, Clock } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
@@ -1263,138 +1263,125 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
       {/* Modal de Edição */}
       {isEditModalOpen && selectedAcompanhamento && (
-        <div className="fixed inset-0 bg-primary/20 backdrop-blur-md z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
-          <div data-dropdown-root="true" className="relative bg-surface-container-lowest w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl shadow-[0px_24px_48px_rgba(0,0,0,0.15)] overflow-visible border border-white/20 animate-in zoom-in-95 duration-300">
-            <div className="bg-gradient-to-r from-[#1c2e4a] to-[#253c61] px-10 py-6 flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                  <ClipboardList className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-white text-xl font-black tracking-tight leading-tight">Editar Acompanhamento</h3>
-                  <p className="text-white/60 text-xs font-medium uppercase tracking-widest mt-1">
-                    Paciente: {selectedAcompanhamento.expand?.paciente?.nome || 'Desconhecido'}
-                  </p>
-                </div>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xl z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+          <div data-dropdown-root="true" className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl shadow-slate-900/10 animate-in zoom-in-95 duration-300">
+            {/* Header */}
+            <div className="relative flex items-center gap-4 bg-gradient-to-r from-slate-900 via-slate-800 to-cyan-900 px-5 py-5 sm:px-6 shrink-0">
+              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 text-xl font-black text-white shadow-lg shadow-cyan-500/30 ring-2 ring-white/20">
+                {(selectedAcompanhamento.expand?.paciente?.nome || '??').split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
               </div>
-              <button onClick={handleCloseModal} className="p-2 -mr-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-all duration-300 hover:rotate-90">
-                <X className="w-6 h-6" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-xs font-semibold text-cyan-200/70 mb-0.5">
+                  <Edit className="h-3.5 w-3.5" />
+                  EDITAR ACOMPANHAMENTO
+                </div>
+                <h2 className="truncate text-lg font-black text-white leading-tight">{selectedAcompanhamento.expand?.paciente?.nome || 'Desconhecido'}</h2>
+              </div>
+              <button onClick={handleCloseModal} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/50 ring-1 ring-white/10 transition-all hover:bg-white/15 hover:text-white">
+                <X className="h-4 w-4" />
               </button>
             </div>
-            
-            <div className="overflow-y-auto custom-scrollbar-modal flex-1 p-5 sm:p-8 md:p-10">
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4">
               <form id="edit-acompanhamento-form" onSubmit={handleSaveEdit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5 sm:gap-y-6">
-                  <div className="space-y-2 group/field">
-                    <DatePickerPTBR 
-                      label="Data da Busca"
-                      value={selectedAcompanhamento.data_busca_formatada} 
-                      isISO={false}
-                      onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, data_busca_formatada: val})} 
-                    />
+                <div className="space-y-3">
+                  {/* Seção 1 — Busca Ativa */}
+                  <div className="rounded-xl border-l-4 border-cyan-500 bg-gradient-to-r from-cyan-50/80 to-white p-3.5">
+                    <div className="mb-2.5 flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-cyan-500/10">
+                        <Search className="h-3.5 w-3.5 text-cyan-600" />
+                      </div>
+                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-cyan-700">Busca Ativa</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2.5">
+                      <div>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                          <Calendar className="h-3 w-3" />
+                          Data da Busca <span className="text-red-500">*</span>
+                        </label>
+                        <DatePickerPTBR value={selectedAcompanhamento.data_busca_formatada} isISO={false} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, data_busca_formatada: val})} />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                          <Search className="h-3 w-3" />
+                          Tipo de Busca <span className="text-red-500">*</span>
+                        </label>
+                        <SingleSelect placeholder="Selecione o tipo" options={TIPO_BUSCA_OPTIONS} value={selectedAcompanhamento.tipo_busca || ''} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, tipo_busca: val})} required showSearch={false} />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                          <Phone className="h-3 w-3" />
+                          Tipo de Contato <span className="text-red-500">*</span>
+                        </label>
+                        <SingleSelect placeholder="Selecione" options={TIPO_CONTATO_OPTIONS} value={selectedAcompanhamento.tipo_contato || ''} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, tipo_contato: val})} required showSearch={false} />
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Tipo de Busca */}
-                  <SingleSelect 
-                    label="Tipo de Busca"
-                    placeholder="Selecione"
-                    options={TIPO_BUSCA_OPTIONS}
-                    value={selectedAcompanhamento.tipo_busca || ''}
-                    onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, tipo_busca: val})}
-                    required
-                    icon={<Search className="w-3.5 h-3.5" />}
-                    showSearch={false}
-                  />
-
-                  {/* Tipo de Contato */}
-                  <SingleSelect 
-                    label="Tipo de Contato"
-                    placeholder="Selecione uma modalidade"
-                    options={TIPO_CONTATO_OPTIONS}
-                    value={selectedAcompanhamento.tipo_contato || ''}
-                    onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, tipo_contato: val})}
-                    required
-                    icon={<Phone className="w-3.5 h-3.5" />}
-                    showSearch={false}
-                  />
-
-                  {/* Entraves Informado Por */}
-                  <SingleSelect 
-                    label="Entrave(s) Informado Por"
-                    placeholder="Selecione"
-                    options={ENTRAVES_INFORMADO_POR_OPTIONS}
-                    value={selectedAcompanhamento.entraves_informado_por || ''}
-                    onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_informado_por: val})}
-                    icon={<Info className="w-3.5 h-3.5" />}
-                    showSearch={false}
-                  />
-
-                  {/* Situação Pós Busca */}
-                  <SingleSelect 
-                    label="Situação Pós Busca Ativa"
-                    placeholder="Selecione o desfecho da busca"
-                    className="col-span-1 md:col-span-2"
-                    options={SITUACAO_POS_BUSCA_OPTIONS}
-                    value={selectedAcompanhamento.situacao_pos_busca || ''}
-                    onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, situacao_pos_busca: val})}
-                    required
-                    icon={<Info className="w-3.5 h-3.5" />}
-                    showSearch={false}
-                  />
-
-                  {/* Entraves Identificados */}
-                  <MultiSelect 
-                    label="Entraves Identificados"
-                    placeholder="Selecione"
-                    className="col-span-1 md:col-span-2"
-                    options={ENTRAVES_IDENTIFICADOS_OPTIONS}
-                    value={selectedAcompanhamento.entraves_identificados || []}
-                    onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_identificados: val})}
-                    showSearch={false}
-                  />
-
-                  {/* Observações */}
-                  <div className="col-span-1 md:col-span-2 space-y-2 group/field">
-                    <label className="flex items-center gap-2 text-[0.65rem] font-bold text-primary/70 uppercase tracking-[0.15em] transition-colors group-focus-within/field:text-primary">
-                      <div className="p-1 rounded bg-primary/5 group-focus-within/field:bg-primary/10 transition-colors">
-                        <MessageSquare className="w-3.5 h-3.5" />
+                  {/* Seção 2 — Entraves */}
+                  <div className="rounded-xl border-l-4 border-amber-500 bg-gradient-to-r from-amber-50/80 to-white p-3.5">
+                    <div className="mb-2.5 flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-500/10">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
                       </div>
-                      Observações Detalhadas
-                    </label>
-                    <textarea 
-                      name="observacoes" 
-                      value={selectedAcompanhamento.observacoes || ''} 
-                      onChange={(e) => setSelectedAcompanhamento({...selectedAcompanhamento, observacoes: e.target.value})}
-                      className="w-full bg-white border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary p-4 resize-none transition-all outline-none placeholder:text-outline-variant/60 shadow-sm hover:border-primary/40 min-h-[120px]" 
-                      rows={4}
-                      placeholder="Informações adicionais relevantes..."
+                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-amber-700">Entraves</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2.5">
+                      <div>
+                        <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-slate-500">Entrave(s) Identificado(s)</label>
+                        <MultiSelect placeholder="Selecione" options={ENTRAVES_IDENTIFICADOS_OPTIONS} value={selectedAcompanhamento.entraves_identificados || []} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_identificados: val})} showSearch={false} />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">Entrave(s) Informado Por</label>
+                        <SingleSelect placeholder="Selecione" options={ENTRAVES_INFORMADO_POR_OPTIONS} value={selectedAcompanhamento.entraves_informado_por || ''} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_informado_por: val})} showSearch={false} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Seção 3 — Desfecho */}
+                  <div className="rounded-xl border-l-4 border-emerald-500 bg-gradient-to-r from-emerald-50/80 to-white p-3.5">
+                    <div className="mb-2.5 flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500/10">
+                        <Clock className="h-3.5 w-3.5 text-emerald-600" />
+                      </div>
+                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-700">Desfecho</p>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                        Situação Pós Busca Ativa <span className="text-red-500">*</span>
+                      </label>
+                      <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={selectedAcompanhamento.situacao_pos_busca || ''} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, situacao_pos_busca: val})} required showSearch={false} />
+                    </div>
+                  </div>
+
+                  {/* Seção 4 — Observações */}
+                  <div className="rounded-xl border-l-4 border-blue-500 bg-gradient-to-r from-blue-50/80 to-white p-3.5">
+                    <div className="mb-2.5 flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-500/10">
+                        <MessageSquare className="h-3.5 w-3.5 text-blue-600" />
+                      </div>
+                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-blue-700">Observações</p>
+                    </div>
+                    <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">Observações do Acompanhamento</label>
+                    <textarea name="observacoes" value={selectedAcompanhamento.observacoes || ''} onChange={(e) => setSelectedAcompanhamento({...selectedAcompanhamento, observacoes: e.target.value})}
+                      className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none transition-all duration-200 placeholder:text-slate-400 focus:bg-white focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/15"
+                      rows={3} placeholder="Descreva aqui detalhes relevantes do atendimento..."
                     ></textarea>
                   </div>
                 </div>
               </form>
             </div>
-              
-            <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 p-5 sm:p-6 md:px-10 md:py-6 border-t border-outline-variant/10 bg-surface-container-lowest shrink-0 z-10">
-              <button 
-                type="button" 
-                onClick={handleCloseModal}
-                disabled={isSaving}
-                className="px-6 sm:px-8 py-3 rounded-xl text-sm font-bold text-primary hover:bg-primary/5 transition-all border border-transparent hover:border-primary/10 w-full sm:w-auto order-2 sm:order-1 disabled:opacity-50"
-              >
-                Descartar
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-slate-100 shrink-0">
+              <button type="button" onClick={handleCloseModal} disabled={isSaving} className="text-xs font-bold text-slate-400 transition-colors hover:text-slate-600 px-5 py-2.5 disabled:opacity-50">
+                Cancelar
               </button>
-              <button 
-                form="edit-acompanhamento-form"
-                type="submit" 
-                disabled={isSaving}
-                className="px-6 sm:px-10 py-3 rounded-xl text-sm font-black text-white bg-gradient-to-r from-[#1c2e4a] to-[#253c61] shadow-[0_10px_20px_rgba(28,46,74,0.3)] hover:shadow-[0_15px_30px_rgba(28,46,74,0.4)] hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 group w-full sm:w-auto order-1 sm:order-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSaving ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                ) : (
-                  <CheckCircle2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                )}
-                {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+              <button form="edit-acompanhamento-form" type="submit" disabled={isSaving}
+                className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-2.5 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-emerald-500/20 transition-all hover:from-emerald-400 hover:to-emerald-500 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
+                {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                {isSaving ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </div>

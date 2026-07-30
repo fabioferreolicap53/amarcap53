@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck, Upload, Loader2, Printer, Download, Activity } from 'lucide-react';
+import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck, Upload, Loader2, Printer, Download, Activity, Clock, MessageSquare } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import Papa from 'papaparse';
@@ -2130,105 +2130,124 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       {/* Modal Registro de Acompanhamento */}
       {isModalOpen && selectedPaciente && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xl z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
-          <div data-dropdown-root="true" className="relative bg-white w-full max-w-3xl max-h-[92vh] flex flex-col rounded-3xl shadow-[0_32px_64px_-12px_rgba(0,0,0,0.25)] overflow-visible border border-slate-200/60 animate-in zoom-in-95 duration-300">
-            {/* Header com gradiente e decoração */}
-            <div className="relative bg-gradient-to-br from-[#1c2e4a] via-[#253c61] to-[#1a365d] px-5 sm:px-8 md:px-10 py-5 sm:py-6 shrink-0 overflow-hidden">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
-              <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/4" />
-              <div className="absolute top-6 right-24 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-
-              <div className="relative flex justify-between items-center">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-[inset_0_2px_4px_rgba(255,255,255,0.15)] border border-white/10">
-                    <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-white text-base sm:text-lg md:text-xl font-black tracking-tight leading-tight">Registro de Acompanhamento</h3>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
-                      <p className="text-white/60 text-[10px] sm:text-xs font-medium uppercase tracking-widest truncate max-w-[200px] sm:max-w-[300px]">
-                        {selectedPaciente.nome}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <button onClick={handleCloseModal} className="p-2 -mr-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all duration-300 hover:rotate-90 backdrop-blur-sm">
-                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
-                </button>
+          <div data-dropdown-root="true" className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl shadow-slate-900/10 animate-in zoom-in-95 duration-300">
+            {/* Header */}
+            <div className="relative flex items-center gap-4 bg-gradient-to-r from-slate-900 via-slate-800 to-cyan-900 px-5 py-5 sm:px-6 shrink-0">
+              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 text-xl font-black text-white shadow-lg shadow-cyan-500/30 ring-2 ring-white/20">
+                {selectedPaciente.nome.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
               </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-xs font-semibold text-cyan-200/70 mb-0.5">
+                  <ClipboardList className="h-3.5 w-3.5" />
+                  NOVO ACOMPANHAMENTO
+                </div>
+                <h2 className="truncate text-lg font-black text-white leading-tight">{selectedPaciente.nome}</h2>
+              </div>
+              <button onClick={handleCloseModal} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/50 ring-1 ring-white/10 transition-all hover:bg-white/15 hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
             {/* Body */}
-            <div className="overflow-y-auto custom-scrollbar-modal flex-1 p-5 sm:p-8 md:p-10">
+            <div className="flex-1 overflow-y-auto px-5 py-4">
               <form id="registro-acompanhamento-form" onSubmit={handleSaveFollowUp}>
-                {/* Chip do paciente */}
-                <div className="flex items-center gap-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/60 rounded-2xl px-4 py-3 mb-5">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center text-white text-sm font-black shadow-sm">
-                    {selectedPaciente.nome.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+                <div className="space-y-3">
+                  {/* Seção 1 — Busca Ativa */}
+                  <div className="rounded-xl border-l-4 border-cyan-500 bg-gradient-to-r from-cyan-50/80 to-white p-3.5">
+                    <div className="mb-2.5 flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-cyan-500/10">
+                        <Search className="h-3.5 w-3.5 text-cyan-600" />
+                      </div>
+                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-cyan-700">Busca Ativa</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2.5">
+                      <div>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                          <Calendar className="h-3 w-3" />
+                          Data da Busca <span className="text-red-500">*</span>
+                        </label>
+                        <DatePickerPTBR value={selectedDate} isISO={false} onChange={(val) => setSelectedDate(val)} />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                          <Search className="h-3 w-3" />
+                          Tipo de Busca <span className="text-red-500">*</span>
+                        </label>
+                        <SingleSelect placeholder="Selecione o tipo" options={TIPO_BUSCA_OPTIONS} value={modalTipoBusca} onChange={setModalTipoBusca} required showSearch={false} />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                          <Phone className="h-3 w-3" />
+                          Tipo de Contato <span className="text-red-500">*</span>
+                        </label>
+                        <SingleSelect placeholder="Selecione" options={TIPO_CONTATO_OPTIONS} value={modalTipoContato} onChange={setModalTipoContato} required showSearch={false} />
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-black text-emerald-800 uppercase truncate">{selectedPaciente.nome}</p>
-                    <p className="text-[10px] font-bold text-emerald-500">CNS: {selectedPaciente.cns}</p>
+
+                  {/* Seção 2 — Entraves */}
+                  <div className="rounded-xl border-l-4 border-amber-500 bg-gradient-to-r from-amber-50/80 to-white p-3.5">
+                    <div className="mb-2.5 flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-500/10">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                      </div>
+                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-amber-700">Entraves</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2.5">
+                      <div>
+                        <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-slate-500">Entrave(s) Identificado(s)</label>
+                        <MultiSelect placeholder="Selecione" options={ENTRAVES_IDENTIFICADOS_OPTIONS} value={modalEntraves} onChange={setModalEntraves} showSearch={false} />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">Entrave(s) Informado Por</label>
+                        <SingleSelect placeholder="Selecione" options={ENTRAVES_INFORMADO_POR_OPTIONS} value={modalEntravesInformadoPor} onChange={setModalEntravesInformadoPor} showSearch={false} />
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                {/* Bloco 1 — Quando & Como */}
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#1c2e4a] text-white text-[9px] font-black shrink-0">01</div>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Quando &amp; Como</span>
-                  <div className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent" />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <DatePickerPTBR label="Data da Busca" value={selectedDate} isISO={false} onChange={(val) => setSelectedDate(val)} />
-                  <SingleSelect label="Tipo de Busca" placeholder="Selecione" options={TIPO_BUSCA_OPTIONS} value={modalTipoBusca} onChange={setModalTipoBusca} required icon={<Search className="w-3.5 h-3.5" />} showSearch={false} />
-                  <SingleSelect label="Tipo de Contato" placeholder="Selecione" options={TIPO_CONTATO_OPTIONS} value={modalTipoContato} onChange={setModalTipoContato} required icon={<Phone className="w-3.5 h-3.5" />} showSearch={false} />
-                </div>
+                  {/* Seção 3 — Desfecho */}
+                  <div className="rounded-xl border-l-4 border-emerald-500 bg-gradient-to-r from-emerald-50/80 to-white p-3.5">
+                    <div className="mb-2.5 flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500/10">
+                        <Clock className="h-3.5 w-3.5 text-emerald-600" />
+                      </div>
+                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-700">Desfecho</p>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                        Situação Pós Busca Ativa <span className="text-red-500">*</span>
+                      </label>
+                      <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={modalSituacao} onChange={setModalSituacao} required showSearch={false} />
+                    </div>
+                  </div>
 
-                {/* Bloco 2 — Desfecho */}
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#1c2e4a] text-white text-[9px] font-black shrink-0">02</div>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Desfecho</span>
-                  <div className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent" />
-                </div>
-                <div className="mb-6">
-                  <SingleSelect label="Situação Pós Busca Ativa" placeholder="Selecione o desfecho da busca" options={SITUACAO_POS_BUSCA_OPTIONS} value={modalSituacao} onChange={setModalSituacao} required icon={<Info className="w-3.5 h-3.5" />} showSearch={false} />
-                </div>
-
-                {/* Bloco 3 — Entraves */}
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#1c2e4a] text-white text-[9px] font-black shrink-0">03</div>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Entraves</span>
-                  <div className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent" />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  <SingleSelect label="Entrave(s) Informado Por" placeholder="Selecione" options={ENTRAVES_INFORMADO_POR_OPTIONS} value={modalEntravesInformadoPor} onChange={setModalEntravesInformadoPor} icon={<Info className="w-3.5 h-3.5" />} showSearch={false} />
-                  <MultiSelect label="Entraves Identificados" placeholder="Selecione" options={ENTRAVES_IDENTIFICADOS_OPTIONS} value={modalEntraves} onChange={setModalEntraves} showSearch={false} />
-                </div>
-
-                {/* Bloco 4 — Observações */}
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#1c2e4a] text-white text-[9px] font-black shrink-0">04</div>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Observações</span>
-                  <div className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent" />
-                </div>
-                <div className="space-y-2">
-                  <textarea name="observacoes" value={modalObservacoes} onChange={(e) => setModalObservacoes(e.target.value)}
-                    className="w-full h-[88px] px-4 py-3 bg-white border border-slate-200/60 rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none transition-all outline-none placeholder:text-slate-300 shadow-sm hover:border-slate-300"
-                    rows={3} placeholder="Informações adicionais relevantes..."
-                  ></textarea>
+                  {/* Seção 4 — Observações */}
+                  <div className="rounded-xl border-l-4 border-blue-500 bg-gradient-to-r from-blue-50/80 to-white p-3.5">
+                    <div className="mb-2.5 flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-500/10">
+                        <MessageSquare className="h-3.5 w-3.5 text-blue-600" />
+                      </div>
+                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-blue-700">Observações</p>
+                    </div>
+                    <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">Observações do Acompanhamento</label>
+                    <textarea name="observacoes" value={modalObservacoes} onChange={(e) => setModalObservacoes(e.target.value)}
+                      className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none transition-all duration-200 placeholder:text-slate-400 focus:bg-white focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/15"
+                      rows={3} placeholder="Descreva aqui detalhes relevantes do atendimento..."
+                    ></textarea>
+                  </div>
                 </div>
               </form>
             </div>
 
             {/* Footer */}
-            <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 px-5 sm:px-8 py-5 border-t border-slate-100 bg-gradient-to-b from-white to-slate-50 shrink-0 z-10">
-              <button type="button" onClick={handleCloseModal} disabled={isSaving} className="px-6 sm:px-8 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 transition-all border border-transparent hover:border-slate-200 w-full sm:w-auto order-2 sm:order-1 disabled:opacity-50">
-                Descartar
+            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-slate-100 shrink-0">
+              <button type="button" onClick={handleCloseModal} disabled={isSaving} className="text-xs font-bold text-slate-400 transition-colors hover:text-slate-600 px-5 py-2.5 disabled:opacity-50">
+                Cancelar
               </button>
               <button form="registro-acompanhamento-form" type="submit" disabled={isSaving}
-                className="px-8 sm:px-10 py-3 rounded-xl text-sm font-black uppercase tracking-widest text-white bg-gradient-to-r from-[#1c2e4a] to-[#253c61] shadow-lg shadow-slate-300/50 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 flex items-center gap-2 w-full sm:w-auto justify-center order-1 sm:order-2">
-                {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                {isSaving ? 'Salvando...' : 'Salvar Registro'}
+                className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-2.5 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-emerald-500/20 transition-all hover:from-emerald-400 hover:to-emerald-500 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
+                {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                {isSaving ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </div>

@@ -28,6 +28,14 @@ export const TIPO_BUSCA_OPTIONS: SelectOption[] = [
       "3 - BUSCA ATIVA - MENSAGEM REGISTRADA EM PRONTUÁRIO",
       "3 - Busca ativa - Mensagem registrada em prontuário"
     ]
+  },
+  {
+    label: "SEM BUSCA ATIVA (CONTATO OPORTUNIZADO NO ACOLHIMENTO)",
+    value: "SEM BUSCA ATIVA (CONTATO OPORTUNIZADO NO ACOLHIMENTO)",
+    aliases: [
+      "4 - SEM BUSCA ATIVA (CONTATO OPORTUNIZADO NO ACOLHIMENTO)",
+      "4 - Sem busca ativa (contato oportunizado no acolhimento)"
+    ]
   }
 ];
 
