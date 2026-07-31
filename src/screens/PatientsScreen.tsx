@@ -305,6 +305,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   // Estados para Busca e Filtros (inicializados com pendingFilter do Dashboard)
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 400);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string[]>(_initFilterStatus);
   const [filterBuscaAtiva, setFilterBuscaAtiva] = useState<boolean | null>(_initFilterBuscaAtiva);
   const [filterGrupo, setFilterGrupo] = useState<string[]>(_initFilterGrupo);
@@ -741,6 +742,13 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     setCurrentPage(1);
   }, [searchTerm, filterStatus, filterGrupo, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterUnidade, filterEquipe, filterMicroarea, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal, filterBuscaAtiva]);
 
+  // Indicador de loading da busca — ativa quando searchTerm muda
+  useEffect(() => {
+    if (searchTerm) {
+      setIsSearchLoading(true);
+    }
+  }, [searchTerm]);
+
   // Versão do fetch — previne race condition (fetch antigo não fecha loading)
   const fetchVersionRef = useRef(0);
   const loadedOnceRef = useRef(false);
@@ -1040,6 +1048,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       } finally {
         setIsFilterLoading(false);
         setSortLoading(false);
+        setIsSearchLoading(false);
         if (!cancelled && fetchVersionRef.current === version) {
           setIsLoading(false);
           loadedOnceRef.current = true;
@@ -1510,16 +1519,41 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             {isSearchVisible && (
               <div className="bg-white p-6 rounded-3xl shadow-xl border border-primary/5 animate-in slide-in-from-top-6 fade-in duration-500">
                 <div className="relative group">
-                  <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/30 group-focus-within:text-primary transition-colors" />
+                  {isSearchLoading ? (
+                    <Loader2 className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-cyan-500 animate-spin" />
+                  ) : (
+                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/30 group-focus-within:text-primary transition-colors" />
+                  )}
                   <input 
                     type="text" 
                     placeholder="Quem você está procurando hoje? Digite nome ou CNS..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-14 pr-6 py-5 bg-surface-container-low border-2 border-transparent rounded-2xl text-base font-bold text-on-surface focus:border-primary/20 outline-none transition-all placeholder:text-on-surface-variant/30"
+                    className="w-full pl-14 pr-12 py-5 bg-surface-container-low border-2 border-transparent rounded-2xl text-base font-bold text-on-surface focus:border-primary/20 outline-none transition-all placeholder:text-on-surface-variant/30"
                     autoFocus
                   />
+                  {searchTerm && (
+                    <button onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-500 transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
+                {searchTerm && !isSearchLoading && (
+                  <div className="mt-2 flex items-center gap-2 animate-in fade-in duration-300">
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                      {totalItems} resultado{totalItems !== 1 ? 's' : ''} encontrado{totalItems !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+                {searchTerm && isSearchLoading && (
+                  <div className="mt-2 flex items-center gap-2 animate-in fade-in duration-300">
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                    <span className="text-[11px] font-bold text-cyan-500 uppercase tracking-widest animate-pulse">
+                      Buscando...
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2160,7 +2194,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                       </div>
                       <p className="text-[11px] font-extrabold uppercase tracking-widest text-cyan-700">Busca Ativa</p>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-2.5">
                       <div>
                         <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
                           <Calendar className="h-3 w-3" />
@@ -2180,7 +2214,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           <Phone className="h-3 w-3" />
                           Tipo de Contato <span className="text-red-500">*</span>
                         </label>
-                        <SingleSelect placeholder="Selecione" options={TIPO_CONTATO_OPTIONS} value={modalTipoContato} onChange={setModalTipoContato} required showSearch={false} />
+                        <SingleSelect placeholder="Selecione o tipo" options={TIPO_CONTATO_OPTIONS} value={modalTipoContato} onChange={setModalTipoContato} required showSearch={false} />
                       </div>
                     </div>
                   </div>

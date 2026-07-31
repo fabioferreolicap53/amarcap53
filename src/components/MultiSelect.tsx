@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, Search, X } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 
 interface Option {
   label: string;
@@ -24,7 +24,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
   value,
   onChange,
   label,
-  placeholder = "Selecionar...",
+  placeholder = "Selecione",
   className = "",
   disabled = false,
   showSearch = true,
@@ -49,7 +49,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       const rect = containerRef.current.getBoundingClientRect();
       const portalHost = containerRef.current.closest('[data-dropdown-root="true"]') as HTMLElement | null;
       const hostRect = portalHost?.getBoundingClientRect();
-      const dropdownHeight = 300; // Altura máxima estimada
+      const dropdownHeight = 300;
       const viewportPadding = 12;
       const spaceBelow = window.innerHeight - rect.bottom;
       const spaceAbove = rect.top;
@@ -136,6 +136,11 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
     onChange(value.filter(v => v !== optValue));
   };
 
+  const selectAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(filteredOptions.map(o => o.value));
+  };
+
   const clearAll = (e: React.MouseEvent) => {
     e.stopPropagation();
     onChange([]);
@@ -144,9 +149,9 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
   return (
     <div className={`space-y-1.5 flex-1 min-w-[180px] relative ${className}`} ref={containerRef}>
       {label && (
-        <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest ml-1">
+        <label className="flex items-center gap-2 text-[0.65rem] font-bold text-slate-400 uppercase tracking-[0.15em] ml-0.5">
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {required && <span className="text-red-500">*</span>}
         </label>
       )}
       
@@ -159,17 +164,17 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
         `}
       >
         {value.length === 0 ? (
-          <span className="text-sm font-bold text-on-surface/20 uppercase tracking-tight">{placeholder}</span>
+          <span className="text-sm font-bold text-slate-400 uppercase tracking-tight">{placeholder}</span>
         ) : (
           <div className="flex flex-wrap gap-1.5 pr-6">
             {value.map(v => {
-              const label = normalizedOptions.find(o => o.value === v)?.label || v;
+              const lbl = normalizedOptions.find(o => o.value === v)?.label || v;
               return (
                 <span 
                   key={v} 
-                  className="bg-primary/10 text-primary text-[10px] font-black uppercase py-1 px-2.5 rounded-lg flex items-center gap-1.5 border border-primary/5 hover:bg-primary/20 transition-colors"
+                  className="bg-gradient-to-r from-[#1c2e4a] to-[#253c61] text-white text-[10px] font-black uppercase py-1 px-2.5 rounded-lg flex items-center gap-1.5 shadow-md shadow-primary/20 hover:from-[#253c61] hover:to-[#1c2e4a] transition-colors"
                 >
-                  {label}
+                  {lbl}
                   <X 
                     className="w-3 h-3 cursor-pointer" 
                     onClick={(e) => removeValue(e, v)}
@@ -198,10 +203,10 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
         const portalHost = containerRef.current?.closest('[data-dropdown-root="true"]') as HTMLElement | null;
         const dropdownContent = (
           <div 
-            className={`multiselect-dropdown-content z-[9999] animate-in fade-in duration-200 ${
+            className={`multiselect-dropdown-content z-[99999] animate-in fade-in duration-200 ${
               portalHost
                 ? 'absolute'
-                : `absolute inset-x-0 ${dropdownPosition.openAbove ? 'bottom-full mb-2 slide-in-from-bottom-1 origin-bottom' : 'top-full mt-2 slide-in-from-top-1 origin-top'}`
+                : `absolute inset-x-0 ${dropdownPosition.openAbove ? 'bottom-full mb-2 slide-in-from-bottom-1 origin-bottom' : 'top-full mt-1.5 slide-in-from-top-1 origin-top'}`
             }`}
             style={portalHost ? {
               top: dropdownPosition.openAbove
@@ -211,44 +216,65 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
               width: dropdownPosition.width
             } : undefined}
           >
-            <div className="bg-white border border-primary/10 rounded-2xl shadow-[0px_15px_40px_rgba(0,0,0,0.15)] p-3 backdrop-blur-xl bg-white/98 ring-1 ring-black/5">
-            {showSearch && (
-              <div className="relative mb-4">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar..."
-                  className="w-full bg-slate-50 border border-slate-100 p-3 pl-11 rounded-2xl text-xs font-bold outline-none focus:border-primary/20 transition-all"
-                  autoFocus
-                />
+            <div className="w-full rounded-2xl border border-slate-200/80 bg-white shadow-2xl shadow-slate-900/10 ring-1 ring-black/5 overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-3 py-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  {value.length === 0 ? 'Nenhum selecionado' : `${value.length} selecionado${value.length > 1 ? 's' : ''}`}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button 
+                    type="button"
+                    onClick={selectAll}
+                    className="rounded-lg px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider transition-all duration-150 hover:scale-105 active:scale-95"
+                  >
+                    <span className="text-cyan-600 hover:text-cyan-700">Todas</span>
+                  </button>
+                  <div className="h-3 w-px bg-slate-200" />
+                  <button 
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}
+                    className="rounded-lg bg-gradient-to-r from-slate-800 to-slate-700 px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white shadow-sm transition-all duration-150 hover:from-slate-700 hover:to-slate-600 hover:shadow-md active:scale-95"
+                  >
+                    Concluir
+                  </button>
+                </div>
               </div>
-            )}
 
-            <div className="overflow-y-auto no-scrollbar space-y-1" style={{ maxHeight: dropdownPosition.maxHeight }}>
-              {filteredOptions.length === 0 ? (
-                <p className="text-[10px] font-bold text-slate-400 text-center py-4 uppercase">Nenhum resultado</p>
-              ) : (
-                filteredOptions.map((opt) => {
-                  const isSelected = value.includes(opt.value);
-                  return (
-                    <div
-                      key={opt.value}
-                      onClick={() => toggleOption(opt.value)}
-                      className={`
-                        flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all
-                        ${isSelected ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'hover:bg-slate-50 text-slate-600'}
-                      `}
-                    >
-                      <span className="text-xs font-bold uppercase tracking-tight">{opt.label}</span>
-                      {isSelected && <Check className="w-4 h-4" />}
-                    </div>
-                  );
-                })
-              )}
+              {/* Options */}
+              <div className="max-h-56 overflow-y-auto p-1.5" style={{ maxHeight: dropdownPosition.maxHeight }}>
+                {filteredOptions.length === 0 ? (
+                  <p className="text-[10px] font-bold text-slate-400 text-center py-4 uppercase">Nenhum resultado</p>
+                ) : (
+                  filteredOptions.map((opt) => {
+                    const isSelected = value.includes(opt.value);
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => toggleOption(opt.value)}
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-150 ${
+                          isSelected ? 'bg-cyan-50 text-cyan-700' : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-lg border-2 transition-all duration-200 ${
+                          isSelected ? 'border-cyan-500 bg-cyan-500' : 'border-slate-300 hover:border-cyan-300'
+                        }`}>
+                          {isSelected && (
+                            <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className={`text-[11px] font-bold uppercase tracking-wide leading-tight transition-colors duration-150 ${
+                          isSelected ? 'text-cyan-700' : ''
+                        }`}>{opt.label}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
           </div>
         );
 

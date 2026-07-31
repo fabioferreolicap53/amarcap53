@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck, Printer, Download, Activity, Clock, MessageSquare } from 'lucide-react';
+import { X, Search, AlertTriangle, Calendar, Phone, ClipboardList, MapPin, Info, CheckCircle2, Building, TestTube, Microscope, SearchX, FileText, ChevronLeft, ChevronRight, Eye, Users, Filter, RotateCcw, Star, BadgeCheck, Printer, Download, Activity, Clock, MessageSquare, Loader2 } from 'lucide-react';
 import { AcompButton } from '../components/AcompButton';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
@@ -255,6 +255,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
   // Estados de Busca e Filtro
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [isSearchTyping, setIsSearchTyping] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const [filterGrupo, setFilterGrupo] = useState<string[]>([]);
@@ -897,16 +899,46 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
             {isSearchVisible && (
               <div className="bg-white p-6 rounded-3xl shadow-xl border border-primary/5 animate-in slide-in-from-top-6 fade-in duration-500">
                 <div className="relative group">
-                  <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/30 group-focus-within:text-primary transition-colors" />
+                  {isSearchTyping ? (
+                    <Loader2 className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-cyan-500 animate-spin" />
+                  ) : (
+                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/30 group-focus-within:text-primary transition-colors" />
+                  )}
                   <input 
                     type="text" 
                     placeholder="Filtrar favoritos por nome ou CNS..." 
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-14 pr-6 py-5 bg-surface-container-low border-2 border-transparent rounded-2xl text-base font-bold text-on-surface focus:border-primary/20 outline-none transition-all placeholder:text-on-surface-variant/30"
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setIsSearchTyping(true);
+                      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+                      searchTimerRef.current = setTimeout(() => setIsSearchTyping(false), 300);
+                    }}
+                    className="w-full pl-14 pr-12 py-5 bg-surface-container-low border-2 border-transparent rounded-2xl text-base font-bold text-on-surface focus:border-primary/20 outline-none transition-all placeholder:text-on-surface-variant/30"
                     autoFocus
                   />
+                  {searchTerm && (
+                    <button onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-500 transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
+                {searchTerm && !isSearchTyping && (
+                  <div className="mt-2 flex items-center gap-2 animate-in fade-in duration-300">
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                      {filteredPacientes.length} resultado{filteredPacientes.length !== 1 ? 's' : ''} encontrado{filteredPacientes.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+                {searchTerm && isSearchTyping && (
+                  <div className="mt-2 flex items-center gap-2 animate-in fade-in duration-300">
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                    <span className="text-[11px] font-bold text-cyan-500 uppercase tracking-widest animate-pulse">
+                      Filtrando...
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1351,7 +1383,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                       </div>
                       <p className="text-[11px] font-extrabold uppercase tracking-widest text-cyan-700">Busca Ativa</p>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-2.5">
                       <div>
                         <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
                           <Calendar className="h-3 w-3" />
@@ -1371,7 +1403,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                           <Phone className="h-3 w-3" />
                           Tipo de Contato <span className="text-red-500">*</span>
                         </label>
-                        <SingleSelect placeholder="Selecione" options={TIPO_CONTATO_OPTIONS} value={modalTipoContato} onChange={setModalTipoContato} required showSearch={false} />
+                        <SingleSelect placeholder="Selecione o tipo" options={TIPO_CONTATO_OPTIONS} value={modalTipoContato} onChange={setModalTipoContato} required showSearch={false} />
                       </div>
                     </div>
                   </div>

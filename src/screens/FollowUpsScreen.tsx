@@ -3,7 +3,7 @@ import { Header } from '../components/Header';
 import { ScrollIndicator } from '../components/ScrollIndicator';
 import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2, RotateCcw, Users, MapPin, Plus, Printer, Clock } from 'lucide-react';
+import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2, RotateCcw, Users, MapPin, Plus, Printer, Clock, Loader2 } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
@@ -116,6 +116,8 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
   // Estados para Busca e Filtros
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchTyping, setIsSearchTyping] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Filtro por paciente vindo do long press (PatientsScreen/FavoritesScreen)
   const [filterPacienteId, setFilterPacienteId] = useState<string | null>(() => {
@@ -869,16 +871,46 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
             {isSearchVisible && (
               <div className="col-span-1 md:col-span-2 lg:col-span-4 bg-white p-6 rounded-[2rem] shadow-xl border border-primary/5 animate-in slide-in-from-top-6 fade-in duration-500">
                 <div className="relative group">
-                  <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/30 group-focus-within:text-primary transition-colors" />
+                  {isSearchTyping ? (
+                    <Loader2 className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-cyan-500 animate-spin" />
+                  ) : (
+                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/30 group-focus-within:text-primary transition-colors" />
+                  )}
                   <input 
                     type="text" 
                     placeholder="Buscar paciente ou data específica..." 
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-14 pr-6 py-5 bg-surface-container-low border-2 border-transparent rounded-2xl text-base font-bold text-on-surface focus:border-primary/20 outline-none transition-all placeholder:text-on-surface-variant/30"
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setIsSearchTyping(true);
+                      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+                      searchTimerRef.current = setTimeout(() => setIsSearchTyping(false), 300);
+                    }}
+                    className="w-full pl-14 pr-12 py-5 bg-surface-container-low border-2 border-transparent rounded-2xl text-base font-bold text-on-surface focus:border-primary/20 outline-none transition-all placeholder:text-on-surface-variant/30"
                     autoFocus
                   />
+                  {searchTerm && (
+                    <button onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-500 transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
+                {searchTerm && !isSearchTyping && (
+                  <div className="mt-2 flex items-center gap-2 animate-in fade-in duration-300">
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                      {filteredRecords.length} resultado{filteredRecords.length !== 1 ? 's' : ''} encontrado{filteredRecords.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+                {searchTerm && isSearchTyping && (
+                  <div className="mt-2 flex items-center gap-2 animate-in fade-in duration-300">
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                    <span className="text-[11px] font-bold text-cyan-500 uppercase tracking-widest animate-pulse">
+                      Filtrando...
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1294,7 +1326,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                       </div>
                       <p className="text-[11px] font-extrabold uppercase tracking-widest text-cyan-700">Busca Ativa</p>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-2.5">
                       <div>
                         <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
                           <Calendar className="h-3 w-3" />
@@ -1484,30 +1516,88 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
                     </div>
 
-                    {/* Campos do formulário */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-                      <div className="space-y-2">
-                        <DatePickerPTBR label="Data da Busca" value={createDate} isISO={false} onChange={setCreateDate} />
+                    {/* Seção 1 — Busca Ativa */}
+                    <div className="rounded-xl border-l-4 border-cyan-500 bg-gradient-to-r from-cyan-50/80 to-white p-3.5">
+                      <div className="mb-2.5 flex items-center gap-2">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-cyan-500/10">
+                          <Search className="h-3.5 w-3.5 text-cyan-600" />
+                        </div>
+                        <p className="text-[11px] font-extrabold uppercase tracking-widest text-cyan-700">Busca Ativa</p>
                       </div>
-                      <SingleSelect label="Tipo de Busca" placeholder="Selecione" options={TIPO_BUSCA_OPTIONS} value={createTipoBusca} onChange={setCreateTipoBusca} required icon={<Search className="w-3.5 h-3.5" />} showSearch={false} />
-                      <SingleSelect label="Tipo de Contato" placeholder="Selecione uma modalidade" options={TIPO_CONTATO_OPTIONS} value={createTipoContato} onChange={setCreateTipoContato} required icon={<Phone className="w-3.5 h-3.5" />} showSearch={false} />
-                      <SingleSelect label="Situação Pós Busca Ativa" placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={createSituacao} onChange={setCreateSituacao} required icon={<Info className="w-3.5 h-3.5" />} showSearch={false} />
-                      <SingleSelect label="Entrave(s) Informado Por" placeholder="Selecione" options={ENTRAVES_INFORMADO_POR_OPTIONS} value={createEntravesInformadoPor} onChange={setCreateEntravesInformadoPor} icon={<Info className="w-3.5 h-3.5" />} showSearch={false} />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-2.5">
+                        <div>
+                          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                            <Calendar className="h-3 w-3" />
+                            Data da Busca <span className="text-red-500">*</span>
+                          </label>
+                          <DatePickerPTBR value={createDate} isISO={false} onChange={setCreateDate} />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                            <Search className="h-3 w-3" />
+                            Tipo de Busca <span className="text-red-500">*</span>
+                          </label>
+                          <SingleSelect placeholder="Selecione o tipo" options={TIPO_BUSCA_OPTIONS} value={createTipoBusca} onChange={setCreateTipoBusca} required showSearch={false} />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                            <Phone className="h-3 w-3" />
+                            Tipo de Contato <span className="text-red-500">*</span>
+                          </label>
+                          <SingleSelect placeholder="Selecione o tipo" options={TIPO_CONTATO_OPTIONS} value={createTipoContato} onChange={setCreateTipoContato} required showSearch={false} />
+                        </div>
+                      </div>
                     </div>
 
-                    <MultiSelect label="Entraves Identificados" placeholder="Selecione" options={ENTRAVES_IDENTIFICADOS_OPTIONS} value={createEntraves} onChange={setCreateEntraves} showSearch={false} />
-
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 text-[0.65rem] font-bold text-slate-400 uppercase tracking-[0.15em]">
-                        <div className="p-1 rounded-lg bg-slate-100">
-                          <MessageSquare className="w-3.5 h-3.5" />
+                    {/* Seção 2 — Entraves */}
+                    <div className="rounded-xl border-l-4 border-amber-500 bg-gradient-to-r from-amber-50/80 to-white p-3.5">
+                      <div className="mb-2.5 flex items-center gap-2">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-500/10">
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
                         </div>
-                        Observações Detalhadas
-                      </label>
+                        <p className="text-[11px] font-extrabold uppercase tracking-widest text-amber-700">Entraves</p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2.5">
+                        <div>
+                          <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-slate-500">Entrave(s) Identificado(s)</label>
+                          <MultiSelect placeholder="Selecione" options={ENTRAVES_IDENTIFICADOS_OPTIONS} value={createEntraves} onChange={setCreateEntraves} showSearch={false} />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">Entrave(s) Informado Por</label>
+                          <SingleSelect placeholder="Selecione" options={ENTRAVES_INFORMADO_POR_OPTIONS} value={createEntravesInformadoPor} onChange={setCreateEntravesInformadoPor} showSearch={false} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Seção 3 — Desfecho */}
+                    <div className="rounded-xl border-l-4 border-emerald-500 bg-gradient-to-r from-emerald-50/80 to-white p-3.5">
+                      <div className="mb-2.5 flex items-center gap-2">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500/10">
+                          <Clock className="h-3.5 w-3.5 text-emerald-600" />
+                        </div>
+                        <p className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-700">Desfecho</p>
+                      </div>
+                      <div>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                          Situação Pós Busca Ativa <span className="text-red-500">*</span>
+                        </label>
+                        <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={createSituacao} onChange={setCreateSituacao} required showSearch={false} />
+                      </div>
+                    </div>
+
+                    {/* Seção 4 — Observações */}
+                    <div className="rounded-xl border-l-4 border-blue-500 bg-gradient-to-r from-blue-50/80 to-white p-3.5">
+                      <div className="mb-2.5 flex items-center gap-2">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-500/10">
+                          <MessageSquare className="h-3.5 w-3.5 text-blue-600" />
+                        </div>
+                        <p className="text-[11px] font-extrabold uppercase tracking-widest text-blue-700">Observações</p>
+                      </div>
+                      <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">Observações do Acompanhamento</label>
                       <textarea
                         value={createObservacoes}
                         onChange={(e) => setCreateObservacoes(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200/60 rounded-2xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-blue-100 focus:border-blue-300 focus:bg-white p-4 resize-none transition-all outline-none placeholder:text-slate-300 shadow-sm hover:border-slate-300 min-h-[100px]"
+                        className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none transition-all duration-200 placeholder:text-slate-400 focus:bg-white focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/15"
                         rows={3}
                         placeholder="Informações adicionais relevantes..."
                       ></textarea>
