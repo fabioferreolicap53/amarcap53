@@ -394,32 +394,32 @@ export function AuthScreen() {
           <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-blue-400/[0.03] rounded-full blur-[100px]" />
         </div>
 
-        <div className="relative z-10 flex flex-col justify-center px-16 xl:px-20 py-12 w-full">
+        <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16 2xl:px-20 py-8 lg:py-10 xl:py-12 w-full">
           {/* Logo — staggered entrance */}
-          <div className="flex items-center gap-5 mb-16 animate-[fadeSlideIn_0.6s_ease-out_0.2s_both]">
-            <div className="w-16 h-16 rounded-[1.25rem] bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg shadow-black/10 ring-1 ring-white/10 hover:bg-white/15 hover:scale-105 transition-all duration-300">
-              <Heart className="w-8 h-8 text-white" />
+          <div className="flex items-center gap-4 lg:gap-5 mb-8 lg:mb-12 xl:mb-16 animate-[fadeSlideIn_0.6s_ease-out_0.2s_both]">
+            <div className="w-12 h-12 lg:w-14 lg:h-14 xl:w-16 xl:h-16 rounded-[1rem] lg:rounded-[1.25rem] bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg shadow-black/10 ring-1 ring-white/10 hover:bg-white/15 hover:scale-105 transition-all duration-300">
+              <Heart className="w-6 h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-4xl font-black text-white tracking-tight">{appConfig.name}</h1>
-              <p className="text-blue-200/70 text-[11px] xl:text-xs font-bold uppercase tracking-[0.2em] mt-1">ACOMPANHAMENTO DA MULHER NAS AÇÕES DE RASTREIO</p>
+              <h1 className="text-3xl lg:text-3xl xl:text-4xl font-black text-white tracking-tight">{appConfig.name}</h1>
+              <p className="text-blue-200/70 text-[10px] lg:text-[11px] xl:text-xs font-bold uppercase tracking-[0.2em] mt-1">ACOMPANHAMENTO DA MULHER NAS AÇÕES DE RASTREIO</p>
             </div>
           </div>
 
           {/* Tagline — staggered */}
-          <div className="space-y-6 mb-16 animate-[fadeSlideIn_0.6s_ease-out_0.4s_both]">
-            <h2 className="text-4xl xl:text-5xl font-black text-white leading-[1.1] tracking-tight">
+          <div className="space-y-4 lg:space-y-5 xl:space-y-6 mb-8 lg:mb-12 xl:mb-16 animate-[fadeSlideIn_0.6s_ease-out_0.4s_both]">
+            <h2 className="text-3xl lg:text-3xl xl:text-4xl 2xl:text-5xl font-black text-white leading-[1.1] tracking-tight">
               Acompanhamento
               <br />
               <span className="text-blue-300 bg-gradient-to-r from-blue-300 to-blue-200 bg-clip-text text-transparent">que salva vidas</span>
             </h2>
-            <p className="text-blue-200/70 text-[0.9375rem] font-medium leading-relaxed max-w-md">
+            <p className="text-blue-200/70 text-sm lg:text-[0.9375rem] font-medium leading-relaxed max-w-md">
               Plataforma integrada para gestão e monitoramento de pacientes no rastreamento do câncer do colo do útero.
             </p>
           </div>
 
           {/* Features — staggered with hover */}
-          <div className="space-y-4 animate-[fadeSlideIn_0.6s_ease-out_0.6s_both]">
+          <div className="space-y-2 lg:space-y-3 xl:space-y-4 animate-[fadeSlideIn_0.6s_ease-out_0.6s_both]">
             {[
               { icon: BadgeCheck, text: 'Gestão de pacientes por território', delay: '0.7s' },
               { icon: Activity, text: 'Rastreamento de exames em tempo real', delay: '0.8s' },
@@ -427,20 +427,20 @@ export function AuthScreen() {
             ].map((item, i) => (
               <div
                 key={i}
-                className="flex items-center gap-3 group p-2 -ml-2 rounded-xl hover:bg-white/[0.04] transition-all duration-300 cursor-default"
+                className="flex items-center gap-3 group p-1.5 lg:p-2 -ml-2 rounded-xl hover:bg-white/[0.04] transition-all duration-300 cursor-default"
                 style={{ animationDelay: item.delay }}
               >
-                <div className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center ring-1 ring-white/[0.06] group-hover:bg-white/[0.1] group-hover:ring-white/[0.12] group-hover:scale-110 transition-all duration-300">
-                  <item.icon className="w-[18px] h-[18px] text-blue-300 group-hover:text-blue-200 transition-colors" />
+                <div className="w-8 h-8 lg:w-9 lg:h-9 xl:w-10 xl:h-10 rounded-lg lg:rounded-xl bg-white/[0.06] flex items-center justify-center ring-1 ring-white/[0.06] group-hover:bg-white/[0.1] group-hover:ring-white/[0.12] group-hover:scale-110 transition-all duration-300">
+                  <item.icon className="w-4 h-4 lg:w-[18px] lg:h-[18px] text-blue-300 group-hover:text-blue-200 transition-colors" />
                 </div>
-                <span className="text-[0.9375rem] font-medium text-blue-200/80 group-hover:text-blue-100/90 transition-colors">{item.text}</span>
+                <span className="text-sm lg:text-[0.9375rem] font-medium text-blue-200/80 group-hover:text-blue-100/90 transition-colors">{item.text}</span>
               </div>
             ))}
           </div>
 
           {/* Footer — improved contrast */}
-          <div className="mt-auto pt-20 border-t border-white/[0.07] animate-[fadeSlideIn_0.6s_ease-out_1s_both]">
-            <div className="flex flex-col gap-2.5">
+          <div className="mt-auto pt-10 lg:pt-12 xl:pt-20 border-t border-white/[0.07] animate-[fadeSlideIn_0.6s_ease-out_1s_both]">
+            <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2.5">
                 <div className="w-px h-4 bg-blue-400/40" />
                 <p className="text-blue-200/55 text-[10px] font-bold uppercase tracking-[0.15em]">Coordenadoria Geral de Atenção Primária — AP 5.3</p>
@@ -457,12 +457,12 @@ export function AuthScreen() {
       {/* Form Panel — Scrollable for virtual keyboard */}
       <div className="relative z-10 w-full lg:w-1/2 lg:ml-auto flex flex-col min-h-dvh min-h-[100dvh] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
         <div
-          className="flex-1 flex items-center justify-center px-4 py-6 sm:px-8 md:px-10 lg:px-14 xl:px-16"
-          style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top, 1.5rem))', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}
+          className="flex-1 flex items-center justify-center px-4 py-4 sm:px-6 md:px-8 lg:px-10 xl:px-14 2xl:px-16"
+          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 1rem))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}
         >
-          <div className="w-full max-w-[440px] lg:max-w-[400px] xl:max-w-[420px]">
+          <div className="w-full max-w-[440px] lg:max-w-[380px] xl:max-w-[400px] 2xl:max-w-[420px]">
             {/* Mobile logo — compacto */}
-            <div className="lg:hidden flex flex-col items-center mb-5 sm:mb-10 animate-[fadeSlideIn_0.5s_ease-out]">
+            <div className="lg:hidden flex flex-col items-center mb-4 sm:mb-8 animate-[fadeSlideIn_0.5s_ease-out]">
               <div className="w-14 h-14 sm:w-[4.5rem] sm:h-[4.5rem] rounded-[1rem] sm:rounded-[1.25rem] bg-gradient-to-br from-[#001b3d] to-[#003d7a] flex items-center justify-center shadow-lg shadow-blue-900/20 ring-1 ring-white/10 mb-2.5 sm:mb-4">
                 <Heart className="w-7 h-7 sm:w-9 sm:h-9 text-white" />
               </div>
@@ -472,21 +472,21 @@ export function AuthScreen() {
 
             {/* Form Card — Premium glassmorphism */}
             <div
-              className="bg-white/80 sm:bg-white backdrop-blur-xl sm:backdrop-blur-none rounded-[1.25rem] sm:rounded-[2rem] shadow-[0_8px_40px_rgba(0,0,0,0.06)] sm:shadow-[0_20px_60px_rgba(0,0,0,0.08)] lg:shadow-[0_25px_80px_rgba(0,0,0,0.12)] border border-white/60 sm:border-slate-200/50 lg:border-slate-200/60 p-5 sm:p-8 md:p-10 relative overflow-hidden animate-[fadeSlideIn_0.6s_ease-out_0.1s_both]"
+              className="bg-white/80 sm:bg-white backdrop-blur-xl sm:backdrop-blur-none rounded-[1.25rem] sm:rounded-[2rem] shadow-[0_8px_40px_rgba(0,0,0,0.06)] sm:shadow-[0_20px_60px_rgba(0,0,0,0.08)] lg:shadow-[0_25px_80px_rgba(0,0,0,0.12)] border border-white/60 sm:border-slate-200/50 lg:border-slate-200/60 p-4 sm:p-6 md:p-8 lg:p-7 xl:p-8 relative overflow-hidden animate-[fadeSlideIn_0.6s_ease-out_0.1s_both]"
             >
               {/* Top gradient bar */}
               <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-500 via-[#001b3d] to-blue-500" />
 
               {/* Header */}
-              <div className="mb-4 sm:mb-8">
-                <h2 className="text-lg sm:text-[1.375rem] md:text-2xl lg:text-[1.625rem] font-black text-[#001b3d] tracking-tight leading-tight">
+              <div className="mb-3 sm:mb-5 lg:mb-6">
+                <h2 className="text-lg sm:text-[1.375rem] md:text-2xl lg:text-[1.5rem] xl:text-[1.625rem] font-black text-[#001b3d] tracking-tight leading-tight">
                   {authState === 'login' && 'Bem-vindo de volta'}
                   {authState === 'register' && 'Solicitar Acesso'}
                   {authState === 'forgot_password' && 'Recuperar Senha'}
                   {authState === 'reset_password' && 'Redefinir Senha'}
                   {authState === 'confirm_email_change' && 'Confirmando novo e-mail'}
                 </h2>
-                <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1.5 sm:mt-2 leading-snug sm:leading-relaxed">
+                <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1 sm:mt-1.5 leading-snug sm:leading-relaxed">
                   {authState === 'login' && 'Acesse sua conta'}
                   {authState === 'register' && 'Preencha os dados para criar sua conta'}
                   {authState === 'forgot_password' && 'Enviaremos um link de recuperação'}
@@ -497,7 +497,7 @@ export function AuthScreen() {
 
               {/* Messages */}
               {error && (
-                <div className="mb-3 sm:mb-6 p-3 sm:p-4 bg-rose-50/80 backdrop-blur-sm border border-rose-100 rounded-xl sm:rounded-2xl flex items-start gap-2.5 sm:gap-3 animate-[shakeIn_0.4s_ease-out]">
+                <div className="mb-2.5 sm:mb-4 lg:mb-5 p-3 sm:p-3.5 lg:p-3 bg-rose-50/80 backdrop-blur-sm border border-rose-100 rounded-xl sm:rounded-2xl flex items-start gap-2.5 sm:gap-3 animate-[shakeIn_0.4s_ease-out]">
                   <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-rose-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-rose-500/30">
                     <span className="text-white text-[10px] sm:text-[11px] font-black">!</span>
                   </div>
@@ -508,7 +508,7 @@ export function AuthScreen() {
 
 
               {successMsg && (
-                <div className="mb-3 sm:mb-6 p-3 sm:p-4 bg-emerald-50/80 backdrop-blur-sm border border-emerald-100 rounded-xl sm:rounded-2xl flex items-start gap-2.5 sm:gap-3 animate-[fadeSlideIn_0.4s_ease-out]">
+                <div className="mb-2.5 sm:mb-4 lg:mb-5 p-3 sm:p-3.5 lg:p-3 bg-emerald-50/80 backdrop-blur-sm border border-emerald-100 rounded-xl sm:rounded-2xl flex items-start gap-2.5 sm:gap-3 animate-[fadeSlideIn_0.4s_ease-out]">
                   <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-emerald-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-emerald-500/30">
                     <BadgeCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                   </div>
@@ -518,7 +518,7 @@ export function AuthScreen() {
 
               {/* Login Form */}
               {authState === 'login' && (
-                <form className="space-y-3.5 sm:space-y-5" onSubmit={handleLogin}>
+                <form className="space-y-3 sm:space-y-4 lg:space-y-3.5" onSubmit={handleLogin}>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-black text-slate-500 uppercase tracking-[0.15em] ml-1">E-mail de acesso</label>
                     <div className="relative">
@@ -917,7 +917,7 @@ export function AuthScreen() {
               {/* Confirm Email Change — sem formulário, processa automático */}
 
               {/* Footer Nav */}
-              <div className="mt-5 sm:mt-8 pt-4 sm:pt-6 border-t border-slate-100">
+              <div className="mt-4 sm:mt-6 lg:mt-5 pt-3 sm:pt-5 lg:pt-4 border-t border-slate-100">
                 {authState === 'login' ? (
                   <p className="text-center">
                     <span className="text-[11px] sm:text-xs font-bold text-slate-400">Não possui conta? </span>
@@ -940,7 +940,7 @@ export function AuthScreen() {
             </div>
 
             {/* Mobile Footer */}
-            <div className="flex flex-col items-center gap-4 sm:gap-8 mt-5 sm:mt-8 animate-[fadeSlideIn_0.6s_ease-out_0.3s_both]">
+            <div className="flex flex-col items-center gap-3 sm:gap-6 lg:gap-4 mt-4 sm:mt-6 lg:mt-5 animate-[fadeSlideIn_0.6s_ease-out_0.3s_both]">
               <div className="flex-col gap-1.5 flex lg:hidden">
                 <div className="flex items-center gap-2 justify-center">
                   <div className="w-px h-3 bg-slate-300/30" />

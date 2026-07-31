@@ -149,27 +149,27 @@ export function EmailActionPage({ action, token, onError, onSuccess }: EmailActi
           <div className="absolute bottom-20 -right-20 w-[30rem] h-[30rem] bg-blue-400/5 rounded-full blur-3xl animate-[floatSlow_25s_ease-in-out_infinite_reverse]" />
           <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:60px_60px] opacity-60" />
         </div>
-        <div className="relative z-10 flex flex-col justify-center px-16 xl:px-20 py-12 w-full">
-          <div className="flex items-center gap-5 mb-16 animate-[fadeSlideIn_0.6s_ease-out_0.2s_both]">
-            <div className="w-16 h-16 rounded-[1.25rem] bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg shadow-black/10 ring-1 ring-white/10">
-              <Heart className="w-8 h-8 text-white" />
+        <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16 2xl:px-20 py-8 lg:py-10 xl:py-12 w-full">
+          <div className="flex items-center gap-4 lg:gap-5 mb-8 lg:mb-12 xl:mb-16 animate-[fadeSlideIn_0.6s_ease-out_0.2s_both]">
+            <div className="w-12 h-12 lg:w-14 lg:h-14 xl:w-16 xl:h-16 rounded-[1rem] lg:rounded-[1.25rem] bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg shadow-black/10 ring-1 ring-white/10">
+              <Heart className="w-6 h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-4xl font-black text-white tracking-tight">AMAR</h1>
-              <p className="text-blue-200/70 text-[11px] xl:text-xs font-bold uppercase tracking-[0.2em] mt-1">ACOMPANHAMENTO DA MULHER NAS AÇÕES DE RASTREIO</p>
+              <h1 className="text-3xl lg:text-3xl xl:text-4xl font-black text-white tracking-tight">AMAR</h1>
+              <p className="text-blue-200/70 text-[10px] lg:text-[11px] xl:text-xs font-bold uppercase tracking-[0.2em] mt-1">ACOMPANHAMENTO DA MULHER NAS AÇÕES DE RASTREIO</p>
             </div>
           </div>
-          <div className="space-y-6 mb-16 animate-[fadeSlideIn_0.6s_ease-out_0.4s_both]">
-            <h2 className="text-4xl xl:text-5xl font-black text-white leading-[1.1] tracking-tight">
+          <div className="space-y-4 lg:space-y-5 xl:space-y-6 mb-8 lg:mb-12 xl:mb-16 animate-[fadeSlideIn_0.6s_ease-out_0.4s_both]">
+            <h2 className="text-3xl lg:text-3xl xl:text-4xl 2xl:text-5xl font-black text-white leading-[1.1] tracking-tight">
               Acompanhamento<br />
               <span className="text-blue-300 bg-gradient-to-r from-blue-300 to-blue-200 bg-clip-text text-transparent">que salva vidas</span>
             </h2>
-            <p className="text-blue-200/70 text-[0.9375rem] font-medium leading-relaxed max-w-md">
+            <p className="text-blue-200/70 text-sm lg:text-[0.9375rem] font-medium leading-relaxed max-w-md">
               Plataforma integrada para gestão e monitoramento de pacientes no rastreamento do câncer do colo do útero.
             </p>
           </div>
-          <div className="mt-auto pt-20 border-t border-white/[0.07] animate-[fadeSlideIn_0.6s_ease-out_1s_both]">
-            <div className="flex flex-col gap-2.5">
+          <div className="mt-auto pt-10 lg:pt-12 xl:pt-20 border-t border-white/[0.07] animate-[fadeSlideIn_0.6s_ease-out_1s_both]">
+            <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2.5">
                 <div className="w-px h-4 bg-blue-400/40" />
                 <p className="text-blue-200/55 text-[10px] font-bold uppercase tracking-[0.15em]">Coordenadoria Geral de Atenção Primária — AP 5.3</p>
@@ -185,12 +185,12 @@ export function EmailActionPage({ action, token, onError, onSuccess }: EmailActi
 
       {/* Action Panel */}
       <div className="relative z-10 w-full lg:w-1/2 lg:ml-auto flex flex-col min-h-dvh min-h-[100dvh] overflow-y-auto overscroll-contain">
-        <div className="flex-1 flex items-center justify-center px-4 py-6 sm:px-8 md:px-10 lg:px-14 xl:px-16"
-          style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top, 1.5rem))', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}>
-          <div className="w-full max-w-[440px] lg:max-w-[400px] xl:max-w-[420px]">
+        <div className="flex-1 flex items-center justify-center px-4 py-4 sm:px-6 md:px-8 lg:px-10 xl:px-14 2xl:px-16"
+          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 1rem))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}>
+          <div className="w-full max-w-[440px] lg:max-w-[380px] xl:max-w-[400px] 2xl:max-w-[420px]">
 
             {/* Mobile Logo */}
-            <div className="lg:hidden flex flex-col items-center mb-5 sm:mb-10 animate-[fadeSlideIn_0.5s_ease-out]">
+            <div className="lg:hidden flex flex-col items-center mb-4 sm:mb-8 animate-[fadeSlideIn_0.5s_ease-out]">
               <div className="w-14 h-14 sm:w-[4.5rem] sm:h-[4.5rem] rounded-[1rem] sm:rounded-[1.25rem] bg-gradient-to-br from-[#001b3d] to-[#003d7a] flex items-center justify-center shadow-lg shadow-blue-900/20 ring-1 ring-white/10 mb-2.5 sm:mb-4">
                 <Heart className="w-7 h-7 sm:w-9 sm:h-9 text-white" />
               </div>
@@ -199,14 +199,14 @@ export function EmailActionPage({ action, token, onError, onSuccess }: EmailActi
             </div>
 
             {/* Action Card */}
-            <div className="bg-white/80 sm:bg-white backdrop-blur-xl sm:backdrop-blur-none rounded-[1.25rem] sm:rounded-[2rem] shadow-[0_8px_40px_rgba(0,0,0,0.06)] sm:shadow-[0_20px_60px_rgba(0,0,0,0.08)] lg:shadow-[0_25px_80px_rgba(0,0,0,0.12)] border border-white/60 sm:border-slate-200/50 lg:border-slate-200/60 p-6 sm:p-8 md:p-10 relative overflow-hidden animate-[fadeSlideIn_0.6s_ease-out_0.1s_both]">
+            <div className="bg-white/80 sm:bg-white backdrop-blur-xl sm:backdrop-blur-none rounded-[1.25rem] sm:rounded-[2rem] shadow-[0_8px_40px_rgba(0,0,0,0.06)] sm:shadow-[0_20px_60px_rgba(0,0,0,0.08)] lg:shadow-[0_25px_80px_rgba(0,0,0,0.12)] border border-white/60 sm:border-slate-200/50 lg:border-slate-200/60 p-4 sm:p-6 md:p-8 lg:p-7 xl:p-8 relative overflow-hidden animate-[fadeSlideIn_0.6s_ease-out_0.1s_both]">
 
               {/* Top gradient bar */}
               <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-500 via-[#001b3d] to-blue-500" />
 
               {/* Icon + Title */}
-              <div className="flex flex-col items-center text-center mb-6 sm:mb-8">
-                <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl flex items-center justify-center mb-4 sm:mb-5 shadow-lg transition-all duration-500 ${
+              <div className="flex flex-col items-center text-center mb-4 sm:mb-6 lg:mb-5">
+                <div className={`w-14 h-14 sm:w-16 sm:h-16 lg:w-16 lg:h-16 xl:w-20 xl:h-20 rounded-2xl sm:rounded-3xl flex items-center justify-center mb-3 sm:mb-4 lg:mb-4 shadow-lg transition-all duration-500 ${
                   status === 'success' ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-500/25' :
                   status === 'error' ? 'bg-gradient-to-br from-rose-400 to-rose-600 shadow-rose-500/25' :
                   'bg-gradient-to-br from-[#001b3d] to-[#002b5c] shadow-blue-900/20'
@@ -216,7 +216,7 @@ export function EmailActionPage({ action, token, onError, onSuccess }: EmailActi
                   {status === 'success' && <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10 text-white" />}
                   {status === 'error' && <AlertTriangle className="w-8 h-8 sm:w-10 sm:h-10 text-white" />}
                 </div>
-                <h2 className="text-lg sm:text-[1.375rem] md:text-2xl font-black text-[#001b3d] tracking-tight leading-tight">
+                <h2 className="text-base sm:text-lg lg:text-lg xl:text-[1.375rem] md:text-2xl font-black text-[#001b3d] tracking-tight leading-tight">
                   {status === 'loading' ? config.loadingText : status === 'error' ? config.errorTitle : status === 'success' ? config.successTitle : config.title}
                 </h2>
                 <p className="text-[11px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1.5 sm:mt-2">
@@ -368,7 +368,7 @@ export function EmailActionPage({ action, token, onError, onSuccess }: EmailActi
             </div>
 
             {/* Footer */}
-            <div className="mt-5 sm:mt-8 flex flex-col items-center gap-4 sm:gap-8 animate-[fadeSlideIn_0.6s_ease-out_0.3s_both]">
+            <div className="mt-4 sm:mt-6 lg:mt-5 flex flex-col items-center gap-3 sm:gap-6 lg:gap-4 animate-[fadeSlideIn_0.6s_ease-out_0.3s_both]">
               <div className="flex-col gap-1.5 flex">
                 <div className="flex items-center gap-2 justify-center">
                   <div className="w-px h-3 bg-slate-300/30" />
