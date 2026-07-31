@@ -273,6 +273,12 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const _initFilterStatus: string[] = _pfData?.filterStatus ?? [];
 
   const [pacientes, setPacientes] = useState<Paciente[]>(_pfHasFilter ? [] : (_patInit?.pacientes ?? []));
+
+  // Sempre usar dados frescos do array para o modal
+  const activeSelectedPaciente = selectedPaciente
+    ? (pacientes.find(p => p.id === selectedPaciente.id) || selectedPaciente)
+    : null;
+
   const [isLoading, setIsLoading] = useState(true);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [filterVersion, setFilterVersion] = useState(0); // força refetch ao aplicar filtros
@@ -2162,20 +2168,20 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       <LoadingOverlay visible={isFilterLoading} variant="card" title="Carregando Pacientes" message="Aplicando filtros, aguarde um momento..." />
 
       {/* Modal Registro de Acompanhamento */}
-      {isModalOpen && selectedPaciente && (
+      {isModalOpen && activeSelectedPaciente && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xl z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
           <div data-dropdown-root="true" className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl shadow-slate-900/10 animate-in zoom-in-95 duration-300">
             {/* Header */}
             <div className="relative flex items-center gap-4 bg-gradient-to-r from-slate-900 via-slate-800 to-cyan-900 px-5 py-5 sm:px-6 shrink-0">
               <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 text-xl font-black text-white shadow-lg shadow-cyan-500/30 ring-2 ring-white/20">
-                {selectedPaciente.nome.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+                {activeSelectedPaciente.nome.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-xs font-semibold text-cyan-200/70 mb-0.5">
                   <ClipboardList className="h-3.5 w-3.5" />
                   NOVO ACOMPANHAMENTO
                 </div>
-                <h2 className="truncate text-lg font-black text-white leading-tight">{selectedPaciente.nome}</h2>
+                <h2 className="truncate text-lg font-black text-white leading-tight">{activeSelectedPaciente.nome}</h2>
               </div>
               <button onClick={handleCloseModal} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/50 ring-1 ring-white/10 transition-all hover:bg-white/15 hover:text-white">
                 <X className="h-4 w-4" />
