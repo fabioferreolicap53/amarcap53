@@ -2366,7 +2366,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em]">Status de Rastreamento</h4>
                 </div>
 
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* DNA-HPV PEP */}
                   <div className="bg-white rounded-xl border border-slate-200/60 p-3 shadow-sm">
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-2">DNA-HPV (PEP)</p>
