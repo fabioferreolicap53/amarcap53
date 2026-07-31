@@ -190,6 +190,33 @@ body {
   scrollbar-color: rgba(5, 25, 52, 0.12) rgba(0, 0, 0, 0.02);
 }
 
+/* ─── Compatibilidade: Fallbacks para navegadores antigos ─── */
+
+/* backdrop-filter fallback: adiciona fundo sólido quando backdrop-blur não é suportado */
+@supports not (backdrop-filter: blur(1px)) {
+  header {
+    background-color: #001b3d !important;
+  }
+}
+
+/* gap em flexbox fallback: usa margin quando gap não é suportado */
+@supports not (gap: 1rem) {
+  /* Header flex containers que usam gap */
+  .flex-gap-fallback > * + * {
+    margin-left: 0.75rem;
+  }
+  .flex-gap-fallback-lg > * + * {
+    margin-left: 1.25rem;
+  }
+  .flex-gap-fallback-xl > * + * {
+    margin-left: 2rem;
+  }
+  /* Gap vertical fallback */
+  .flex-gap-v-fallback > * + * {
+    margin-top: 0.75rem;
+  }
+}
+
 /* Mobile e Tablet Responsividade */
 @media (max-width: 1024px) {
   .sidebar-mobile-hidden {
