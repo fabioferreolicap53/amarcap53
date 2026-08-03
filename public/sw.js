@@ -1,4 +1,4 @@
-const CACHE_NAME = 'amar-saude-v6';
+const CACHE_NAME = 'amar-saude-v7';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -7,8 +7,8 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.map(k => caches.delete(k)))
-    ).then(() => clients.claim())
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
 });
 
@@ -33,25 +33,38 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then(cached => {
-      if (cached) return cached;
-
-      return fetch(request).then(res => {
+  // NAVEGAÇÕES (HTML): network-first — sempre buscar do servidor
+  if (request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
+    event.respondWith(
+      fetch(request).then(res => {
         if (res.ok) {
           const clone = res.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
         }
         return res;
       }).catch(() => {
-        if (request.mode === 'navigate') {
-          return caches.match('/') || new Response('Offline', {
-            status: 503,
-            statusText: 'Service Unavailable',
-          });
+        return caches.match('/') || caches.match(request) || new Response('Offline', {
+          status: 503,
+          statusText: 'Service Unavailable',
+        });
+      })
+    );
+    return;
+  }
+
+  // ASSETS (JS, CSS, imagens): stale-while-revalidate — serve cache imediatamente, atualiza em background
+  event.respondWith(
+    caches.open(CACHE_NAME).then(async cache => {
+      const cached = await cache.match(request);
+
+      const fetchPromise = fetch(request).then(res => {
+        if (res.ok) {
+          cache.put(request, res.clone());
         }
-        return new Response('', { status: 408, statusText: 'Request Timeout' });
-      });
+        return res;
+      }).catch(() => cached);
+
+      return cached || fetchPromise;
     })
   );
 });
