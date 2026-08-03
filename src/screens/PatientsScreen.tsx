@@ -44,6 +44,7 @@ interface Paciente {
   alertas?: string; 
   total_acompanhamentos?: number;
   isFavorite?: boolean;
+  lastAcomp?: any;
 }
 
 const DNA_HPV_PEP_SYNC_EVENT = 'amarcap53:dna-hpv-pep-updated';
@@ -1009,7 +1010,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           try {
             const raw: any = await pb.collection('amarcap53_acompanhamentos').getFullList({
               filter: `(${patientIds.slice(0, 200).map(id => `paciente = "${id}"`).join(' || ')})`,
-              fields: 'id,paciente',
+              sort: '-created',
+              fields: 'id,paciente,situacao_pos_busca,data_busca,data_do_agendamento',
               requestKey: null
             });
             acompResults = Array.isArray(raw) ? raw : (raw?.items ?? []);
@@ -1017,12 +1019,17 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         }
         if (cancelled) return;
         const countMap = new Map<string, number>();
+        const lastAcompMap = new Map<string, any>();
         acompResults.forEach((r: any) => {
           countMap.set(r.paciente, (countMap.get(r.paciente) || 0) + 1);
+          if (!lastAcompMap.has(r.paciente)) {
+            lastAcompMap.set(r.paciente, r);
+          }
         });
 
         let pacientesFormatados = allRecords.map(record => {
           const count = countMap.get(record.id) || 0;
+          const lastAcomp = lastAcompMap.get(record.id) || null;
           const p: Paciente = {
             id: record.id,
             unidade: record.unidade || '--',
@@ -1041,6 +1048,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             alertas_rastreamento: record.alertas_rastreamento || '--',
             total_acompanhamentos: count,
             isFavorite: favorites.includes(record.id),
+            lastAcomp: lastAcomp || null,
           };
           
           p.alertas = determinarAlerta(p);
@@ -1912,7 +1920,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         {sortField === 'idade' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'cito_lab') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('cito_lab'); setSortDir('asc'); } }}>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[153px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'cito_lab') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('cito_lab'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Microscope className="w-4 h-4 text-blue-400/60" />
                         <div className="flex items-center gap-1.5">
@@ -1923,7 +1931,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         {sortField === 'cito_lab' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] cursor-pointer select-none" onClick={() => { if (sortField === 'cito_pep') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('cito_pep'); setSortDir('asc'); } }}>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[153px] cursor-pointer select-none" onClick={() => { if (sortField === 'cito_pep') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('cito_pep'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <FileText className="w-4 h-4 text-blue-400/60" />
                         <div className="flex items-center gap-1.5">
@@ -1934,7 +1942,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         {sortField === 'cito_pep' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'dna_hpv_gal') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('dna_hpv_gal'); setSortDir('asc'); } }}>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[153px] cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'dna_hpv_gal') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('dna_hpv_gal'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <TestTube className="w-4 h-4 text-blue-400/60" />
                         <div className="flex items-center gap-1.5">
@@ -1945,12 +1953,19 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         {sortField === 'dna_hpv_gal' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[200px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'last_desfecho') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('last_desfecho'); setSortDir('asc'); } }}>
+                      <div className="flex flex-col items-center gap-1">
+                        <ClipboardList className="w-4 h-4 text-blue-400/60" />
+                        <span>Último<br/>Desfecho</span>
+                        {sortField === 'last_desfecho' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
                   {pacientes.length === 0 ? (
                     <tr>
-                      <td colSpan={isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea' ? 9 : 8} className="px-6 py-20 text-center">
+                      <td colSpan={isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea' ? 10 : 9} className="px-6 py-20 text-center">
                         <div className="flex flex-col items-center opacity-30">
                           <SearchX className="w-16 h-16 mb-4" />
                           <p className="text-sm font-black uppercase tracking-widest">Nenhum registro encontrado</p>
@@ -1969,6 +1984,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         case 'cito_lab': va = a.cito_lab || ''; vb = b.cito_lab || ''; break;
                         case 'cito_pep': va = a.cito_pep || ''; vb = b.cito_pep || ''; break;
                         case 'dna_hpv_gal': va = a.dna_hpv_gal || ''; vb = b.dna_hpv_gal || ''; break;
+                        case 'last_desfecho': va = a.lastAcomp?.situacao_pos_busca || ''; vb = b.lastAcomp?.situacao_pos_busca || ''; break;
                         default: va = a.nome || ''; vb = b.nome || '';
                       }
                       const cmp = va.localeCompare(vb, 'pt-BR', { sensitivity: 'base' });
@@ -2096,6 +2112,27 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           </span>
                           {paciente.unidade_solicitante && paciente.unidade_solicitante !== '--' && (
                             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter mt-1">{paciente.unidade_solicitante}</p>
+                          )}
+                        </td>
+
+                        {/* 11. ÚLTIMO DESFECHO */}
+                        <td className="px-4 py-6 text-center">
+                          { paciente.lastAcomp ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="inline-block px-3.5 py-2 rounded-lg text-[10px] md:text-[11px] font-black uppercase tracking-tight shadow-sm bg-emerald-50 text-emerald-700 border border-emerald-100 max-w-[180px] break-words leading-tight">
+                                {paciente.lastAcomp.situacao_pos_busca || '--'}
+                              </span>
+                              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
+                                {formatarData(paciente.lastAcomp.data_busca)}
+                              </span>
+                              {paciente.lastAcomp.situacao_pos_busca === 'AGENDAMENTO APÓS CONTATO DIRETO' && paciente.lastAcomp.data_do_agendamento && (
+                                <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-tighter">
+                                  Agendamento: {formatarData(paciente.lastAcomp.data_do_agendamento)}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 italic text-[10px] md:text-[12px] font-black uppercase tracking-tight">--</span>
                           )}
                         </td>
                       </tr>
