@@ -400,7 +400,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         const fetchOpts: any = {
           sort: '-created',
           expand: 'paciente',
-          fields: 'id,created,updated,paciente,data_busca,tipo_busca,tipo_contato,situacao_pos_busca,entraves_identificados,entraves_informado_por,observacoes,profissional,expand.paciente.nome,expand.paciente.cns,expand.paciente.unidade,expand.paciente.equipe,expand.paciente.microarea',
+          fields: 'id,created,updated,paciente,data_busca,tipo_busca,tipo_contato,situacao_pos_busca,data_do_agendamento,entraves_identificados,entraves_informado_por,observacoes,profissional,expand.paciente.nome,expand.paciente.cns,expand.paciente.unidade,expand.paciente.equipe,expand.paciente.microarea',
           batch: 500,
           requestKey: null,
         };
@@ -445,17 +445,31 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         dataBuscaFormatada = `${parts[2]}/${parts[1]}/${parts[0]}`;
       }
 
+      let dataAgendamentoFormatada = '';
+      if (acompToEdit.data_do_agendamento) {
+        const parts = acompToEdit.data_do_agendamento.substring(0, 10).split('-');
+        if (parts.length === 3) {
+          dataAgendamentoFormatada = `${parts[0]}-${parts[1]}-${parts[2]}`;
+        }
+      }
+
       setSelectedAcompanhamento({
         ...acompToEdit,
         data_busca_formatada: dataBuscaFormatada,
+        data_do_agendamento: dataAgendamentoFormatada,
         tipo_busca: getCanonicalSelectValue(acompToEdit.tipo_busca, TIPO_BUSCA_OPTIONS),
         tipo_contato: getCanonicalSelectValue(acompToEdit.tipo_contato, TIPO_CONTATO_OPTIONS),
         situacao_pos_busca: getCanonicalSelectValue(acompToEdit.situacao_pos_busca, SITUACAO_POS_BUSCA_OPTIONS),
-        entraves_identificados: acompToEdit.entraves_identificados
-          ? (Array.isArray(acompToEdit.entraves_identificados)
-            ? acompToEdit.entraves_identificados.map(v => getCanonicalSelectValue(v, ENTRAVES_IDENTIFICADOS_OPTIONS))
-            : acompToEdit.entraves_identificados.split('; ').map(v => getCanonicalSelectValue(v, ENTRAVES_IDENTIFICADOS_OPTIONS)))
-          : [],
+        entraves_identificados: (() => {
+          const raw = acompToEdit.entraves_identificados;
+          if (!raw) return [];
+          if (Array.isArray(raw)) return raw.map(v => getCanonicalSelectValue(v, ENTRAVES_IDENTIFICADOS_OPTIONS));
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) return parsed.map((v: any) => getCanonicalSelectValue(String(v), ENTRAVES_IDENTIFICADOS_OPTIONS));
+          } catch {}
+          return raw.split('; ').map(v => getCanonicalSelectValue(v, ENTRAVES_IDENTIFICADOS_OPTIONS));
+        })(),
         entraves_informado_por: getCanonicalSelectValue(acompToEdit.entraves_informado_por, ENTRAVES_INFORMADO_POR_OPTIONS)
       });
       setIsEditModalOpen(true);
@@ -523,8 +537,12 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       alert('Preencha todos os campos obrigatórios: Tipo de Busca, Tipo de Contato e Situação Pós Busca.');
       return;
     }
-    if (createEntravesInformadoPor && createEntraves.length === 0) {
-      alert('Por favor, selecione ao menos um entrave identificado.');
+    if (createEntraves.length > 0 && !createEntravesInformadoPor) {
+      alert('Por favor, preencha o campo "Entrave(s) Informado Por" quando houver entrave(s) identificado(s).');
+      return;
+    }
+    if (getSelectLabel(createSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' && !createDataAgendamento) {
+      alert('Por favor, preencha o campo "Data do Agendamento" quando a situação for "Agendamento após contato direto".');
       return;
     }
 
@@ -582,8 +600,13 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       return;
     }
     
-    if (selectedAcompanhamento.entraves_informado_por && (!selectedAcompanhamento.entraves_identificados || selectedAcompanhamento.entraves_identificados.length === 0)) {
-      alert('Por favor, selecione ao menos um entrave identificado.');
+    const hasEntravesIdentificados = Array.isArray(selectedAcompanhamento.entraves_identificados) ? selectedAcompanhamento.entraves_identificados.filter((v: any) => v).length > 0 : !!selectedAcompanhamento.entraves_identificados;
+    if (hasEntravesIdentificados && !selectedAcompanhamento.entraves_informado_por) {
+      alert('Por favor, preencha o campo "Entrave(s) Informado Por" quando houver entrave(s) identificado(s).');
+      return;
+    }
+    if (getSelectLabel(selectedAcompanhamento.situacao_pos_busca || '', SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' && !selectedAcompanhamento.data_do_agendamento) {
+      alert('Por favor, preencha o campo "Data do Agendamento" quando a situação for "Agendamento após contato direto".');
       return;
     }
 
@@ -1406,7 +1429,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                         <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
                           Situação Pós Busca Ativa <span className="text-red-500">*</span>
                         </label>
-                        <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={activeSelectedAcompanhamento.situacao_pos_busca || ''} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, situacao_pos_busca: val})} required showSearch={false} />
+                        <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={getCanonicalSelectValue(activeSelectedAcompanhamento.situacao_pos_busca || '', SITUACAO_POS_BUSCA_OPTIONS)} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, situacao_pos_busca: val})} required showSearch={false} />
                       </div>
                       {getSelectLabel(activeSelectedAcompanhamento.situacao_pos_busca || '', SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' && (
                         <div>
@@ -1414,7 +1437,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                             <Calendar className="h-3 w-3" />
                             Data do Agendamento
                           </label>
-                          <DatePickerPTBR value={activeSelectedAcompanhamento.data_do_agendamento || ''} isISO={false} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, data_do_agendamento: val})} />
+                          <DatePickerPTBR value={(selectedAcompanhamento.data_do_agendamento || '').substring(0, 10)} isISO={true} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, data_do_agendamento: val})} />
                         </div>
                       )}
                     </div>

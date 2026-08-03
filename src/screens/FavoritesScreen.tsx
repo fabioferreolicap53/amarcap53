@@ -1245,7 +1245,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                       <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[200px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'last_desfecho') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('last_desfecho'); setSortDir('asc'); } }}>
                         <div className="flex flex-col items-center gap-1">
                           <ClipboardList className="w-4 h-4 text-blue-400/60" />
-                          <span>Último<br/>Desfecho</span>
+                          <span>Últ. Desf.<br/>da Busca</span>
                           {sortField === 'last_desfecho' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                         </div>
                       </th>
@@ -1356,15 +1356,15 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                         <td className="px-4 py-6 text-center">
                           { paciente.lastAcomp ? (
                             <div className="flex flex-col items-center gap-1">
-                              <span className="inline-block px-3.5 py-2 rounded-lg text-[10px] md:text-[11px] font-black uppercase tracking-tight shadow-sm bg-emerald-50 text-emerald-700 border border-emerald-100 max-w-[180px] break-words leading-tight">
+                              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
+                                Busca realizada em {formatarData(paciente.lastAcomp.data_busca)}
+                              </span>
+                              <span className="inline-block px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-tight shadow-sm bg-emerald-50 text-emerald-700 border border-emerald-100 max-w-[153px] break-words leading-tight">
                                 {paciente.lastAcomp.situacao_pos_busca || '--'}
                               </span>
-                              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
-                                {formatarData(paciente.lastAcomp.data_busca)}
-                              </span>
-                              {paciente.lastAcomp.situacao_pos_busca === 'AGENDAMENTO APÓS CONTATO DIRETO' && paciente.lastAcomp.data_do_agendamento && (
+                              {normalizeText(paciente.lastAcomp.situacao_pos_busca || '').includes('AGENDAMENTO') && paciente.lastAcomp.data_do_agendamento && (
                                 <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-tighter">
-                                  Agendamento: {formatarData(paciente.lastAcomp.data_do_agendamento)}
+                                  Agendamento para {formatarData(paciente.lastAcomp.data_do_agendamento)}
                                 </span>
                               )}
                             </div>

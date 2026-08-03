@@ -163,11 +163,11 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         `}
       >
-        {value.length === 0 ? (
+        {(Array.isArray(value) ? value.length : 0) === 0 ? (
           <span className="text-sm font-bold text-slate-400 uppercase tracking-tight">{placeholder}</span>
         ) : (
           <div className="flex flex-wrap gap-1.5 pr-6">
-            {value.map(v => {
+            {(Array.isArray(value) ? value : []).map(v => {
               const lbl = normalizedOptions.find(o => o.value === v)?.label || v;
               return (
                 <span 
