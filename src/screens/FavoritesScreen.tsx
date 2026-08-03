@@ -1190,7 +1190,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                         </div>
                       </th>
                       {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
-                        <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[220px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'unidade') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('unidade'); setSortDir('asc'); } }}>
+                        <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[165px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'unidade') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('unidade'); setSortDir('asc'); } }}>
                           <div className="flex flex-col items-center gap-1">
                             <Building className="w-4 h-4 text-blue-400/60" />
                             <span>Unidade<br/>Equipe<br/>Microárea</span>
@@ -1307,15 +1307,15 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                           />
                         </td>
                         {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
-                        <td className="px-4 py-6 text-center">
+                        <td className="px-3 py-6 text-center">
                           <div className="flex flex-col items-center gap-0.5">
-                            <p className="text-[10px] md:text-[11px] font-black text-primary uppercase leading-tight truncate max-w-full" title={paciente.unidade}>
+                            <p className="text-[10px] md:text-[11px] font-black text-primary uppercase leading-tight break-words max-w-full" title={paciente.unidade}>
                               {paciente.unidade}
                             </p>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter break-words">
                               {paciente.equipe}
                             </p>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter break-words">
                               MA: {paciente.microarea}
                             </p>
                           </div>
