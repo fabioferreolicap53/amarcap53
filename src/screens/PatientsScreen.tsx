@@ -1913,7 +1913,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           </div>
                         </th>
                       )}
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[110px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'idade') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('idade'); setSortDir('asc'); } }}>
+                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[94px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'idade') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('idade'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Calendar className="w-4 h-4 text-blue-400/60" />
                         <span>Idade/Grupo</span>

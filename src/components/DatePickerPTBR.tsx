@@ -322,8 +322,8 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
             </button>
           )}
           <button type="button" onClick={(e) => { e.stopPropagation(); if (window.innerWidth < 1024) return; isOpen ? setIsOpen(false) : handleOpen(); }}
-            className={`p-2 rounded-xl transition-all ${isOpen ? 'bg-primary text-white scale-105' : 'bg-primary/5 text-primary hover:bg-primary/10 group-hover:scale-105'} lg:flex hidden`}>
-            <CalendarIcon className="w-4 h-4" />
+            className={`${compact ? 'p-1.5 rounded-lg' : 'p-2 rounded-xl'} transition-all ${isOpen ? 'bg-primary text-white scale-105' : 'bg-primary/5 text-primary hover:bg-primary/10 group-hover:scale-105'} lg:flex hidden`}>
+            <CalendarIcon className={`${compact ? 'w-3 h-3' : 'w-4 h-4'}`} />
           </button>
           <div className="px-2.5 py-1.5 bg-slate-100 text-slate-400 rounded-xl lg:hidden flex items-center">
             <span className="text-[10px] font-black tracking-widest">123</span>
