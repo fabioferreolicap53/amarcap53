@@ -304,6 +304,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [modalTipoBusca, setModalTipoBusca] = useState('');
   const [modalTipoContato, setModalTipoContato] = useState('');
   const [modalSituacao, setModalSituacao] = useState('');
+  const [modalDataAgendamento, setModalDataAgendamento] = useState('');
   const [modalEntraves, setModalEntraves] = useState<string[]>([]);
   const [modalEntravesInformadoPor, setModalEntravesInformadoPor] = useState('');
   const [modalObservacoes, setModalObservacoes] = useState('');
@@ -556,6 +557,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     setModalTipoBusca('');
     setModalTipoContato('');
     setModalSituacao('');
+    setModalDataAgendamento('');
     setModalEntraves([]);
     setModalEntravesInformadoPor('');
     setModalObservacoes('');
@@ -597,6 +599,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       tipo_busca: getSelectLabel(modalTipoBusca, TIPO_BUSCA_OPTIONS),
       tipo_contato: getSelectLabel(modalTipoContato, TIPO_CONTATO_OPTIONS),
       situacao_pos_busca: getSelectLabel(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS),
+      data_do_agendamento: getSelectLabel(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' ? (modalDataAgendamento.includes('/') ? (() => { const [d,m,y] = modalDataAgendamento.split('/'); return `${y}-${m}-${d}`; })() : modalDataAgendamento) : '',
       entraves_identificados: JSON.stringify(
         Array.isArray(modalEntraves)
           ? modalEntraves.filter(v => v)
@@ -2253,11 +2256,22 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                       </div>
                       <p className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-700">Desfecho</p>
                     </div>
-                    <div>
-                      <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
-                        Situação Pós Busca Ativa <span className="text-red-500">*</span>
-                      </label>
-                      <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={modalSituacao} onChange={setModalSituacao} required showSearch={false} />
+                    <div className={`grid gap-x-3 gap-y-2.5 ${getSelectLabel(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                      <div>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                          Situação Pós Busca Ativa <span className="text-red-500">*</span>
+                        </label>
+                        <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={modalSituacao} onChange={setModalSituacao} required showSearch={false} />
+                      </div>
+                      {getSelectLabel(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' && (
+                        <div>
+                          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                            <Calendar className="h-3 w-3" />
+                            Data do Agendamento
+                          </label>
+                          <DatePickerPTBR value={modalDataAgendamento} isISO={false} onChange={setModalDataAgendamento} />
+                        </div>
+                      )}
                     </div>
                   </div>
 

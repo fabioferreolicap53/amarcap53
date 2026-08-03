@@ -43,6 +43,7 @@ interface Acompanhamento {
   tipo_busca?: string;
   tipo_contato?: string;
   situacao_pos_busca?: string;
+  data_do_agendamento?: string;
   entraves_identificados?: string | string[];
   entraves_informado_por?: string; // Novo campo
   observacoes?: string;
@@ -114,6 +115,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const [createTipoBusca, setCreateTipoBusca] = useState('');
   const [createTipoContato, setCreateTipoContato] = useState('');
   const [createSituacao, setCreateSituacao] = useState('');
+  const [createDataAgendamento, setCreateDataAgendamento] = useState('');
   const [createEntraves, setCreateEntraves] = useState<string[]>([]);
   const [createEntravesInformadoPor, setCreateEntravesInformadoPor] = useState('');
   const [createObservacoes, setCreateObservacoes] = useState('');
@@ -503,6 +505,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     setCreateTipoBusca('');
     setCreateTipoContato('');
     setCreateSituacao('');
+    setCreateDataAgendamento('');
     setCreateEntraves([]);
     setCreateEntravesInformadoPor('');
     setCreateObservacoes('');
@@ -533,6 +536,12 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       dataBuscaIso = `${y}-${m}-${d}`;
     }
 
+    let dataAgendamentoIso = '';
+    if (createDataAgendamento && createDataAgendamento.includes('/')) {
+      const [d, m, y] = createDataAgendamento.split('/');
+      dataAgendamentoIso = `${y}-${m}-${d}`;
+    }
+
     const data = {
       paciente: createSelectedPaciente.id,
       profissional: user.id,
@@ -540,6 +549,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       tipo_busca: getSelectLabel(createTipoBusca, TIPO_BUSCA_OPTIONS),
       tipo_contato: getSelectLabel(createTipoContato, TIPO_CONTATO_OPTIONS),
       situacao_pos_busca: getSelectLabel(createSituacao, SITUACAO_POS_BUSCA_OPTIONS),
+      data_do_agendamento: dataAgendamentoIso || createDataAgendamento,
       entraves_identificados: JSON.stringify(
         Array.isArray(createEntraves) ? createEntraves.filter(v => v) : []
       ),
@@ -588,11 +598,19 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
     const rawTipoContato = selectedAcompanhamento.tipo_contato || '';
 
+    const rawDataAgendamento = selectedAcompanhamento.data_do_agendamento || '';
+    let dataAgendamentoIso = '';
+    if (rawDataAgendamento && rawDataAgendamento.includes('/')) {
+      const [d, m, y] = rawDataAgendamento.split('/');
+      dataAgendamentoIso = `${y}-${m}-${d}`;
+    }
+
     const data = {
       tipo_busca: getSelectLabel(selectedAcompanhamento.tipo_busca, TIPO_BUSCA_OPTIONS),
       data_busca: dataBuscaIso || rawDate,
       tipo_contato: rawTipoContato.normalize('NFC'),
       situacao_pos_busca: getSelectLabel(selectedAcompanhamento.situacao_pos_busca, SITUACAO_POS_BUSCA_OPTIONS),
+      data_do_agendamento: dataAgendamentoIso || rawDataAgendamento,
       entraves_identificados: JSON.stringify(
         Array.isArray(selectedAcompanhamento.entraves_identificados)
           ? selectedAcompanhamento.entraves_identificados.filter(v => v)
@@ -1383,11 +1401,22 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                       </div>
                       <p className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-700">Desfecho</p>
                     </div>
-                    <div>
-                      <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
-                        Situação Pós Busca Ativa <span className="text-red-500">*</span>
-                      </label>
-                      <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={activeSelectedAcompanhamento.situacao_pos_busca || ''} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, situacao_pos_busca: val})} required showSearch={false} />
+                    <div className={`grid gap-x-3 gap-y-2.5 ${getSelectLabel(activeSelectedAcompanhamento.situacao_pos_busca || '', SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                      <div>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                          Situação Pós Busca Ativa <span className="text-red-500">*</span>
+                        </label>
+                        <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={activeSelectedAcompanhamento.situacao_pos_busca || ''} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, situacao_pos_busca: val})} required showSearch={false} />
+                      </div>
+                      {getSelectLabel(activeSelectedAcompanhamento.situacao_pos_busca || '', SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' && (
+                        <div>
+                          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                            <Calendar className="h-3 w-3" />
+                            Data do Agendamento
+                          </label>
+                          <DatePickerPTBR value={activeSelectedAcompanhamento.data_do_agendamento || ''} isISO={false} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, data_do_agendamento: val})} />
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1581,11 +1610,22 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                         </div>
                         <p className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-700">Desfecho</p>
                       </div>
-                      <div>
-                        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
-                          Situação Pós Busca Ativa <span className="text-red-500">*</span>
-                        </label>
-                        <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={createSituacao} onChange={setCreateSituacao} required showSearch={false} />
+                      <div className={`grid gap-x-3 gap-y-2.5 ${getSelectLabel(createSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                        <div>
+                          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                            Situação Pós Busca Ativa <span className="text-red-500">*</span>
+                          </label>
+                          <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={createSituacao} onChange={setCreateSituacao} required showSearch={false} />
+                        </div>
+                        {getSelectLabel(createSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' && (
+                          <div>
+                            <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                              <Calendar className="h-3 w-3" />
+                              Data do Agendamento
+                            </label>
+                            <DatePickerPTBR value={createDataAgendamento} isISO={false} onChange={setCreateDataAgendamento} />
+                          </div>
+                        )}
                       </div>
                     </div>
 
