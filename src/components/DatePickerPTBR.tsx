@@ -9,6 +9,7 @@ interface DatePickerPTBRProps {
   placeholder?: string;
   className?: string;
   isISO?: boolean;
+  compact?: boolean;
 }
 
 type PickerView = 'days' | 'months' | 'years';
@@ -24,6 +25,7 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
   placeholder = 'DD/MM/YYYY',
   className = '',
   isISO = true,
+  compact = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [displayValue, setDisplayValue] = useState('');
@@ -295,7 +297,7 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
   return (
     <div className={`space-y-1.5 flex-1 min-w-[140px] relative ${className}`} ref={containerRef}>
       {label && (
-        <label className="text-[10px] font-black text-primary/50 uppercase tracking-widest ml-1">
+        <label className={`font-black text-primary/50 uppercase tracking-widest ml-1 ${compact ? 'text-[8px]' : 'text-[10px]'}`}>
           {label}
         </label>
       )}
@@ -310,7 +312,7 @@ export const DatePickerPTBR: React.FC<DatePickerPTBRProps> = ({
           onFocus={handleOpen}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full h-[56px] px-4 pr-10 bg-white border border-slate-200/60 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all hover:border-slate-300 placeholder:text-slate-300 shadow-sm"
+          className={`w-full bg-white border border-slate-200/60 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all hover:border-slate-300 placeholder:text-slate-300 shadow-sm font-medium text-slate-700 ${compact ? 'h-[45px] px-3 pr-8 text-[11px] rounded-lg' : 'h-[56px] px-4 pr-10 text-sm rounded-xl'}`}
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {displayValue && (

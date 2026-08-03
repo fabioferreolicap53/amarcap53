@@ -2060,6 +2060,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           <DatePickerPTBR
                             value={paciente.dna_hpv_pep || ''}
                             isISO={false}
+                            compact
                             onChange={(displayDate) => handleUpdateCitoLaboratorio(paciente.id, displayDate)}
                           />
                         </td>

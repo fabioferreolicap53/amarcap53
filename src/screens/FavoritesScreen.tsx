@@ -1315,6 +1315,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                           <DatePickerPTBR 
                             value={paciente.dna_hpv_pep || ''} 
                             isISO={false}
+                            compact
                             onChange={(displayDate) => handleUpdateCitoLaboratorio(paciente.id, displayDate)} 
                           />
                         </td>
