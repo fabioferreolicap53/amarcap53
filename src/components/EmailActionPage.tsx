@@ -149,34 +149,34 @@ export function EmailActionPage({ action, token, onError, onSuccess }: EmailActi
           <div className="absolute bottom-20 -right-20 w-[30rem] h-[30rem] bg-blue-400/5 rounded-full blur-3xl animate-[floatSlow_25s_ease-in-out_infinite_reverse]" />
           <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:60px_60px] opacity-60" />
         </div>
-        <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16 2xl:px-20 py-8 lg:py-10 xl:py-12 w-full">
-          <div className="flex items-center gap-4 lg:gap-5 mb-8 lg:mb-12 xl:mb-16 animate-[fadeSlideIn_0.6s_ease-out_0.2s_both]">
-            <div className="w-12 h-12 lg:w-14 lg:h-14 xl:w-16 xl:h-16 rounded-[1rem] lg:rounded-[1.25rem] bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg shadow-black/10 ring-1 ring-white/10">
-              <Heart className="w-6 h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 text-white" />
+        <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16 2xl:px-20 py-6 lg:py-8 xl:py-10 w-full">
+          <div className="flex items-center gap-3 lg:gap-4 mb-4 lg:mb-6 xl:mb-8 animate-[fadeSlideIn_0.6s_ease-out_0.2s_both]">
+            <div className="w-10 h-10 lg:w-12 lg:h-12 xl:w-14 xl:h-14 rounded-[0.875rem] lg:rounded-[1rem] bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg shadow-black/10 ring-1 ring-white/10">
+              <Heart className="w-5 h-5 lg:w-6 lg:h-6 xl:w-7 xl:h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl lg:text-3xl xl:text-4xl font-black text-white tracking-tight">AMAR</h1>
-              <p className="text-blue-200/70 text-[10px] lg:text-[11px] xl:text-xs font-bold uppercase tracking-[0.2em] mt-1">ACOMPANHAMENTO DA MULHER NAS AÇÕES DE RASTREIO</p>
+              <h1 className="text-2xl lg:text-2xl xl:text-3xl font-black text-white tracking-tight">AMAR</h1>
+              <p className="text-blue-200/70 text-[9px] lg:text-[10px] xl:text-[11px] font-bold uppercase tracking-[0.2em] mt-0.5">ACOMPANHAMENTO DA MULHER NAS AÇÕES DE RASTREIO</p>
             </div>
           </div>
-          <div className="space-y-4 lg:space-y-5 xl:space-y-6 mb-8 lg:mb-12 xl:mb-16 animate-[fadeSlideIn_0.6s_ease-out_0.4s_both]">
-            <h2 className="text-3xl lg:text-3xl xl:text-4xl 2xl:text-5xl font-black text-white leading-[1.1] tracking-tight">
+          <div className="space-y-2.5 lg:space-y-3 xl:space-y-4 mb-4 lg:mb-6 xl:mb-8 animate-[fadeSlideIn_0.6s_ease-out_0.4s_both]">
+            <h2 className="text-2xl lg:text-2xl xl:text-3xl 2xl:text-4xl font-black text-white leading-[1.05] tracking-tight">
               Acompanhamento<br />
               <span className="text-blue-300 bg-gradient-to-r from-blue-300 to-blue-200 bg-clip-text text-transparent">que salva vidas</span>
             </h2>
-            <p className="text-blue-200/70 text-sm lg:text-[0.9375rem] font-medium leading-relaxed max-w-md">
+            <p className="text-blue-200/70 text-[13px] lg:text-sm font-medium leading-snug max-w-md">
               Plataforma integrada para gestão e monitoramento de pacientes no rastreamento do câncer do colo do útero.
             </p>
           </div>
-          <div className="mt-auto pt-10 lg:pt-12 xl:pt-20 border-t border-white/[0.07] animate-[fadeSlideIn_0.6s_ease-out_1s_both]">
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2.5">
-                <div className="w-px h-4 bg-blue-400/40" />
-                <p className="text-blue-200/55 text-[10px] font-bold uppercase tracking-[0.15em]">Coordenadoria Geral de Atenção Primária — AP 5.3</p>
+          <div className="mt-auto pt-6 lg:pt-8 xl:pt-12 border-t border-white/[0.07] animate-[fadeSlideIn_0.6s_ease-out_1s_both]">
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <div className="w-px h-3 bg-blue-400/40" />
+                <p className="text-blue-200/55 text-[9px] font-bold uppercase tracking-[0.15em]">Coordenadoria Geral de Atenção Primária — AP 5.3</p>
               </div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-px h-3 bg-blue-400/25" />
-                <p className="text-blue-300/35 text-[10px] font-semibold tracking-[0.2em]">© 2026 AMAR — Todos os direitos reservados</p>
+              <div className="flex items-center gap-2">
+                <div className="w-px h-2.5 bg-blue-400/25" />
+                <p className="text-blue-300/35 text-[9px] font-semibold tracking-[0.2em]">© 2026 AMAR — Todos os direitos reservados</p>
               </div>
             </div>
           </div>
