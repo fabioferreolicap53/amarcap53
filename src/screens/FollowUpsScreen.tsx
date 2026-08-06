@@ -1384,14 +1384,14 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                           <Search className="h-3 w-3" />
                           Tipo de Busca <span className="text-red-500">*</span>
                         </label>
-                        <SingleSelect placeholder="Selecione o tipo" options={TIPO_BUSCA_OPTIONS} value={activeSelectedAcompanhamento.tipo_busca || ''} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, tipo_busca: val})} required showSearch={false} />
+                        <SingleSelect placeholder="Selecione o tipo" options={TIPO_BUSCA_OPTIONS} value={getCanonicalSelectValue(selectedAcompanhamento.tipo_busca || '', TIPO_BUSCA_OPTIONS)} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, tipo_busca: val})} required showSearch={false} />
                       </div>
                       <div>
                         <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
                           <Phone className="h-3 w-3" />
                           Tipo de Contato <span className="text-red-500">*</span>
                         </label>
-                        <SingleSelect placeholder="Selecione" options={TIPO_CONTATO_OPTIONS} value={activeSelectedAcompanhamento.tipo_contato || ''} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, tipo_contato: val})} required showSearch={false} />
+                        <SingleSelect placeholder="Selecione" options={TIPO_CONTATO_OPTIONS} value={getCanonicalSelectValue(selectedAcompanhamento.tipo_contato || '', TIPO_CONTATO_OPTIONS)} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, tipo_contato: val})} required showSearch={false} />
                       </div>
                     </div>
                   </div>
@@ -1407,11 +1407,11 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2.5">
                       <div>
                         <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-slate-500">Entrave(s) Identificado(s)</label>
-                        <MultiSelect placeholder="Selecione" options={ENTRAVES_IDENTIFICADOS_OPTIONS} value={activeSelectedAcompanhamento.entraves_identificados || []} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_identificados: val})} showSearch={false} />
+                        <MultiSelect placeholder="Selecione" options={ENTRAVES_IDENTIFICADOS_OPTIONS} value={selectedAcompanhamento.entraves_identificados || []} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_identificados: val})} showSearch={false} />
                       </div>
                       <div>
                         <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">Entrave(s) Informado Por</label>
-                        <SingleSelect placeholder="Selecione" options={ENTRAVES_INFORMADO_POR_OPTIONS} value={activeSelectedAcompanhamento.entraves_informado_por || ''} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_informado_por: val})} showSearch={false} />
+                        <SingleSelect placeholder="Selecione" options={ENTRAVES_INFORMADO_POR_OPTIONS} value={getCanonicalSelectValue(selectedAcompanhamento.entraves_informado_por || '', ENTRAVES_INFORMADO_POR_OPTIONS)} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_informado_por: val})} showSearch={false} />
                       </div>
                     </div>
                   </div>
@@ -1424,14 +1424,14 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                       </div>
                       <p className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-700">Desfecho</p>
                     </div>
-                    <div className={`grid gap-x-3 gap-y-2.5 ${getSelectLabel(activeSelectedAcompanhamento.situacao_pos_busca || '', SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                    <div className={`grid gap-x-3 gap-y-2.5 ${getSelectLabel(selectedAcompanhamento.situacao_pos_busca || '', SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
                       <div>
                         <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
                           Situação Pós Busca Ativa <span className="text-red-500">*</span>
                         </label>
-                        <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={getCanonicalSelectValue(activeSelectedAcompanhamento.situacao_pos_busca || '', SITUACAO_POS_BUSCA_OPTIONS)} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, situacao_pos_busca: val})} required showSearch={false} />
+                        <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={getCanonicalSelectValue(selectedAcompanhamento.situacao_pos_busca || '', SITUACAO_POS_BUSCA_OPTIONS)} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, situacao_pos_busca: val})} required showSearch={false} />
                       </div>
-                      {getSelectLabel(activeSelectedAcompanhamento.situacao_pos_busca || '', SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' && (
+                      {getSelectLabel(selectedAcompanhamento.situacao_pos_busca || '', SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' && (
                         <div>
                           <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
                             <Calendar className="h-3 w-3" />
@@ -1452,7 +1452,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                       <p className="text-[11px] font-extrabold uppercase tracking-widest text-blue-700">Observações</p>
                     </div>
                     <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">Observações do Acompanhamento</label>
-                    <textarea name="observacoes" value={activeSelectedAcompanhamento.observacoes || ''} onChange={(e) => setSelectedAcompanhamento({...selectedAcompanhamento, observacoes: e.target.value})}
+                    <textarea name="observacoes" value={selectedAcompanhamento.observacoes || ''} onChange={(e) => setSelectedAcompanhamento({...selectedAcompanhamento, observacoes: e.target.value})}
                       className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none transition-all duration-200 placeholder:text-slate-400 focus:bg-white focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/15"
                       rows={3} placeholder="Descreva aqui detalhes relevantes do atendimento..."
                     ></textarea>
