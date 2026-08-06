@@ -1377,7 +1377,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                           <Calendar className="h-3 w-3" />
                           Data da Busca <span className="text-red-500">*</span>
                         </label>
-                        <DatePickerPTBR value={activeSelectedAcompanhamento.data_busca_formatada} isISO={false} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, data_busca_formatada: val})} />
+                        <DatePickerPTBR value={selectedAcompanhamento.data_busca_formatada || ''} isISO={false} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, data_busca_formatada: val})} />
                       </div>
                       <div>
                         <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
