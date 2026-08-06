@@ -69,6 +69,20 @@ const SIM_NAO_OPTIONS = [
   { label: 'NÃO', value: 'NÃO' },
 ];
 
+const InfoRow: React.FC<{ label: string; value?: string }> = ({ label, value }) => {
+  let display = value || '--';
+  if (value && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    const p = value.substring(0, 10).split('-');
+    if (p.length === 3) display = `${p[2]}/${p[1]}/${p[0]}`;
+  }
+  return (
+    <div className="flex flex-col">
+      <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">{label}</span>
+      <span className="text-xs font-semibold text-slate-700">{display}</span>
+    </div>
+  );
+};
+
 export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, setActiveTab }) => {
   const { user, isAdmin } = useAuth();
 
@@ -104,6 +118,21 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     ? (acompanhamentos.find(a => a.id === selectedAcompanhamento.id) || selectedAcompanhamento)
     : null;
   const [isSaving, setIsSaving] = useState(false);
+
+  // Modal de visualização do paciente
+  const [viewPacienteModal, setViewPacienteModal] = useState<{ isOpen: boolean; paciente: any; loading: boolean }>({ isOpen: false, paciente: null, loading: false });
+
+  const handleViewPaciente = async (pacienteId?: string) => {
+    if (!pacienteId) return;
+    setViewPacienteModal({ isOpen: true, paciente: null, loading: true });
+    try {
+      const record = await pb.collection('amarcap53_pacientes').getOne(pacienteId, { expand: '', requestKey: null });
+      setViewPacienteModal({ isOpen: true, paciente: record, loading: false });
+    } catch (err) {
+      console.error('[VIEW PACIENTE] Erro:', err);
+      setViewPacienteModal({ isOpen: true, paciente: null, loading: false });
+    }
+  };
 
   // Modal de novo registro state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -1316,6 +1345,13 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                             <td className="px-6 py-6 text-center">
                               <div className="flex items-center justify-center gap-3">
                                 <button 
+                                  onClick={() => handleViewPaciente(acomp.paciente || acomp.expand?.paciente?.id)}
+                                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-cyan-600 hover:border-cyan-200 hover:bg-cyan-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                                  title="Ver Paciente"
+                                >
+                                  <Eye className="w-5 h-5" />
+                                </button>
+                                <button 
                                   onClick={() => handleEdit(acomp.id)}
                                   className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
                                   title="Editar"
@@ -1695,6 +1731,110 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Visualizar Paciente */}
+      {viewPacienteModal.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xl z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+          <div className="relative bg-white w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl shadow-slate-900/10 overflow-hidden border border-slate-200/60 animate-in zoom-in-95 duration-300">
+            {/* Header */}
+            <div className="relative flex items-center gap-4 bg-gradient-to-r from-cyan-600 via-cyan-500 to-teal-500 px-5 py-5 shrink-0">
+              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-xl font-black text-white shadow-lg ring-2 ring-white/20">
+                {viewPacienteModal.paciente ? (
+                  (viewPacienteModal.paciente.nome || '??').split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()
+                ) : (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-xs font-semibold text-cyan-100/70 mb-0.5">
+                  <Eye className="h-3.5 w-3.5" />
+                  FICHA DO PACIENTE
+                </div>
+                <h2 className="truncate text-lg font-black text-white leading-tight">
+                  {viewPacienteModal.loading ? 'Carregando...' : (viewPacienteModal.paciente?.nome || 'Paciente não encontrado')}
+                </h2>
+              </div>
+              <button onClick={() => setViewPacienteModal({ isOpen: false, paciente: null, loading: false })} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/10 text-white/70 ring-1 ring-white/10 transition-all hover:bg-white/20 hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              {viewPacienteModal.loading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-8 w-8 text-cyan-400 animate-spin" />
+                  <span className="ml-3 text-sm font-bold text-slate-400">Carregando dados do paciente...</span>
+                </div>
+              ) : viewPacienteModal.paciente ? (
+                <div className="space-y-3">
+                  {/* Dados Pessoais */}
+                  <div className="rounded-xl border-l-4 border-cyan-500 bg-gradient-to-r from-cyan-50/80 to-white p-3.5">
+                    <p className="text-[11px] font-extrabold uppercase tracking-widest text-cyan-700 mb-3 flex items-center gap-2">
+                      <Users className="h-3.5 w-3.5" /> Dados Pessoais
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                      <InfoRow label="Nome Completo" value={viewPacienteModal.paciente.nome} />
+                      <InfoRow label="CNS" value={viewPacienteModal.paciente.cns} />
+                      <InfoRow label="Data de Nascimento" value={viewPacienteModal.paciente.data_nascimento} />
+                      <InfoRow label="Idade" value={(() => {
+                        const dn = viewPacienteModal.paciente.data_nascimento;
+                        if (!dn) return undefined;
+                        const nasc = new Date(dn.substring(0, 10));
+                        const hoje = new Date();
+                        let idade = hoje.getFullYear() - nasc.getFullYear();
+                        const m = hoje.getMonth() - nasc.getMonth();
+                        if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+                        return `${idade} anos`;
+                      })()} />
+                      <InfoRow label="CPF" value={viewPacienteModal.paciente.cpf} />
+                      <InfoRow label="Telefone" value={viewPacienteModal.paciente.telefone || viewPacienteModal.paciente.celular} />
+                      <InfoRow label="Grupo" value={viewPacienteModal.paciente.grupo} />
+                    </div>
+                  </div>
+
+                  {/* Localização */}
+                  <div className="rounded-xl border-l-4 border-amber-500 bg-gradient-to-r from-amber-50/80 to-white p-3.5">
+                    <p className="text-[11px] font-extrabold uppercase tracking-widest text-amber-700 mb-3 flex items-center gap-2">
+                      <Building className="h-3.5 w-3.5" /> Localização
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                      <InfoRow label="Unidade de Saúde" value={viewPacienteModal.paciente.unidade} />
+                      <InfoRow label="Equipe" value={viewPacienteModal.paciente.equipe} />
+                      <InfoRow label="Microárea" value={viewPacienteModal.paciente.microarea} />
+                      <InfoRow label="Endereço" value={viewPacienteModal.paciente.endereco || viewPacienteModal.paciente.logradouro} />
+                    </div>
+                  </div>
+
+                  {/* Rastreamento */}
+                  <div className="rounded-xl border-l-4 border-emerald-500 bg-gradient-to-r from-emerald-50/80 to-white p-3.5">
+                    <p className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-700 mb-3 flex items-center gap-2">
+                      <ClipboardList className="h-3.5 w-3.5" /> Rastreamento
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                      <InfoRow label="Cito (PEP)" value={viewPacienteModal.paciente.cito_pep} />
+                      <InfoRow label="Cito (Lab)" value={viewPacienteModal.paciente.cito_lab} />
+                      <InfoRow label="DNA-HPV (PEP)" value={viewPacienteModal.paciente.dna_hpv_pep} />
+                      <InfoRow label="DNA-HPV (GAL)" value={viewPacienteModal.paciente.dna_hpv_gal} />
+                      <InfoRow label="Status" value={viewPacienteModal.paciente.status} />
+                      <InfoRow label="Obs. Paciente" value={viewPacienteModal.paciente.observacoes} />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-slate-400 text-sm font-bold">Paciente não encontrado.</div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end px-5 py-4 border-t border-slate-100 shrink-0">
+              <button onClick={() => setViewPacienteModal({ isOpen: false, paciente: null, loading: false })} className="text-xs font-bold text-slate-400 transition-colors hover:text-slate-600 px-5 py-2.5">
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}

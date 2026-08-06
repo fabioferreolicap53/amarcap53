@@ -250,13 +250,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         };
 
         // 1. Buscar TODOS acompanhamentos (~5K, leve)
-        const allAcomp = await paginatedFetch('amarcap53_acompanhamentos', 'paciente,data_busca');
+        const allAcomp = await paginatedFetch('amarcap53_acompanhamentos', 'paciente,data_busca,tipo_busca');
         if (cancelled) return;
 
-        // 2. Filtrar por data no intervalo + extrair IDs únicos
+        // 2. Filtrar por data no intervalo + excluir SEM BUSCA ATIVA + extrair IDs únicos
         const pacIdsNoPeriodo = new Set<string>();
         for (const r of allAcomp) {
           if (!r.paciente) continue;
+          const tb = String(r.tipo_busca || '').toLowerCase();
+          if (tb.includes('sem busca ativa')) continue;
           const dataBusca = toISODate(r.data_busca || '');
           if (dInicio && dataBusca < dInicio) continue;
           if (dFim && dataBusca > dFim) continue;
@@ -682,20 +684,28 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           const scopedSet = new Set(scopedPatientIds);
           const baseFilter = acompFilterParts.join(' && ').trim();
           try {
-            const allAcomp = await paginatedFetch('amarcap53_acompanhamentos', 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created,paciente', baseFilter || undefined);
-            // Filtra no client: só registros de pacientes dentro do scope
-            acompRecords = allAcomp.filter((r: any) => scopedSet.has(r.paciente));
+            const allAcomp = await paginatedFetch('amarcap53_acompanhamentos', 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created,paciente,tipo_busca', baseFilter || undefined);
+            // Filtra no client: só registros de pacientes dentro do scope, excluindo SEM BUSCA ATIVA
+            acompRecords = allAcomp.filter((r: any) => {
+              if (!scopedSet.has(r.paciente)) return false;
+              const tb = String(r.tipo_busca || '').toLowerCase();
+              return !tb.includes('sem busca ativa');
+            });
           } catch { /* fallback vazio */ }
         } else if (!cancelled) {
           // Admin sem filtros: busca acompanhamentos → IDs únicos → busca só esses pacientes (eficiente)
           try {
             // 1. Busca todos acompanhamentos (~5K, leve)
             const baseFilter = acompFilterParts.join(' && ').trim();
-            acompRecords = await paginatedFetch('amarcap53_acompanhamentos', 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created,paciente', baseFilter || undefined);
+            acompRecords = await paginatedFetch('amarcap53_acompanhamentos', 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created,paciente,tipo_busca', baseFilter || undefined);
             if (cancelled) return;
 
-            // 2. Extrai IDs únicos dos pacientes com acompanhamento (~2K)
-            const comBuscaPacIds = [...new Set(acompRecords.map((r: any) => r.paciente).filter(Boolean))];
+            // 2. Extrai IDs únicos dos pacientes COM BUSCA ATIVA (exclui "SEM BUSCA ATIVA")
+            const comBuscaRecords = acompRecords.filter((r: any) => {
+              const tb = String(r.tipo_busca || '').toLowerCase();
+              return !tb.includes('sem busca ativa');
+            });
+            const comBuscaPacIds = [...new Set(comBuscaRecords.map((r: any) => r.paciente).filter(Boolean))];
 
             // 3. Busca APENAS esses pacientes com id+grupo+campos de status (~2K registros, não 130K)
             if (comBuscaPacIds.length > 0) {

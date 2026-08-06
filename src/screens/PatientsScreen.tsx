@@ -152,6 +152,20 @@ const InfoTooltip: React.FC<{ content: string }> = ({ content }) => {
   );
 };
 
+const InfoRow: React.FC<{ label: string; value?: string }> = ({ label, value }) => {
+  let display = value || '--';
+  if (value && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    const p = value.substring(0, 10).split('-');
+    if (p.length === 3) display = `${p[2]}/${p[1]}/${p[0]}`;
+  }
+  return (
+    <div className="flex flex-col">
+      <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">{label}</span>
+      <span className="text-xs font-semibold text-slate-700">{display}</span>
+    </div>
+  );
+};
+
 const ALERT_CONFIGS: Record<string, { label: string; icon: any; color: string; bg: string; description: string }> = {
   'PEP_MOLECULAR': {
     label: 'CONFIRMADO O REGISTRO DE RESULTADOS DO TESTE MOLECULAR DNA-HPV NO PEP',
@@ -962,8 +976,9 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         // Filtrar por busca ativa (pacientes COM ou SEM acompanhamento — com filtro de datas se aplicável)
         if (filterBuscaAtiva !== null) {
           try {
-            const acompOpts: any = { fields: 'paciente', requestKey: null, batch: 500 };
+            const acompOpts: any = { fields: 'paciente,tipo_busca', requestKey: null, batch: 500 };
             const dateParts: string[] = [];
+            dateParts.push(`tipo_busca != "SEM BUSCA ATIVA (CONTATO OPORTUNIZADO NO ACOLHIMENTO)"`);
             if (filterDataInicio) dateParts.push(`data_busca >= "${filterDataInicio}"`);
             if (filterDataFim) dateParts.push(`data_busca <= "${filterDataFim} 23:59:59"`);
             if (dateParts.length > 0) acompOpts.filter = dateParts.join(' && ');
@@ -2348,204 +2363,198 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       {/* Modal de Detalhes do Paciente */}
       {isDetailsModalOpen && activePatientForDetails && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xl z-[110] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-2xl max-h-[92vh] rounded-3xl shadow-[0_32px_64px_-12px_rgba(0,0,0,0.25)] flex flex-col border border-slate-200/60 animate-in zoom-in-95 duration-300 overflow-hidden">
-            {/* Header com avatar e gradiente */}
-            <div className="relative bg-gradient-to-br from-[#001b3d] via-[#002b5c] to-[#0a3a6e] px-6 sm:px-8 py-7 shrink-0 overflow-hidden">
-              {/* Decoração de fundo */}
-              <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3" />
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/4" />
-              <div className="absolute top-4 right-20 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-              <div className="absolute bottom-6 right-12 w-1.5 h-1.5 bg-blue-300 rounded-full animate-pulse delay-300" />
-
-              <div className="relative flex items-center gap-4 sm:gap-5">
-                {/* Avatar com iniciais */}
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center shadow-[inset_0_2px_4px_rgba(255,255,255,0.15)] text-white text-xl sm:text-2xl font-black">
-                  {activePatientForDetails.nome.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-white text-lg sm:text-xl font-black tracking-tight leading-tight truncate">{activePatientForDetails.nome}</h3>
-                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/10 text-white/70 text-[10px] font-bold uppercase tracking-wide">
-                      <span className="w-1 h-1 rounded-full bg-emerald-400" />
-                      CNS: {activePatientForDetails.cns}
-                    </span>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/10 text-white/70 text-[10px] font-bold uppercase tracking-wide">
-                      {activePatientForDetails.idade} anos
-                    </span>
-                  </div>
-                </div>
+          <div className="relative bg-white w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl shadow-slate-900/10 overflow-hidden border border-slate-200/60 animate-in zoom-in-95 duration-300">
+            {/* Header */}
+            <div className="relative flex items-center gap-4 bg-gradient-to-r from-cyan-600 via-cyan-500 to-teal-500 px-5 py-5 shrink-0">
+              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-xl font-black text-white shadow-lg ring-2 ring-white/20">
+                {activePatientForDetails.nome.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
               </div>
-              <button onClick={handleCloseDetails} className="absolute top-4 right-4 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all duration-300 hover:rotate-90 backdrop-blur-sm">
-                <X className="w-5 h-5" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-xs font-semibold text-cyan-100/70 mb-0.5">
+                  <Eye className="h-3.5 w-3.5" />
+                  FICHA DO PACIENTE
+                </div>
+                <h2 className="truncate text-lg font-black text-white leading-tight">{activePatientForDetails.nome}</h2>
+              </div>
+              <button onClick={handleCloseDetails} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/10 text-white/70 ring-1 ring-white/10 transition-all hover:bg-white/20 hover:text-white">
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="p-6 sm:p-8 overflow-y-auto no-scrollbar flex-1">
-              {/* Grid de informações */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
-                <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-2xl p-4 border border-slate-200/60">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1.5">Grupo</p>
-                  <p className="text-sm font-black text-slate-800">{activePatientForDetails.grupo}</p>
-                </div>
-                <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-2xl p-4 border border-slate-200/60">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1.5">Nascimento</p>
-                  <p className="text-sm font-black text-slate-800">{formatarData(activePatientForDetails.data_nascimento)}</p>
-                </div>
-                <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-2xl p-4 border border-slate-200/60 col-span-2 sm:col-span-1">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1.5">Unidade</p>
-                  <p className="text-sm font-black text-slate-800 leading-tight">{activePatientForDetails.unidade}</p>
-                </div>
-              </div>
-
-              {/* Equipe / Microárea */}
-              <div className="flex gap-3 mb-6">
-                <div className="flex-1 bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-2xl p-4 border border-blue-100/60">
-                  <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.15em] mb-1">Equipe</p>
-                  <p className="text-sm font-bold text-blue-800">{activePatientForDetails.equipe}</p>
-                </div>
-                <div className="flex-1 bg-gradient-to-br from-violet-50 to-purple-50/50 rounded-2xl p-4 border border-violet-100/60">
-                  <p className="text-[9px] font-black text-violet-400 uppercase tracking-[0.15em] mb-1">Microárea</p>
-                  <p className="text-sm font-black text-violet-800">{activePatientForDetails.microarea}</p>
-                </div>
-              </div>
-
-              {/* Status de Rastreamento */}
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-                    <Activity className="w-3 h-3 text-primary" />
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 no-scrollbar">
+              <div className="space-y-3">
+                {/* Dados Pessoais */}
+                <div className="rounded-xl border-l-4 border-cyan-500 bg-gradient-to-r from-cyan-50/80 to-white p-3.5">
+                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-cyan-700 mb-3 flex items-center gap-2">
+                    <Users className="h-3.5 w-3.5" /> Dados Pessoais
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                    <InfoRow label="Nome Completo" value={activePatientForDetails.nome} />
+                    <InfoRow label="CNS" value={activePatientForDetails.cns} />
+                    <InfoRow label="Data de Nascimento" value={activePatientForDetails.data_nascimento} />
+                    <InfoRow label="Idade" value={activePatientForDetails.idade ? `${activePatientForDetails.idade} anos` : undefined} />
+                    <InfoRow label="CPF" value={activePatientForDetails.cpf} />
+                    <InfoRow label="Telefone" value={activePatientForDetails.telefone || activePatientForDetails.celular} />
+                    <InfoRow label="Grupo" value={activePatientForDetails.grupo} />
                   </div>
-                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em]">Status de Rastreamento</h4>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* DNA-HPV PEP */}
-                  <div className="bg-white rounded-xl border border-slate-200/60 p-3 shadow-sm">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-2">DNA-HPV (PEP)</p>
-                    <DatePickerPTBR
-                      value={activePatientForDetails.dna_hpv_pep || ''}
-                      isISO={false}
-                      onChange={(displayDate) => handleUpdateCitoLaboratorio(activePatientForDetails.id, displayDate)}
-                    />
+                {/* Localização */}
+                <div className="rounded-xl border-l-4 border-amber-500 bg-gradient-to-r from-amber-50/80 to-white p-3.5">
+                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-amber-700 mb-3 flex items-center gap-2">
+                    <Building className="h-3.5 w-3.5" /> Localização
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                    <InfoRow label="Unidade de Saúde" value={activePatientForDetails.unidade} />
+                    <InfoRow label="Equipe" value={activePatientForDetails.equipe} />
+                    <InfoRow label="Microárea" value={activePatientForDetails.microarea} />
+                    <InfoRow label="Endereço" value={activePatientForDetails.endereco || activePatientForDetails.logradouro} />
                   </div>
+                </div>
 
-                  {/* Badge de Status */}
-                  {activePatientForDetails.alertas && ALERT_CONFIGS[activePatientForDetails.alertas] ? (
-                    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl ${ALERT_CONFIGS[activePatientForDetails.alertas].bg} shadow-sm`}>
-                      <div className="p-1.5 bg-white/20 rounded-lg">
-                        {React.createElement(ALERT_CONFIGS[activePatientForDetails.alertas].icon, { className: "w-4 h-4 text-white" })}
-                      </div>
-                      <span className="text-[10px] font-black uppercase leading-tight text-white">
-                        {ALERT_CONFIGS[activePatientForDetails.alertas].label}
-                      </span>
+                {/* Rastreamento */}
+                <div className="rounded-xl border-l-4 border-emerald-500 bg-gradient-to-r from-emerald-50/80 to-white p-3.5">
+                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-700 mb-3 flex items-center gap-2">
+                    <ClipboardList className="h-3.5 w-3.5" /> Rastreamento
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                    <InfoRow label="Cito (PEP)" value={activePatientForDetails.cito_pep} />
+                    <InfoRow label="Cito (Lab)" value={activePatientForDetails.cito_lab} />
+                    <InfoRow label="DNA-HPV (PEP)" value={activePatientForDetails.dna_hpv_pep} />
+                    <InfoRow label="DNA-HPV (GAL)" value={activePatientForDetails.dna_hpv_gal} />
+                    <InfoRow label="Status" value={activePatientForDetails.status} />
+                    <InfoRow label="Obs. Paciente" value={activePatientForDetails.observacoes} />
+                  </div>
+                </div>
+
+                {/* DatePicker DNA-HPV PEP */}
+                <div className="rounded-xl border border-slate-200/60 p-3 shadow-sm">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-2">DNA-HPV (PEP) - Editar Data</p>
+                  <DatePickerPTBR
+                    value={activePatientForDetails.dna_hpv_pep || ''}
+                    isISO={false}
+                    onChange={(displayDate) => handleUpdateCitoLaboratorio(activePatientForDetails.id, displayDate)}
+                  />
+                </div>
+
+                {/* Badge de Alerta */}
+                {activePatientForDetails.alertas && ALERT_CONFIGS[activePatientForDetails.alertas] ? (
+                  <div className={`flex items-center gap-3 px-4 py-3 rounded-xl ${ALERT_CONFIGS[activePatientForDetails.alertas].bg} shadow-sm`}>
+                    <div className="p-1.5 bg-white/20 rounded-lg">
+                      {React.createElement(ALERT_CONFIGS[activePatientForDetails.alertas].icon, { className: "w-4 h-4 text-white" })}
                     </div>
-                  ) : (
-                    <div className="px-4 py-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-400 text-[10px] font-black uppercase italic">
-                      Status não identificado
-                    </div>
-                  )}
-
-                  {/* Datas de Exames */}
-                  <div className="flex flex-wrap gap-2">
-                    {activePatientForDetails.dna_hpv_pep && activePatientForDetails.dna_hpv_pep !== '--' && (
-                      <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-black uppercase">DNA-HPV (PEP): {formatarData(activePatientForDetails.dna_hpv_pep)}</span>
-                    )}
-                    {activePatientForDetails.dna_hpv_gal !== '--' && (
-                      <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase">DNA-HPV (GAL): {formatarData(activePatientForDetails.dna_hpv_gal)}</span>
-                    )}
-                    {activePatientForDetails.unidade_solicitante && activePatientForDetails.unidade_solicitante !== '--' && (
-                      <span className="px-2.5 py-1 rounded-lg bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-100 text-[9px] font-black uppercase">Solicitante: {activePatientForDetails.unidade_solicitante}</span>
-                    )}
-                    {activePatientForDetails.cito_pep !== '--' && (
-                      <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase">CITO (PEP): {formatarData(activePatientForDetails.cito_pep)}</span>
-                    )}
-                    {activePatientForDetails.cito_lab !== '--' && (
-                      <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-100 text-[9px] font-black uppercase">CITO (LAB): {formatarData(activePatientForDetails.cito_lab)}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Alertas de Rastreamento */}
-              {activePatientForDetails.alertas_rastreamento && activePatientForDetails.alertas_rastreamento !== '--' && (
-                <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 rounded-2xl">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                    <p className="text-[9px] font-black text-amber-600 uppercase tracking-[0.15em]">Observações de Alerta</p>
-                  </div>
-                  <p className="text-xs font-bold text-amber-800 leading-relaxed">{activePatientForDetails.alertas_rastreamento}</p>
-                </div>
-              )}
-
-              {/* Timeline de Buscas */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200/50 flex items-center justify-center">
-                      <ClipboardList className="w-3 h-3 text-slate-500" />
-                    </div>
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em]">Buscas Realizadas</h4>
-                  </div>
-                  {!detailsAcompsLoading && (
-                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">
-                      {detailsAcomps.length} {detailsAcomps.length === 1 ? 'registro' : 'registros'}
+                    <span className="text-[10px] font-black uppercase leading-tight text-white">
+                      {ALERT_CONFIGS[activePatientForDetails.alertas].label}
                     </span>
-                  )}
-                </div>
-
-                {detailsAcompsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-5 h-5 text-slate-300 animate-spin" />
-                  </div>
-                ) : detailsAcomps.length === 0 ? (
-                  <div className="text-center py-8 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50">
-                    <SearchX className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="text-[11px] font-bold text-slate-400">Nenhuma busca registrada</p>
                   </div>
                 ) : (
-                  <div className="relative">
-                    <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gradient-to-b from-slate-300 via-slate-200 to-transparent" />
-                    <div className="space-y-1">
-                      {detailsAcomps.map((acomp, idx) => {
-                        const dataFormatada = acomp.data_busca
-                          ? (() => { const p = acomp.data_busca.substring(0,10).split('-'); const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']; return `${p[2]}/${meses[parseInt(p[1])-1]}/${p[0]}`; })()
-                          : '--';
-                        return (
-                          <div key={acomp.id} className="relative flex items-start gap-4 py-3 px-1 group hover:bg-slate-50/50 rounded-xl transition-colors">
-                            <div className="relative z-10 mt-0.5">
-                              <div className={`w-[11px] h-[11px] rounded-full border-2 border-white shadow-sm ${idx === 0 ? 'bg-gradient-to-br from-slate-600 to-slate-800' : 'bg-slate-300 group-hover:bg-slate-400'} transition-colors`} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`text-[11px] font-black tabular-nums ${idx === 0 ? 'text-slate-800' : 'text-slate-600'}`}>
-                                  {dataFormatada}
-                                </span>
-                                {acomp.tipo_busca && (
-                                  <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[9px] font-bold uppercase tracking-wide">
-                                    {acomp.tipo_busca}
-                                  </span>
-                                )}
-                                {acomp.situacao_pos_busca && (
-                                  <span className="px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-400 text-[9px] font-bold uppercase tracking-wide border border-slate-100">
-                                    {acomp.situacao_pos_busca}
-                                  </span>
-                                )}
-                              </div>
-                              {acomp.observacoes && (
-                                <p className="text-[10px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">{acomp.observacoes}</p>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                  <div className="px-4 py-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-400 text-[10px] font-black uppercase italic">
+                    Status não identificado
                   </div>
                 )}
+
+                {/* Datas de Exames */}
+                <div className="flex flex-wrap gap-2">
+                  {activePatientForDetails.dna_hpv_pep && activePatientForDetails.dna_hpv_pep !== '--' && (
+                    <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-black uppercase">DNA-HPV (PEP): {formatarData(activePatientForDetails.dna_hpv_pep)}</span>
+                  )}
+                  {activePatientForDetails.dna_hpv_gal !== '--' && (
+                    <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase">DNA-HPV (GAL): {formatarData(activePatientForDetails.dna_hpv_gal)}</span>
+                  )}
+                  {activePatientForDetails.unidade_solicitante && activePatientForDetails.unidade_solicitante !== '--' && (
+                    <span className="px-2.5 py-1 rounded-lg bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-100 text-[9px] font-black uppercase">Solicitante: {activePatientForDetails.unidade_solicitante}</span>
+                  )}
+                  {activePatientForDetails.cito_pep !== '--' && (
+                    <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase">CITO (PEP): {formatarData(activePatientForDetails.cito_pep)}</span>
+                  )}
+                  {activePatientForDetails.cito_lab !== '--' && (
+                    <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-100 text-[9px] font-black uppercase">CITO (LAB): {formatarData(activePatientForDetails.cito_lab)}</span>
+                  )}
+                </div>
+
+                {/* Alertas de Rastreamento */}
+                {activePatientForDetails.alertas_rastreamento && activePatientForDetails.alertas_rastreamento !== '--' && (
+                  <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 rounded-xl">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                      <p className="text-[9px] font-black text-amber-600 uppercase tracking-[0.15em]">Observações de Alerta</p>
+                    </div>
+                    <p className="text-xs font-bold text-amber-800 leading-relaxed">{activePatientForDetails.alertas_rastreamento}</p>
+                  </div>
+                )}
+
+                {/* Timeline de Buscas */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200/50 flex items-center justify-center">
+                        <ClipboardList className="w-3 h-3 text-slate-500" />
+                      </div>
+                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em]">Buscas Realizadas</h4>
+                    </div>
+                    {!detailsAcompsLoading && (
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                        {detailsAcomps.length} {detailsAcomps.length === 1 ? 'registro' : 'registros'}
+                      </span>
+                    )}
+                  </div>
+
+                  {detailsAcompsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-5 h-5 text-slate-300 animate-spin" />
+                    </div>
+                  ) : detailsAcomps.length === 0 ? (
+                    <div className="text-center py-8 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50">
+                      <SearchX className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-[11px] font-bold text-slate-400">Nenhuma busca registrada</p>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gradient-to-b from-slate-300 via-slate-200 to-transparent" />
+                      <div className="space-y-1">
+                        {detailsAcomps.map((acomp, idx) => {
+                          const dataFormatada = acomp.data_busca
+                            ? (() => { const p = acomp.data_busca.substring(0,10).split('-'); const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']; return `${p[2]}/${meses[parseInt(p[1])-1]}/${p[0]}`; })()
+                            : '--';
+                          return (
+                            <div key={acomp.id} className="relative flex items-start gap-4 py-3 px-1 group hover:bg-slate-50/50 rounded-xl transition-colors">
+                              <div className="relative z-10 mt-0.5">
+                                <div className={`w-[11px] h-[11px] rounded-full border-2 border-white shadow-sm ${idx === 0 ? 'bg-gradient-to-br from-slate-600 to-slate-800' : 'bg-slate-300 group-hover:bg-slate-400'} transition-colors`} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`text-[11px] font-black tabular-nums ${idx === 0 ? 'text-slate-800' : 'text-slate-600'}`}>
+                                    {dataFormatada}
+                                  </span>
+                                  {acomp.tipo_busca && (
+                                    <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[9px] font-bold uppercase tracking-wide">
+                                      {acomp.tipo_busca}
+                                    </span>
+                                  )}
+                                  {acomp.situacao_pos_busca && (
+                                    <span className="px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-400 text-[9px] font-bold uppercase tracking-wide border border-slate-100">
+                                      {acomp.situacao_pos_busca}
+                                    </span>
+                                  )}
+                                </div>
+                                {acomp.observacoes && (
+                                  <p className="text-[10px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">{acomp.observacoes}</p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="px-6 sm:px-8 py-5 border-t border-slate-100 bg-gradient-to-b from-white to-slate-50 flex justify-end shrink-0">
-              <button onClick={handleCloseDetails} className="px-8 py-2.5 rounded-xl text-sm font-black text-white bg-gradient-to-r from-[#001b3d] to-[#002b5c] shadow-lg shadow-slate-300/50 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all w-full sm:w-auto">
+            {/* Footer */}
+            <div className="flex items-center justify-end px-5 py-4 border-t border-slate-100 shrink-0">
+              <button onClick={handleCloseDetails} className="text-xs font-bold text-slate-400 transition-colors hover:text-slate-600 px-5 py-2.5">
                 Fechar
               </button>
             </div>
