@@ -1238,7 +1238,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                         case 'observacoes': va = a.observacoes || ''; vb = b.observacoes || ''; break;
                         default: va = a.data_busca || ''; vb = b.data_busca || '';
                       }
-                      const cmp = va.localeCompare(vb, 'pt-BR', { sensitivity: 'base' });
+                      const cmp = String(va || '').localeCompare(String(vb || ''), 'pt-BR', { sensitivity: 'base' });
                       return sortDir === 'asc' ? cmp : -cmp;
                     }).map((acomp) => {
                         const p = acomp.expand?.paciente as any || {};
@@ -1295,6 +1295,11 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                                 <span className="text-[8px] font-bold text-slate-400 uppercase">
                                   {acomp.tipo_busca || '--'}
                                 </span>
+                                {getSelectLabel(acomp.situacao_pos_busca || '', SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' && acomp.data_do_agendamento && (
+                                  <span className="text-[8px] font-bold text-cyan-600 uppercase">
+                                    Agendado para {(() => { const p = (acomp.data_do_agendamento || '').substring(0, 10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : acomp.data_do_agendamento; })()}
+                                  </span>
+                                )}
                               </div>
                             </td>
                             <td className="px-4 py-4 text-center align-middle">
@@ -1435,7 +1440,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                         <div>
                           <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
                             <Calendar className="h-3 w-3" />
-                            Data do Agendamento
+                            Data do Agendamento <span className="text-red-500">*</span>
                           </label>
                           <DatePickerPTBR value={(selectedAcompanhamento.data_do_agendamento || '').substring(0, 10)} isISO={true} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, data_do_agendamento: val})} />
                         </div>
@@ -1644,7 +1649,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                           <div>
                             <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
                               <Calendar className="h-3 w-3" />
-                              Data do Agendamento
+                              Data do Agendamento <span className="text-red-500">*</span>
                             </label>
                             <DatePickerPTBR value={createDataAgendamento} isISO={false} onChange={setCreateDataAgendamento} />
                           </div>
