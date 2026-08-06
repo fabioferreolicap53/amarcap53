@@ -2366,18 +2366,18 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xl z-[110] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
           <div className="relative bg-white w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl shadow-slate-900/10 overflow-hidden border border-slate-200/60 animate-in zoom-in-95 duration-300">
             {/* Header */}
-            <div className="relative flex items-center gap-4 bg-gradient-to-r from-cyan-600 via-cyan-500 to-teal-500 px-5 py-5 shrink-0">
-              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-xl font-black text-white shadow-lg ring-2 ring-white/20">
+            <div className="relative flex items-center gap-4 bg-gradient-to-r from-[#1c2e4a] via-[#253c61] to-[#1a365d] px-5 py-5 shrink-0">
+              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 text-xl font-black text-white shadow-lg shadow-cyan-500/30 ring-2 ring-white/20">
                 {activePatientForDetails.nome.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 text-xs font-semibold text-cyan-100/70 mb-0.5">
+                <div className="flex items-center gap-2 text-xs font-semibold text-cyan-200/70 mb-0.5">
                   <Eye className="h-3.5 w-3.5" />
                   FICHA DO PACIENTE
                 </div>
                 <h2 className="truncate text-lg font-black text-white leading-tight">{activePatientForDetails.nome}</h2>
               </div>
-              <button onClick={handleCloseDetails} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/10 text-white/70 ring-1 ring-white/10 transition-all hover:bg-white/20 hover:text-white">
+              <button onClick={handleCloseDetails} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/50 ring-1 ring-white/10 transition-all hover:bg-white/15 hover:text-white">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -2385,29 +2385,38 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-5 py-4 no-scrollbar">
               <div className="space-y-3">
-                {/* Dados Pessoais */}
+                {/* Dados Pessoais & Localização */}
                 <div className="rounded-xl border-l-4 border-cyan-500 bg-gradient-to-r from-cyan-50/80 to-white p-3.5">
                   <p className="text-[11px] font-extrabold uppercase tracking-widest text-cyan-700 mb-3 flex items-center gap-2">
-                    <Users className="h-3.5 w-3.5" /> Dados Pessoais
+                    <Users className="h-3.5 w-3.5" /> Dados Pessoais & Localização
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-                    <InfoRow label="Nome Completo" value={activePatientForDetails.nome} />
-                    <InfoRow label="CNS" value={activePatientForDetails.cns} />
-                    <InfoRow label="Data de Nascimento" value={activePatientForDetails.data_nascimento} />
-                    <InfoRow label="Idade" value={activePatientForDetails.idade ? `${activePatientForDetails.idade} anos` : undefined} />
-                    <InfoRow label="Grupo" value={activePatientForDetails.grupo} />
-                  </div>
-                </div>
-
-                {/* Localização */}
-                <div className="rounded-xl border-l-4 border-amber-500 bg-gradient-to-r from-amber-50/80 to-white p-3.5">
-                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-amber-700 mb-3 flex items-center gap-2">
-                    <Building className="h-3.5 w-3.5" /> Localização
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-                    <InfoRow label="Unidade de Saúde" value={activePatientForDetails.unidade} />
-                    <InfoRow label="Equipe" value={activePatientForDetails.equipe} />
-                    <InfoRow label="Microárea" value={activePatientForDetails.microarea} />
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    {/* Dados Pessoais */}
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-cyan-600 mb-1 flex items-center gap-1.5">
+                        <Users className="h-2.5 w-2.5" /> Dados Pessoais
+                      </p>
+                      <InfoRow label="Nome Completo" value={activePatientForDetails.nome} />
+                      <InfoRow label="CNS" value={activePatientForDetails.cns} />
+                      <InfoRow label="Data de Nascimento" value={activePatientForDetails.data_nascimento} />
+                      <div className="flex gap-4">
+                        <div className="flex-1">
+                          <InfoRow label="Idade" value={activePatientForDetails.idade ? `${activePatientForDetails.idade} anos` : undefined} />
+                        </div>
+                        <div className="flex-1">
+                          <InfoRow label="Grupo" value={activePatientForDetails.grupo} />
+                        </div>
+                      </div>
+                    </div>
+                    {/* Localização */}
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-cyan-600 mb-1 flex items-center gap-1.5">
+                        <MapPin className="h-2.5 w-2.5" /> Localização
+                      </p>
+                      <InfoRow label="Unidade de Saúde" value={activePatientForDetails.unidade} />
+                      <InfoRow label="Equipe" value={activePatientForDetails.equipe} />
+                      <InfoRow label="Microárea" value={activePatientForDetails.microarea} />
+                    </div>
                   </div>
                 </div>
 
@@ -2425,31 +2434,33 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   </div>
                 </div>
 
-                {/* DatePicker DNA-HPV PEP */}
-                <div className="rounded-xl border border-slate-200/60 p-3 shadow-sm">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-2">DNA-HPV (PEP) - Editar Data</p>
-                  <DatePickerPTBR
-                    value={activePatientForDetails.dna_hpv_pep || ''}
-                    isISO={false}
-                    onChange={(displayDate) => handleUpdateCitoLaboratorio(activePatientForDetails.id, displayDate)}
-                  />
+                {/* DatePicker DNA-HPV PEP + Badge de Alerta */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-slate-200/60 p-3 shadow-sm">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-2">DNA-HPV (PEP) - Editar Data</p>
+                    <DatePickerPTBR
+                      value={activePatientForDetails.dna_hpv_pep || ''}
+                      isISO={false}
+                      onChange={(displayDate) => handleUpdateCitoLaboratorio(activePatientForDetails.id, displayDate)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-center">
+                    {activePatientForDetails.alertas && ALERT_CONFIGS[activePatientForDetails.alertas] ? (
+                      <div className={`flex items-center gap-2 px-4 py-3 rounded-xl ${ALERT_CONFIGS[activePatientForDetails.alertas].bg} shadow-sm w-full`}>
+                        <div className="p-1.5 bg-white/20 rounded-lg shrink-0">
+                          {React.createElement(ALERT_CONFIGS[activePatientForDetails.alertas].icon, { className: "w-4 h-4 text-white" })}
+                        </div>
+                        <span className="text-[9px] font-black uppercase leading-tight text-white">
+                          {ALERT_CONFIGS[activePatientForDetails.alertas].label}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="px-4 py-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-400 text-[9px] font-black uppercase italic w-full text-center">
+                        Status não identificado
+                      </div>
+                    )}
+                  </div>
                 </div>
-
-                {/* Badge de Alerta */}
-                {activePatientForDetails.alertas && ALERT_CONFIGS[activePatientForDetails.alertas] ? (
-                  <div className={`flex items-center gap-3 px-4 py-3 rounded-xl ${ALERT_CONFIGS[activePatientForDetails.alertas].bg} shadow-sm`}>
-                    <div className="p-1.5 bg-white/20 rounded-lg">
-                      {React.createElement(ALERT_CONFIGS[activePatientForDetails.alertas].icon, { className: "w-4 h-4 text-white" })}
-                    </div>
-                    <span className="text-[10px] font-black uppercase leading-tight text-white">
-                      {ALERT_CONFIGS[activePatientForDetails.alertas].label}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="px-4 py-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-400 text-[10px] font-black uppercase italic">
-                    Status não identificado
-                  </div>
-                )}
 
                 {/* Datas de Exames */}
                 <div className="flex flex-wrap gap-2">

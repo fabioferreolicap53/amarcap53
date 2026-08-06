@@ -115,7 +115,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         const target = e.target as HTMLElement;
-        if (!target.closest('.multiselect-dropdown-content')) {
+        if (!target.closest('.multiselect-dropdown-content') && !target.closest('[data-dropdown-root]')) {
           setIsOpen(false);
         }
       }

@@ -3,7 +3,7 @@ import { Header } from '../components/Header';
 import { ScrollIndicator } from '../components/ScrollIndicator';
 import { Footer } from '../components/Footer';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, Building, AlertTriangle, MessageSquare, CheckCircle2, RotateCcw, Users, MapPin, Plus, Printer, Clock, Loader2 } from 'lucide-react';
+import { TrendingUp, BadgeCheck, Search, Filter, Download, Phone, Home, FileText, Eye, ChevronLeft, ChevronRight, Edit, Trash2, X, ClipboardList, Calendar, Info, AlertTriangle, MessageSquare, CheckCircle2, RotateCcw, Users, MapPin, Plus, Printer, Clock, Loader2 } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
 import { DatePickerPTBR } from '../components/DatePickerPTBR';
@@ -1384,7 +1384,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xl z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
           <div data-dropdown-root="true" className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl shadow-slate-900/10 animate-in zoom-in-95 duration-300">
             {/* Header */}
-            <div className="relative flex items-center gap-4 bg-gradient-to-r from-slate-900 via-slate-800 to-cyan-900 px-5 py-5 sm:px-6 shrink-0">
+            <div className="relative flex items-center gap-4 bg-gradient-to-r from-[#1c2e4a] via-[#253c61] to-[#1a365d] px-5 py-5 sm:px-6 shrink-0">
               <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 text-xl font-black text-white shadow-lg shadow-cyan-500/30 ring-2 ring-white/20">
                 {(activeSelectedAcompanhamento.expand?.paciente?.nome || '??').split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
               </div>
@@ -1740,8 +1740,8 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xl z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
           <div className="relative bg-white w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl shadow-slate-900/10 overflow-hidden border border-slate-200/60 animate-in zoom-in-95 duration-300">
             {/* Header */}
-            <div className="relative flex items-center gap-4 bg-gradient-to-r from-cyan-600 via-cyan-500 to-teal-500 px-5 py-5 shrink-0">
-              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-xl font-black text-white shadow-lg ring-2 ring-white/20">
+            <div className="relative flex items-center gap-4 bg-gradient-to-r from-[#1c2e4a] via-[#253c61] to-[#1a365d] px-5 py-5 shrink-0">
+              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 text-xl font-black text-white shadow-lg shadow-cyan-500/30 ring-2 ring-white/20">
                 {viewPacienteModal.paciente ? (
                   (viewPacienteModal.paciente.nome || '??').split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()
                 ) : (
@@ -1749,7 +1749,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 text-xs font-semibold text-cyan-100/70 mb-0.5">
+                <div className="flex items-center gap-2 text-xs font-semibold text-cyan-200/70 mb-0.5">
                   <Eye className="h-3.5 w-3.5" />
                   FICHA DO PACIENTE
                 </div>
@@ -1757,7 +1757,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                   {viewPacienteModal.loading ? 'Carregando...' : (viewPacienteModal.paciente?.nome || 'Paciente não encontrado')}
                 </h2>
               </div>
-              <button onClick={() => setViewPacienteModal({ isOpen: false, paciente: null, loading: false })} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/10 text-white/70 ring-1 ring-white/10 transition-all hover:bg-white/20 hover:text-white">
+              <button onClick={() => setViewPacienteModal({ isOpen: false, paciente: null, loading: false })} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/50 ring-1 ring-white/10 transition-all hover:bg-white/15 hover:text-white">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -1771,38 +1771,47 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                 </div>
               ) : viewPacienteModal.paciente ? (
                 <div className="space-y-3">
-                  {/* Dados Pessoais */}
+                  {/* Dados Pessoais & Localização */}
                   <div className="rounded-xl border-l-4 border-cyan-500 bg-gradient-to-r from-cyan-50/80 to-white p-3.5">
                     <p className="text-[11px] font-extrabold uppercase tracking-widest text-cyan-700 mb-3 flex items-center gap-2">
-                      <Users className="h-3.5 w-3.5" /> Dados Pessoais
+                      <Users className="h-3.5 w-3.5" /> Dados Pessoais & Localização
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-                      <InfoRow label="Nome Completo" value={viewPacienteModal.paciente.nome} />
-                      <InfoRow label="CNS" value={viewPacienteModal.paciente.cns} />
-                      <InfoRow label="Data de Nascimento" value={viewPacienteModal.paciente.data_nascimento} />
-                      <InfoRow label="Idade" value={(() => {
-                        const dn = viewPacienteModal.paciente.data_nascimento;
-                        if (!dn) return undefined;
-                        const nasc = new Date(dn.substring(0, 10));
-                        const hoje = new Date();
-                        let idade = hoje.getFullYear() - nasc.getFullYear();
-                        const m = hoje.getMonth() - nasc.getMonth();
-                        if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
-                        return `${idade} anos`;
-                      })()} />
-                      <InfoRow label="Grupo" value={viewPacienteModal.paciente.grupo} />
-                    </div>
-                  </div>
-
-                  {/* Localização */}
-                  <div className="rounded-xl border-l-4 border-amber-500 bg-gradient-to-r from-amber-50/80 to-white p-3.5">
-                    <p className="text-[11px] font-extrabold uppercase tracking-widest text-amber-700 mb-3 flex items-center gap-2">
-                      <Building className="h-3.5 w-3.5" /> Localização
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-                      <InfoRow label="Unidade de Saúde" value={viewPacienteModal.paciente.unidade} />
-                      <InfoRow label="Equipe" value={viewPacienteModal.paciente.equipe} />
-                      <InfoRow label="Microárea" value={viewPacienteModal.paciente.microarea} />
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      {/* Dados Pessoais */}
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-cyan-600 mb-1 flex items-center gap-1.5">
+                          <Users className="h-2.5 w-2.5" /> Dados Pessoais
+                        </p>
+                        <InfoRow label="Nome Completo" value={viewPacienteModal.paciente.nome} />
+                        <InfoRow label="CNS" value={viewPacienteModal.paciente.cns} />
+                        <InfoRow label="Data de Nascimento" value={viewPacienteModal.paciente.data_nascimento} />
+                        <div className="flex gap-4">
+                          <div className="flex-1">
+                            <InfoRow label="Idade" value={(() => {
+                              const dn = viewPacienteModal.paciente.data_nascimento;
+                              if (!dn) return undefined;
+                              const nasc = new Date(dn.substring(0, 10));
+                              const hoje = new Date();
+                              let idade = hoje.getFullYear() - nasc.getFullYear();
+                              const m = hoje.getMonth() - nasc.getMonth();
+                              if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+                              return `${idade} anos`;
+                            })()} />
+                          </div>
+                          <div className="flex-1">
+                            <InfoRow label="Grupo" value={viewPacienteModal.paciente.grupo} />
+                          </div>
+                        </div>
+                      </div>
+                      {/* Localização */}
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-cyan-600 mb-1 flex items-center gap-1.5">
+                          <MapPin className="h-2.5 w-2.5" /> Localização
+                        </p>
+                        <InfoRow label="Unidade de Saúde" value={viewPacienteModal.paciente.unidade} />
+                        <InfoRow label="Equipe" value={viewPacienteModal.paciente.equipe} />
+                        <InfoRow label="Microárea" value={viewPacienteModal.paciente.microarea} />
+                      </div>
                     </div>
                   </div>
 

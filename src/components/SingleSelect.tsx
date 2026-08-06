@@ -119,7 +119,7 @@ export const SingleSelect: React.FC<SingleSelectProps> = ({
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         const target = e.target as HTMLElement;
-        if (!target.closest('.singleselect-dropdown-content')) {
+        if (!target.closest('.singleselect-dropdown-content') && !target.closest('[data-dropdown-root]')) {
           setIsOpen(false);
         }
       }
