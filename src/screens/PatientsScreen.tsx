@@ -2394,8 +2394,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     <InfoRow label="CNS" value={activePatientForDetails.cns} />
                     <InfoRow label="Data de Nascimento" value={activePatientForDetails.data_nascimento} />
                     <InfoRow label="Idade" value={activePatientForDetails.idade ? `${activePatientForDetails.idade} anos` : undefined} />
-                    <InfoRow label="CPF" value={activePatientForDetails.cpf} />
-                    <InfoRow label="Telefone" value={activePatientForDetails.telefone || activePatientForDetails.celular} />
                     <InfoRow label="Grupo" value={activePatientForDetails.grupo} />
                   </div>
                 </div>
@@ -2409,7 +2407,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     <InfoRow label="Unidade de Saúde" value={activePatientForDetails.unidade} />
                     <InfoRow label="Equipe" value={activePatientForDetails.equipe} />
                     <InfoRow label="Microárea" value={activePatientForDetails.microarea} />
-                    <InfoRow label="Endereço" value={activePatientForDetails.endereco || activePatientForDetails.logradouro} />
                   </div>
                 </div>
 
@@ -2423,8 +2420,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                     <InfoRow label="Cito (Lab)" value={activePatientForDetails.cito_lab} />
                     <InfoRow label="DNA-HPV (PEP)" value={activePatientForDetails.dna_hpv_pep} />
                     <InfoRow label="DNA-HPV (GAL)" value={activePatientForDetails.dna_hpv_gal} />
-                    <InfoRow label="Status" value={activePatientForDetails.status} />
-                    <InfoRow label="Obs. Paciente" value={activePatientForDetails.observacoes} />
+
                   </div>
                 </div>
 

@@ -1577,8 +1577,6 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                     <InfoRow label="CNS" value={activePatientForDetails.cns} />
                     <InfoRow label="Data de Nascimento" value={activePatientForDetails.data_nascimento} />
                     <InfoRow label="Idade" value={`${activePatientForDetails.idade} anos`} />
-                    <InfoRow label="CPF" value={activePatientForDetails.cpf} />
-                    <InfoRow label="Telefone" value={activePatientForDetails.telefone || activePatientForDetails.celular} />
                     <InfoRow label="Grupo" value={activePatientForDetails.grupo} />
                   </div>
                 </div>
@@ -1592,7 +1590,6 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                     <InfoRow label="Unidade de Saúde" value={activePatientForDetails.unidade} />
                     <InfoRow label="Equipe" value={activePatientForDetails.equipe} />
                     <InfoRow label="Microárea" value={activePatientForDetails.microarea != null ? String(activePatientForDetails.microarea) : undefined} />
-                    <InfoRow label="Endereço" value={activePatientForDetails.endereco || activePatientForDetails.logradouro} />
                   </div>
                 </div>
 
@@ -1612,20 +1609,6 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                       </div>
                     </div>
                     <InfoRow label="DNA-HPV (GAL)" value={activePatientForDetails.dna_hpv_gal} />
-                    <div className="flex flex-col">
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Status</span>
-                      {activePatientForDetails.alertas && ALERT_CONFIGS[activePatientForDetails.alertas] ? (
-                        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${ALERT_CONFIGS[activePatientForDetails.alertas].bg} mt-0.5`}>
-                          <div className="p-1 bg-white/20 rounded">
-                            {React.createElement(ALERT_CONFIGS[activePatientForDetails.alertas].icon, { className: "w-3.5 h-3.5 text-white" })}
-                          </div>
-                          <span className="text-[10px] font-black uppercase leading-tight text-white">{ALERT_CONFIGS[activePatientForDetails.alertas].label}</span>
-                        </div>
-                      ) : (
-                        <span className="text-xs font-semibold text-slate-400 italic">Não identificado</span>
-                      )}
-                    </div>
-                    <InfoRow label="Obs. Paciente" value={activePatientForDetails.observacoes} />
                   </div>
                 </div>
               </div>

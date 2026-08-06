@@ -1790,8 +1790,6 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                         if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
                         return `${idade} anos`;
                       })()} />
-                      <InfoRow label="CPF" value={viewPacienteModal.paciente.cpf} />
-                      <InfoRow label="Telefone" value={viewPacienteModal.paciente.telefone || viewPacienteModal.paciente.celular} />
                       <InfoRow label="Grupo" value={viewPacienteModal.paciente.grupo} />
                     </div>
                   </div>
@@ -1805,7 +1803,6 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                       <InfoRow label="Unidade de Saúde" value={viewPacienteModal.paciente.unidade} />
                       <InfoRow label="Equipe" value={viewPacienteModal.paciente.equipe} />
                       <InfoRow label="Microárea" value={viewPacienteModal.paciente.microarea} />
-                      <InfoRow label="Endereço" value={viewPacienteModal.paciente.endereco || viewPacienteModal.paciente.logradouro} />
                     </div>
                   </div>
 
@@ -1819,8 +1816,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                       <InfoRow label="Cito (Lab)" value={viewPacienteModal.paciente.cito_lab} />
                       <InfoRow label="DNA-HPV (PEP)" value={viewPacienteModal.paciente.dna_hpv_pep} />
                       <InfoRow label="DNA-HPV (GAL)" value={viewPacienteModal.paciente.dna_hpv_gal} />
-                      <InfoRow label="Status" value={viewPacienteModal.paciente.status} />
-                      <InfoRow label="Obs. Paciente" value={viewPacienteModal.paciente.observacoes} />
+
                     </div>
                   </div>
                 </div>
