@@ -430,7 +430,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const toggleFavorite = async (id: string) => {
     if (!user?.id) return;
 
-    const collectionName = pb.authStore.model?.collectionName || 'users';
+    const collectionName = 'amarcap53_users';
     
     const isFav = favorites.includes(id);
     const newFavorites = isFav 
@@ -449,8 +449,9 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         favoritos: newFavorites
       });
       
-      // Sincroniza com o retorno real do servidor
+      // Sincroniza com o retorno real do servidor e propaga para AuthContext
       pb.authStore.save(pb.authStore.token, updatedUser);
+      await pb.collection(collectionName).authRefresh();
     } catch (error) {
       console.error("Erro ao sincronizar favoritos:", error);
       

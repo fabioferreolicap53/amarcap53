@@ -23,8 +23,8 @@ import {
 import Papa from 'papaparse';
 
 // Remove acentos via Unicode NFD decomposition (ex: "ESPERANÇA" → "ESPERANCA")
-const normalizeText = (str: string) =>
-  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim().replace(/\s+/g, ' ');
+const normalizeText = (str: any) =>
+  (typeof str === 'string' ? str : String(str ?? '')).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim().replace(/\s+/g, ' ');
 
 interface Paciente {
   id: string;
@@ -324,6 +324,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     : null;
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [patientForDetails, setPatientDetails] = useState<Paciente | null>(null);
+  const [detailsAcomps, setDetailsAcomps] = useState<any[]>([]);
+  const [detailsAcompsLoading, setDetailsAcompsLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -383,7 +385,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
   const toggleFavorite = async (id: string) => {
     if (!user?.id) return;
 
-    const collectionName = pb.authStore.model?.collectionName || 'users';
+    const collectionName = 'amarcap53_users';
     
     const isFav = favorites.includes(id);
     const newFavorites = isFav 
@@ -402,8 +404,9 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
         favoritos: newFavorites
       });
       
-      // Sincroniza com o retorno real do servidor
+      // Sincroniza e propaga para AuthContext
       pb.authStore.save(pb.authStore.token, updatedUser);
+      await pb.collection(collectionName).authRefresh();
     } catch (error) {
       console.error("Erro ao sincronizar favoritos:", error);
       
@@ -636,14 +639,30 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     return matchesSearch && matchesGrupo && matchesTipoBusca && matchesTipoContato && matchesSituacao && matchesEntraves && matchesData && matchesUnidade && matchesEquipe && matchesMicroarea;
   });
 
-  const handleOpenDetails = (paciente: Paciente) => {
+  const handleOpenDetails = async (paciente: Paciente) => {
     setPatientDetails(paciente);
     setIsDetailsModalOpen(true);
+    setDetailsAcompsLoading(true);
+    setDetailsAcomps([]);
+    try {
+      const records = await pb.collection('amarcap53_acompanhamentos').getFullList({
+        filter: `paciente = "${paciente.id}"`,
+        sort: '-data_busca',
+        fields: 'id,data_busca,situacao_pos_busca,tipo_busca,observacoes,data_do_agendamento',
+        requestKey: null
+      });
+      setDetailsAcomps(records);
+    } catch (err) {
+      console.error('[DETAILS] Erro ao buscar acompanhamentos:', err);
+    } finally {
+      setDetailsAcompsLoading(false);
+    }
   };
 
   const handleCloseDetails = () => {
     setIsDetailsModalOpen(false);
     setPatientDetails(null);
+    setDetailsAcomps([]);
   };
 
   const handleOpenModal = (paciente: Paciente) => {
@@ -1565,7 +1584,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="flex-1 overflow-y-auto px-5 py-4 no-scrollbar">
               <div className="space-y-3">
                 {/* Dados Pessoais */}
                 <div className="rounded-xl border-l-4 border-cyan-500 bg-gradient-to-r from-cyan-50/80 to-white p-3.5">
@@ -1576,7 +1595,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                     <InfoRow label="Nome Completo" value={activePatientForDetails.nome} />
                     <InfoRow label="CNS" value={activePatientForDetails.cns} />
                     <InfoRow label="Data de Nascimento" value={activePatientForDetails.data_nascimento} />
-                    <InfoRow label="Idade" value={`${activePatientForDetails.idade} anos`} />
+                    <InfoRow label="Idade" value={activePatientForDetails.idade ? `${activePatientForDetails.idade} anos` : undefined} />
                     <InfoRow label="Grupo" value={activePatientForDetails.grupo} />
                   </div>
                 </div>
@@ -1589,7 +1608,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
                     <InfoRow label="Unidade de Saúde" value={activePatientForDetails.unidade} />
                     <InfoRow label="Equipe" value={activePatientForDetails.equipe} />
-                    <InfoRow label="Microárea" value={activePatientForDetails.microarea != null ? String(activePatientForDetails.microarea) : undefined} />
+                    <InfoRow label="Microárea" value={activePatientForDetails.microarea} />
                   </div>
                 </div>
 
@@ -1601,28 +1620,133 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
                     <InfoRow label="Cito (PEP)" value={activePatientForDetails.cito_pep} />
                     <InfoRow label="Cito (Lab)" value={activePatientForDetails.cito_lab} />
-                    <div className="flex flex-col">
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">DNA-HPV (PEP)</span>
-                      <div className="mt-0.5">
-                        <DatePickerPTBR value={activePatientForDetails.dna_hpv_pep || ''} isISO={false}
-                          onChange={(displayDate) => handleUpdateCitoLaboratorio(activePatientForDetails.id, displayDate)} />
-                      </div>
-                    </div>
+                    <InfoRow label="DNA-HPV (PEP)" value={activePatientForDetails.dna_hpv_pep} />
                     <InfoRow label="DNA-HPV (GAL)" value={activePatientForDetails.dna_hpv_gal} />
                   </div>
                 </div>
-              </div>
 
-              {/* Alertas de Rastreamento */}
-              {activePatientForDetails.alertas_rastreamento && activePatientForDetails.alertas_rastreamento !== '--' && (
-                <div className="mt-3 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 rounded-xl">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                    <p className="text-[9px] font-black text-amber-600 uppercase tracking-[0.15em]">Observações de Alerta</p>
-                  </div>
-                  <p className="text-xs font-bold text-amber-800 leading-relaxed">{activePatientForDetails.alertas_rastreamento}</p>
+                {/* DatePicker DNA-HPV PEP */}
+                <div className="rounded-xl border border-slate-200/60 p-3 shadow-sm">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-2">DNA-HPV (PEP) - Editar Data</p>
+                  <DatePickerPTBR
+                    value={activePatientForDetails.dna_hpv_pep || ''}
+                    isISO={false}
+                    onChange={(displayDate) => handleUpdateCitoLaboratorio(activePatientForDetails.id, displayDate)}
+                  />
                 </div>
-              )}
+
+                {/* Badge de Alerta */}
+                {activePatientForDetails.alertas && ALERT_CONFIGS[activePatientForDetails.alertas] ? (
+                  <div className={`flex items-center gap-3 px-4 py-3 rounded-xl ${ALERT_CONFIGS[activePatientForDetails.alertas].bg} shadow-sm`}>
+                    <div className="p-1.5 bg-white/20 rounded-lg">
+                      {React.createElement(ALERT_CONFIGS[activePatientForDetails.alertas].icon, { className: "w-4 h-4 text-white" })}
+                    </div>
+                    <span className="text-[10px] font-black uppercase leading-tight text-white">
+                      {ALERT_CONFIGS[activePatientForDetails.alertas].label}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="px-4 py-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-400 text-[10px] font-black uppercase italic">
+                    Status não identificado
+                  </div>
+                )}
+
+                {/* Datas de Exames */}
+                <div className="flex flex-wrap gap-2">
+                  {activePatientForDetails.dna_hpv_pep && activePatientForDetails.dna_hpv_pep !== '--' && (
+                    <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-black uppercase">DNA-HPV (PEP): {formatarData(activePatientForDetails.dna_hpv_pep)}</span>
+                  )}
+                  {activePatientForDetails.dna_hpv_gal !== '--' && (
+                    <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase">DNA-HPV (GAL): {formatarData(activePatientForDetails.dna_hpv_gal)}</span>
+                  )}
+                  {activePatientForDetails.unidade_solicitante && activePatientForDetails.unidade_solicitante !== '--' && (
+                    <span className="px-2.5 py-1 rounded-lg bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-100 text-[9px] font-black uppercase">Solicitante: {activePatientForDetails.unidade_solicitante}</span>
+                  )}
+                  {activePatientForDetails.cito_pep !== '--' && (
+                    <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase">CITO (PEP): {formatarData(activePatientForDetails.cito_pep)}</span>
+                  )}
+                  {activePatientForDetails.cito_lab !== '--' && (
+                    <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-100 text-[9px] font-black uppercase">CITO (LAB): {formatarData(activePatientForDetails.cito_lab)}</span>
+                  )}
+                </div>
+
+                {/* Alertas de Rastreamento */}
+                {activePatientForDetails.alertas_rastreamento && activePatientForDetails.alertas_rastreamento !== '--' && (
+                  <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 rounded-xl">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                      <p className="text-[9px] font-black text-amber-600 uppercase tracking-[0.15em]">Observações de Alerta</p>
+                    </div>
+                    <p className="text-xs font-bold text-amber-800 leading-relaxed">{activePatientForDetails.alertas_rastreamento}</p>
+                  </div>
+                )}
+
+                {/* Timeline de Buscas */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200/50 flex items-center justify-center">
+                        <ClipboardList className="w-3 h-3 text-slate-500" />
+                      </div>
+                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em]">Buscas Realizadas</h4>
+                    </div>
+                    {!detailsAcompsLoading && (
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                        {detailsAcomps.length} {detailsAcomps.length === 1 ? 'registro' : 'registros'}
+                      </span>
+                    )}
+                  </div>
+
+                  {detailsAcompsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-5 h-5 text-slate-300 animate-spin" />
+                    </div>
+                  ) : detailsAcomps.length === 0 ? (
+                    <div className="text-center py-8 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50">
+                      <SearchX className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-[11px] font-bold text-slate-400">Nenhuma busca registrada</p>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gradient-to-b from-slate-300 via-slate-200 to-transparent" />
+                      <div className="space-y-1">
+                        {detailsAcomps.map((acomp, idx) => {
+                          const dataFormatada = acomp.data_busca
+                            ? (() => { const p = acomp.data_busca.substring(0,10).split('-'); const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']; return `${p[2]}/${meses[parseInt(p[1])-1]}/${p[0]}`; })()
+                            : '--';
+                          return (
+                            <div key={acomp.id} className="relative flex items-start gap-4 py-3 px-1 group hover:bg-slate-50/50 rounded-xl transition-colors">
+                              <div className="relative z-10 mt-0.5">
+                                <div className={`w-[11px] h-[11px] rounded-full border-2 border-white shadow-sm ${idx === 0 ? 'bg-gradient-to-br from-slate-600 to-slate-800' : 'bg-slate-300 group-hover:bg-slate-400'} transition-colors`} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`text-[11px] font-black tabular-nums ${idx === 0 ? 'text-slate-800' : 'text-slate-600'}`}>
+                                    {dataFormatada}
+                                  </span>
+                                  {acomp.tipo_busca && (
+                                    <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[9px] font-bold uppercase tracking-wide">
+                                      {acomp.tipo_busca}
+                                    </span>
+                                  )}
+                                  {acomp.situacao_pos_busca && (
+                                    <span className="px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-400 text-[9px] font-bold uppercase tracking-wide border border-slate-100">
+                                      {acomp.situacao_pos_busca}
+                                    </span>
+                                  )}
+                                </div>
+                                {acomp.observacoes && (
+                                  <p className="text-[10px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">{acomp.observacoes}</p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Footer */}
