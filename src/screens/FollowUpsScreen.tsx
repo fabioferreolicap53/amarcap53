@@ -1410,7 +1410,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                         <MultiSelect placeholder="Selecione" options={ENTRAVES_IDENTIFICADOS_OPTIONS} value={selectedAcompanhamento.entraves_identificados || []} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_identificados: val})} showSearch={false} />
                       </div>
                       <div>
-                        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">Entrave(s) Informado Por</label>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">Entrave(s) Informado Por {Array.isArray(selectedAcompanhamento.entraves_identificados) && selectedAcompanhamento.entraves_identificados.filter((v: any) => v).length > 0 && <span className="text-red-500">*</span>}</label>
                         <SingleSelect placeholder="Selecione" options={ENTRAVES_INFORMADO_POR_OPTIONS} value={getCanonicalSelectValue(selectedAcompanhamento.entraves_informado_por || '', ENTRAVES_INFORMADO_POR_OPTIONS)} onChange={(val) => setSelectedAcompanhamento({...selectedAcompanhamento, entraves_informado_por: val})} showSearch={false} />
                       </div>
                     </div>
@@ -1619,7 +1619,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                           <MultiSelect placeholder="Selecione" options={ENTRAVES_IDENTIFICADOS_OPTIONS} value={createEntraves} onChange={setCreateEntraves} showSearch={false} />
                         </div>
                         <div>
-                          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">Entrave(s) Informado Por</label>
+                          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">Entrave(s) Informado Por {createEntraves.length > 0 && <span className="text-red-500">*</span>}</label>
                           <SingleSelect placeholder="Selecione" options={ENTRAVES_INFORMADO_POR_OPTIONS} value={createEntravesInformadoPor} onChange={setCreateEntravesInformadoPor} showSearch={false} />
                         </div>
                       </div>
