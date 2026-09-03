@@ -1,173 +1,72 @@
 // acompanhamento_cns.pb.js
-// Solução: campo CNS nos acompanhamentos para re-vinculação
-// SEM HOOKS — frontend envia cns diretamente
+// Fix direto: confronta cns entre acompanhamentos e pacientes
 
 // ═══════════════════════════════════════════════════════
-// 1. DIAGNÓSTICO: ver estado dos dados
+// 1. FIX-DIRECT: re-vincula por CNS via SQL direto
+//    GET (sem body) — zero dependências de parsing
 // ═══════════════════════════════════════════════════════
-routerAdd('GET', '/api/custom/diag-acompanhamentos', function(c) {
+routerAdd('GET', '/api/custom/fix-relink-cns', function(c) {
   try {
     var db = $app.db();
     if (!db) return c.json(500, { message: 'DB indisponivel' });
 
-    var total = db.newQuery('SELECT COUNT(*) as cnt FROM amarcap53_acompanhamentos').all();
-    var comCns = db.newQuery('SELECT COUNT(*) as cnt FROM amarcap53_acompanhamentos WHERE cns IS NOT NULL AND cns != ""').all();
-    var comPaciente = db.newQuery('SELECT COUNT(*) as cnt FROM amarcap53_acompanhamentos WHERE paciente IS NOT NULL AND paciente != ""').all();
-    var huertoComCns = db.newQuery(
-      'SELECT COUNT(*) as cnt FROM amarcap53_acompanhamentos a ' +
-      'WHERE a.cns IS NOT NULL AND a.cns != "" AND (' +
-      'a.paciente IS NULL OR a.paciente = "" OR NOT EXISTS (' +
-      'SELECT 1 FROM amarcap53_pacientes p WHERE p.id = a.paciente))'
-    ).all();
-    var huertoSemCns = db.newQuery(
-      'SELECT COUNT(*) as cnt FROM amarcap53_acompanhamentos a ' +
-      'WHERE (a.cns IS NULL OR a.cns = "") AND (' +
-      'a.paciente IS NULL OR a.paciente = "" OR NOT EXISTS (' +
-      'SELECT 1 FROM amarcap53_pacientes p WHERE p.id = a.paciente))'
-    ).all();
-    var totalPac = db.newQuery('SELECT COUNT(*) as cnt FROM amarcap53_pacientes').all();
-    var pacComCns = db.newQuery('SELECT COUNT(*) as cnt FROM amarcap53_pacientes WHERE cns IS NOT NULL AND cns != ""').all();
+    var ACOMP = 'amarcap53_acompanhamentos';
+    var PAC = 'amarcap53_pacientes';
 
-    // Amostra de huérfãos com cns
-    var amostra = db.newQuery(
-      'SELECT a.id, a.cns, a.paciente FROM amarcap53_acompanhamentos a ' +
-      'WHERE a.cns IS NOT NULL AND a.cns != "" AND (' +
-      'a.paciente IS NULL OR a.paciente = "" OR NOT EXISTS (' +
-      'SELECT 1 FROM amarcap53_pacientes p WHERE p.id = a.paciente)) LIMIT 5'
+    // Diagnóstico: ver estado atual
+    var totalAcomps = db.newQuery('SELECT COUNT(*) as cnt FROM ' + ACOMP).all();
+    var totalPacs = db.newQuery('SELECT COUNT(*) as cnt FROM ' + PAC).all();
+
+    // PASSO 1: Atualizar cns de acompanhamentos que têm paciente válido
+    // (para registros novos que foram criados com cns via frontend)
+    try {
+      db.newQuery(
+        'UPDATE ' + ACOMP + ' SET cns = (' +
+        '  SELECT p.cns FROM ' + PAC + ' p WHERE p.id = ' + ACOMP + '.paciente' +
+        ') WHERE paciente IS NOT NULL AND paciente != "" AND cns IS NULL AND EXISTS (' +
+        '  SELECT 1 FROM ' + PAC + ' p WHERE p.id = ' + ACOMP + '.paciente AND p.cns IS NOT NULL AND p.cns != ""' +
+        ')'
+      ).execute();
+    } catch(_) {}
+
+    // PASSO 2: Re-vincular por CNS — SQL direto
+    // Para cada acompanhamento que tem cns mas paciente inválido/ausente,
+    // encontrar paciente com mesmo cns e atualizar
+    var relinked = db.newQuery(
+      'UPDATE ' + ACOMP + ' SET paciente = (' +
+      '  SELECT p.id FROM ' + PAC + ' p WHERE p.cns = ' + ACOMP + '.cns LIMIT 1' +
+      ') WHERE cns IS NOT NULL AND cns != "" AND (' +
+      '  paciente IS NULL OR paciente = "" OR NOT EXISTS (' +
+      '    SELECT 1 FROM ' + PAC + ' p WHERE p.id = ' + ACOMP + '.paciente' +
+      '  )' +
+      ') AND EXISTS (' +
+      '  SELECT 1 FROM ' + PAC + ' p WHERE p.cns = ' + ACOMP + '.cns' +
+      ')'
+    ).execute();
+
+    // Contar resultado
+    var comPaciente = db.newQuery(
+      'SELECT COUNT(*) as cnt FROM ' + ACOMP + ' a WHERE a.paciente IS NOT NULL AND a.paciente != "" AND EXISTS (SELECT 1 FROM ' + PAC + ' p WHERE p.id = a.paciente)'
     ).all();
-    var amostraData = [];
-    for (var i = 0; i < amostra.length; i++) {
-      amostraData.push({
-        id: amostra[i].get('id'),
-        cns: amostra[i].get('cns'),
-        paciente: amostra[i].get('paciente')
-      });
-    }
+    var semPaciente = db.newQuery(
+      'SELECT COUNT(*) as cnt FROM ' + ACOMP + ' a WHERE a.paciente IS NULL OR a.paciente = "" OR NOT EXISTS (SELECT 1 FROM ' + PAC + ' p WHERE p.id = a.paciente)'
+    ).all();
 
     return c.json(200, {
-      acompanhamentos: {
-        total: total.length > 0 ? total[0].get('cnt') : 0,
-        comCns: comCns.length > 0 ? comCns[0].get('cnt') : 0,
-        comPaciente: comPaciente.length > 0 ? comPaciente[0].get('cnt') : 0,
-        huertoComCns: huertoComCns.length > 0 ? huertoComCns[0].get('cnt') : 0,
-        huertoSemCns: huertoSemCns.length > 0 ? huertoSemCns[0].get('cnt') : 0,
-      },
-      pacientes: {
-        total: totalPac.length > 0 ? totalPac[0].get('cnt') : 0,
-        comCns: pacComCns.length > 0 ? pacComCns[0].get('cnt') : 0,
-      },
-      amostraHuertoComCns: amostraData
+      success: true,
+      totalAcomps: totalAcomps.length > 0 ? totalAcomps[0].get('cnt') : 0,
+      totalPacs: totalPacs.length > 0 ? totalPacs[0].get('cnt') : 0,
+      comPacienteValido: comPaciente.length > 0 ? comPaciente[0].get('cnt') : 0,
+      semPacienteValido: semPaciente.length > 0 ? semPaciente[0].get('cnt') : 0,
     });
+
   } catch(err) {
     return c.json(500, { message: (err && err.message) ? err.message : 'Erro' });
   }
 });
 
 // ═══════════════════════════════════════════════════════
-// 2. FIX: re-vincula TODOS os huérfãos
-//    2a. Preenche cns de huérfãos sem cns usando backup do frontend
-//    2b. Re-vincula huérfãos com cns usando matching cns→paciente
-//    Aceita body JSON: { "oldPatientCnsMap": { "oldId": "cns" } }
-// ═══════════════════════════════════════════════════════
-routerAdd('POST', '/api/custom/relink-by-cns', function(c) {
-  try {
-    var db = $app.db();
-    if (!db) return c.json(500, { message: 'DB indisponivel' });
-
-    // Ler body de forma robusta
-    var oldMap = {};
-    try {
-      var raw = c.requestInfo().rawBody || '';
-      if (raw && raw.length > 2) {
-        var parsed = JSON.parse(raw);
-        oldMap = parsed.oldPatientCnsMap || {};
-      }
-    } catch(_) {
-      try {
-        var info = c.requestInfo();
-        if (info && info.body) {
-          var b = info.body;
-          oldMap = (typeof b.get === 'function') ? (b.get('oldPatientCnsMap') || {}) : (b.oldPatientCnsMap || {});
-        }
-      } catch(_) {}
-    }
-
-    var filled = 0;
-    var relinked = 0;
-
-    // PASSO 1: Preencher cns em huérfãos que não têm cns mas têm paciente antigo
-    if (oldMap && typeof oldMap === 'object') {
-      var keys = [];
-      try { keys = Object.keys(oldMap); } catch(_) {}
-      if (keys.length > 0) {
-        var noCnsOrphans = db.newQuery(
-          'SELECT a.id, a.paciente FROM amarcap53_acompanhamentos a ' +
-          'WHERE (a.cns IS NULL OR a.cns = "") AND ' +
-          'a.paciente IS NOT NULL AND a.paciente != "" AND NOT EXISTS (' +
-          '  SELECT 1 FROM amarcap53_pacientes p WHERE p.id = a.paciente' +
-          ')'
-        ).all();
-
-        for (var i = 0; i < noCnsOrphans.length; i++) {
-          var orphId = noCnsOrphans[i].get('id');
-          var oldPacId = noCnsOrphans[i].get('paciente');
-          var cnsForOld = oldMap[oldPacId];
-          if (!cnsForOld) continue;
-          try {
-            db.newQuery(
-              'UPDATE amarcap53_acompanhamentos SET cns = \'' + cnsForOld + '\' WHERE id = \'' + orphId + '\''
-            ).execute();
-            filled++;
-          } catch(_) {}
-        }
-      }
-    }
-
-    // PASSO 2: Re-vincular TODOS os huérfãos que têm cns
-    var orphans = db.newQuery(
-      'SELECT a.id, a.cns FROM amarcap53_acompanhamentos a ' +
-      'WHERE a.cns IS NOT NULL AND a.cns != "" AND (' +
-      '  a.paciente IS NULL OR a.paciente = "" OR NOT EXISTS (' +
-      '    SELECT 1 FROM amarcap53_pacientes p WHERE p.id = a.paciente' +
-      '  )' +
-      ')'
-    ).all();
-
-    // Indexar pacientes novos por cns
-    var pacByCns = {};
-    var offset = 0;
-    while (true) {
-      var pacRows = db.newQuery(
-        'SELECT id, cns FROM amarcap53_pacientes WHERE cns IS NOT NULL AND cns != "" LIMIT 500 OFFSET ' + offset
-      ).all();
-      if (pacRows.length === 0) break;
-      for (var j = 0; j < pacRows.length; j++) {
-        pacByCns[String(pacRows[j].get('cns'))] = pacRows[j].get('id');
-      }
-      if (pacRows.length < 500) break;
-      offset += 500;
-    }
-
-    for (var k = 0; k < orphans.length; k++) {
-      var oCns = String(orphans[k].get('cns') || '');
-      var oId = orphans[k].get('id');
-      if (!oCns || !pacByCns[oCns]) continue;
-      try {
-        db.newQuery(
-          'UPDATE amarcap53_acompanhamentos SET paciente = \'' + pacByCns[oCns] + '\' WHERE id = \'' + oId + '\''
-        ).execute();
-        relinked++;
-      } catch(_) {}
-    }
-
-    return c.json(200, { success: true, filled: filled, relinked: relinked });
-  } catch(err) {
-    return c.json(500, { message: (err && err.message) ? err.message : 'Erro' });
-  }
-});
-
-// ═══════════════════════════════════════════════════════
-// 3. MIGRATION: popular cns nos acompanhamentos existentes
+// 2. MIGRATION: popular cns nos acompanhamentos existentes
 // ═══════════════════════════════════════════════════════
 routerAdd('POST', '/api/custom/migrate-acompanhamento-cns', function(c) {
   try {
@@ -188,6 +87,34 @@ routerAdd('POST', '/api/custom/migrate-acompanhamento-cns', function(c) {
     var total = (count.length > 0) ? count[0].get('cnt') : 0;
 
     return c.json(200, { success: true, totalComCns: total });
+  } catch(err) {
+    return c.json(500, { message: (err && err.message) ? err.message : 'Erro' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// 3. DIAGNÓSTICO
+// ═══════════════════════════════════════════════════════
+routerAdd('GET', '/api/custom/diag-acompanhamentos', function(c) {
+  try {
+    var db = $app.db();
+    if (!db) return c.json(500, { message: 'DB indisponivel' });
+
+    var total = db.newQuery('SELECT COUNT(*) as cnt FROM amarcap53_acompanhamentos').all();
+    var comCns = db.newQuery('SELECT COUNT(*) as cnt FROM amarcap53_acompanhamentos WHERE cns IS NOT NULL AND cns != ""').all();
+    var comPaciente = db.newQuery('SELECT COUNT(*) as cnt FROM amarcap53_acompanhamentos WHERE paciente IS NOT NULL AND paciente != ""').all();
+    var totalPac = db.newQuery('SELECT COUNT(*) as cnt FROM amarcap53_pacientes').all();
+
+    return c.json(200, {
+      acompanhamentos: {
+        total: total.length > 0 ? total[0].get('cnt') : 0,
+        comCns: comCns.length > 0 ? comCns[0].get('cnt') : 0,
+        comPaciente: comPaciente.length > 0 ? comPaciente[0].get('cnt') : 0,
+      },
+      pacientes: {
+        total: totalPac.length > 0 ? totalPac[0].get('cnt') : 0,
+      }
+    });
   } catch(err) {
     return c.json(500, { message: (err && err.message) ? err.message : 'Erro' });
   }

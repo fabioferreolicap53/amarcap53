@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Header } from '../components/Header';
-import { Edit2, User, Check, ShieldCheck, MapPin, Moon, AlignJustify, Mail, AlertOctagon, Shield, Terminal, UploadCloud, CheckCircle, AlertTriangle, FileText, History, BarChart3, ChevronRight, Info, Trash2, Database, Activity, Loader2, Search, Users, BadgeCheck } from 'lucide-react';
+import { Edit2, User, Check, ShieldCheck, MapPin, Moon, AlignJustify, Mail, AlertOctagon, Shield, Terminal, UploadCloud, CheckCircle, AlertTriangle, FileText, History, BarChart3, ChevronRight, Info, Trash2, Database, Activity, Loader2, Search, Users, BadgeCheck, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -395,28 +395,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         var elapsed = Math.round((Date.now() - importStartTimeRef.current) / 1000);
 
         // Re-vincular acompanhamentos huérfãos por CNS
-        // Envia mapa antigo (oldId→cns) para preencher cns em huérfãos, depois re-vincula
+        // GET direto — SQL compara cns entre tabelas
         var relinkInfo = '';
         try {
-          var oldMap = oldPatientCnsMapRef.current || {};
-          var token = pb.authStore.token || '';
-          var relinkResp = await fetch(pb.baseURL + '/api/custom/relink-by-cns', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': token },
-            body: JSON.stringify({ oldPatientCnsMap: oldMap }),
+          var fixResp = await fetch(pb.baseURL + '/api/custom/fix-relink-cns', {
+            headers: { 'Authorization': pb.authStore.token || '' },
           });
-          var relinkData = await relinkResp.json();
-          if (relinkData && relinkData.relinked > 0) {
-            relinkInfo = ' | ' + relinkData.relinked + ' re-vinculados';
+          var fixData = await fixResp.json();
+          console.log('[Import] Fix relink:', fixData);
+          if (fixData && fixData.comPacienteValido !== undefined) {
+            relinkInfo = ' | ' + fixData.comPacienteValido + ' vinculados, ' + (fixData.semPacienteValido || 0) + ' sem vínculo';
           }
-          if (relinkData && relinkData.filled > 0) {
-            relinkInfo += ' | ' + relinkData.filled + ' cns restaurados';
-          }
-          console.log('[Import] Re-link:', relinkData);
         } catch (relinkErr: any) {
           console.error('[Import] Erro re-vincular:', relinkErr);
         }
-        oldPatientCnsMapRef.current = {};
 
         // Cria registro de log no histórico
         try {
@@ -1300,6 +1292,34 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                         </motion.div>
                       )}
                     </div>
+                  </div>
+
+                  {/* Re-vincular por CNS */}
+                  <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-200/60">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+                        <RefreshCw className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-slate-800 uppercase">Re-vincular Acompanhamentos</h3>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">Restaura vínculo paciente por CNS</p>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mb-4">Após excluir e reimportar pacientes, clique para restaurar os vínculos dos acompanhamentos usando o campo CNS.</p>
+                    <button
+                      onClick={async () => {
+                        try {
+                          var r = await fetch(pb.baseURL + '/api/custom/fix-relink-cns', { headers: { 'Authorization': pb.authStore.token || '' } });
+                          var d = await r.json();
+                          alert(d.ok ? 'Re-vinculados: ' + (d.before - d.after) + ' de ' + d.before + ' huérfãos\nAntes: ' + d.before + ' sem vínculo\nDepois: ' + d.after + ' sem vínculo' : 'Erro: ' + d.err);
+                          fetchStats();
+                          fetchImportHistory();
+                        } catch(e: any) { alert('Erro: ' + e.message); }
+                      }}
+                      className="w-full py-3 bg-blue-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 text-xs"
+                    >
+                      Re-vincular por CNS
+                    </button>
                   </div>
 
                   {/* Histórico de Operações */}
