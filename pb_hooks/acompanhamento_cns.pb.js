@@ -1,9 +1,6 @@
 // acompanhamento_cns.pb.js
 // Solução definitiva: campo CNS nos acompanhamentos
-//
-// 1. Migration: popular cns em acompanhamentos existentes
-// 2. Hook: beforeCreate preenche cns automaticamente
-// 3. Re-link: re-vincula huérfãos por CNS após delete+import de pacientes
+// Goja engine (ES5)
 
 // ═══════════════════════════════════════════════════════
 // 1. MIGRATION: popular cns nos acompanhamentos existentes
@@ -16,8 +13,6 @@ routerAdd('POST', '/api/custom/migrate-acompanhamento-cns', function(c) {
     var db = $app.db();
     if (!db) return c.json(500, { message: 'DB indisponivel' });
 
-    // Atualizar cns de todos acompanhamentos que têm paciente vinculado
-    // e cujo paciente tem cns
     var result = db.newQuery(
       'UPDATE amarcap53_acompanhamentos SET cns = (' +
       '  SELECT p.cns FROM amarcap53_pacientes p WHERE p.id = amarcap53_acompanhamentos.paciente' +
@@ -26,7 +21,6 @@ routerAdd('POST', '/api/custom/migrate-acompanhamento-cns', function(c) {
       ')'
     ).execute();
 
-    // Contar quantos foram atualizados
     var count = db.newQuery(
       'SELECT COUNT(*) as cnt FROM amarcap53_acompanhamentos WHERE cns IS NOT NULL AND cns != ""'
     ).all();
@@ -43,39 +37,63 @@ routerAdd('POST', '/api/custom/migrate-acompanhamento-cns', function(c) {
 
 // ═══════════════════════════════════════════════════════
 // 2. HOOK: beforeCreate - preenche cns automaticamente
+//    Versão ultra-safe: se qualquer erro, apenas loga
 // ═══════════════════════════════════════════════════════
 onRecordCreate(function(e) {
   try {
-    // Só para amarcap53_acompanhamentos
-    var collection = e.record.collection().name;
-    if (collection !== 'amarcap53_acompanhamentos') return;
+    var rec = e.record;
+    if (!rec) return;
 
-    // Se já tem cns, não sobrescrever
-    var existingCns = e.record.get('cns');
-    if (existingCns && String(existingCns).trim() !== '') return;
+    // Pegar nome da coleção de forma segura
+    var col = null;
+    try { col = rec.collection(); } catch(_) {}
+    if (!col) return;
+    var colName = '';
+    try { colName = col.name || ''; } catch(_) {}
+    if (colName !== 'amarcap53_acompanhamentos') return;
 
-    // Buscar paciente para pegar cns
-    var pacienteId = e.record.get('paciente');
+    // Se já tem cns, não fazer nada
+    var currentCns = '';
+    try { currentCns = rec.get('cns') || ''; } catch(_) {}
+    if (currentCns && String(currentCns).trim() !== '') return;
+
+    // Buscar ID do paciente
+    var pacienteId = '';
+    try { pacienteId = rec.get('paciente') || ''; } catch(_) {}
     if (!pacienteId || String(pacienteId).trim() === '') return;
 
-    var db = $app.db();
-    if (!db) return;
-
-    var pacRows = db.newQuery(
-      'SELECT cns FROM amarcap53_pacientes WHERE id = "' + pacienteId + '" AND cns IS NOT NULL AND cns != "" LIMIT 1'
-    ).all();
-
-    if (pacRows.length > 0) {
-      var cns = pacRows[0].get('cns');
-      if (cns) e.record.set('cns', String(cns));
+    // Buscar CNS do paciente via DAO
+    try {
+      var dao = $app.dao();
+      if (!dao) return;
+      var pacRecord = dao.findRecordById('amarcap53_pacientes', pacienteId);
+      if (!pacRecord) return;
+      var pacCns = pacRecord.get('cns') || '';
+      if (pacCns && String(pacCns).trim() !== '') {
+        rec.set('cns', String(pacCns));
+      }
+    } catch(_) {
+      // Se DAO falhar, tentar via DB
+      try {
+        var db = $app.db();
+        if (!db) return;
+        var rows = db.newQuery(
+          'SELECT cns FROM amarcap53_pacientes WHERE id = \'' + pacienteId + '\' AND cns IS NOT NULL AND cns != \'\' LIMIT 1'
+        ).all();
+        if (rows.length > 0) {
+          var cnsVal = rows[0].get('cns');
+          if (cnsVal) rec.set('cns', String(cnsVal));
+        }
+      } catch(_) {}
     }
   } catch(err) {
-    console.error('beforeCreate acompanhamento cns:', (err && err.message) ? err.message : err);
+    // NUNCA impedir o salvamento — apenas logar
+    console.error('HOOK cns:', (err && err.message) ? err.message : String(err));
   }
 }, 'amarcap53_acompanhamentos');
 
 // ═══════════════════════════════════════════════════════
-// 3. RE-LINK: re-vincula huérfãos por CNS após delete+import
+// 3. RE-LINK: re-vincula huérfãos por CNS
 // ═══════════════════════════════════════════════════════
 routerAdd('POST', '/api/custom/relink-by-cns', function(c) {
   try {
@@ -85,16 +103,11 @@ routerAdd('POST', '/api/custom/relink-by-cns', function(c) {
     var db = $app.db();
     if (!db) return c.json(500, { message: 'DB indisponivel' });
 
-    var ACOMP = 'amarcap53_acompanhamentos';
-    var PAC = 'amarcap53_pacientes';
-
-    // 1. Buscar acompanhamentos huérfãos (paciente = null/"" ou ID morto)
-    //    QUE TENHAM campo cns preenchido
     var orphans = db.newQuery(
-      'SELECT a.id, a.cns, a.paciente FROM ' + ACOMP + ' a ' +
+      'SELECT a.id, a.cns, a.paciente FROM amarcap53_acompanhamentos a ' +
       'WHERE a.cns IS NOT NULL AND a.cns != "" AND (' +
       '  a.paciente IS NULL OR a.paciente = "" OR NOT EXISTS (' +
-      '    SELECT 1 FROM ' + PAC + ' p WHERE p.id = a.paciente' +
+      '    SELECT 1 FROM amarcap53_pacientes p WHERE p.id = a.paciente' +
       '  )' +
       ')'
     ).all();
@@ -103,13 +116,12 @@ routerAdd('POST', '/api/custom/relink-by-cns', function(c) {
       return c.json(200, { success: true, relinked: 0, message: 'Nenhum huérfão com cns encontrado' });
     }
 
-    // 2. Indexar pacientes novos por cns
-    var pacPage = 1;
+    // Indexar pacientes novos por cns
     var pacByCns = {};
+    var offset = 0;
     while (true) {
       var pacRows = db.newQuery(
-        'SELECT id, cns FROM ' + PAC + ' WHERE cns IS NOT NULL AND cns != "" ' +
-        'LIMIT 500 OFFSET ' + ((pacPage - 1) * 500)
+        'SELECT id, cns FROM amarcap53_pacientes WHERE cns IS NOT NULL AND cns != "" LIMIT 500 OFFSET ' + offset
       ).all();
       if (pacRows.length === 0) break;
       for (var i = 0; i < pacRows.length; i++) {
@@ -118,10 +130,10 @@ routerAdd('POST', '/api/custom/relink-by-cns', function(c) {
         pacByCns[cns] = id;
       }
       if (pacRows.length < 500) break;
-      pacPage++;
+      offset += 500;
     }
 
-    // 3. Re-vincular cada huérfão
+    // Re-vincular
     var relinked = 0;
     var failed = 0;
 
@@ -136,7 +148,7 @@ routerAdd('POST', '/api/custom/relink-by-cns', function(c) {
 
       try {
         db.newQuery(
-          'UPDATE ' + ACOMP + ' SET paciente = "' + newPacId + '" WHERE id = "' + orphId + '"'
+          'UPDATE amarcap53_acompanhamentos SET paciente = \'' + newPacId + '\' WHERE id = \'' + orphId + '\''
         ).execute();
         relinked++;
       } catch(_) { failed++; }

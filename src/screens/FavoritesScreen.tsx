@@ -704,6 +704,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     const data = {
       paciente: selectedPaciente.id,
       profissional: user.id,
+      cns: (selectedPaciente as any).cns || '',
       data_busca: dataBuscaIso || selectedDate,
       tipo_busca: getCanonicalSelectValue(modalTipoBusca, TIPO_BUSCA_OPTIONS),
       tipo_contato: getCanonicalSelectValue(modalTipoContato, TIPO_CONTATO_OPTIONS),

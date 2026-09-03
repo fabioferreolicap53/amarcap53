@@ -611,6 +611,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     const data = {
       paciente: selectedPaciente.id,
       profissional: user.id,
+      cns: (selectedPaciente as any).cns || '',
       data_busca: dataBuscaIso || selectedDate,
       tipo_busca: getSelectLabel(modalTipoBusca, TIPO_BUSCA_OPTIONS),
       tipo_contato: getSelectLabel(modalTipoContato, TIPO_CONTATO_OPTIONS),

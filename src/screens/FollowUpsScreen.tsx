@@ -592,6 +592,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     const data = {
       paciente: createSelectedPaciente.id,
       profissional: user.id,
+      cns: (createSelectedPaciente as any).cns || '',
       data_busca: dataBuscaIso || createDate,
       tipo_busca: getSelectLabel(createTipoBusca, TIPO_BUSCA_OPTIONS),
       tipo_contato: getSelectLabel(createTipoContato, TIPO_CONTATO_OPTIONS),
