@@ -417,6 +417,19 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
           } catch (relinkErr: any) {
             console.error('[Import] Erro re-vincular:', relinkErr);
           }
+          // Restore via backup
+          try {
+            var token2 = pb.authStore.token || '';
+            var restoreResp = await fetch(pb.baseURL + '/api/custom/backup-patient-links', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': token2 },
+              body: JSON.stringify({ action: 'restore' }),
+            });
+            var restoreData = await restoreResp.json();
+            if (restoreData && restoreData.relinked > 0) {
+              relinkInfo += ' | ' + restoreData.relinked + ' restaurados via backup';
+            }
+          } catch (_) {}
           oldPatientsRef.current = { oldIds: [], cnsMap: {} };
         }
 
@@ -569,6 +582,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       var wasCancelled = false;
 
       setDeleteStatus({ message: 'Iniciando exclusão...', type: 'deleting' });
+
+      // Backup do mapeamento paciente→acompanhamentos ANTES de deletar
+      try {
+        var token = pb.authStore.token || '';
+        await fetch(pb.baseURL + '/api/custom/backup-patient-links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': token },
+          body: JSON.stringify({ action: 'save' }),
+        });
+      } catch (_) {}
 
       // Coletar IDs antigos + CNS antes de deletar (para re-vincular acompanhamentos depois)
       try {
