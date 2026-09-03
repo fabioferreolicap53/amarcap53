@@ -106,7 +106,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
   const deleteStartTimeRef = useRef(0);
   const deleteEtaTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const deleteSnapRef = useRef({ deleted: 0, total: 0, errors: 0, running: false });
-  const oldPatientsRef = useRef<{ oldIds: string[]; cnsMap: Record<string, string> }>({ oldIds: [], cnsMap: {} });
 
   // Sincroniza o estado do input com o usuário do contexto sempre que ele mudar
   useEffect(() => {
@@ -395,53 +394,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         var elapsed = Math.round((Date.now() - importStartTimeRef.current) / 1000);
 
         // Re-vincular acompanhamentos huérfãos por CNS
+        // Campo cns nos acompanhamentos permite re-vincular mesmo após delete+import
         var relinkInfo = '';
-        var importOldIds = oldPatientsRef.current.oldIds;
-        var importCnsMap = oldPatientsRef.current.cnsMap;
-        // Fallback: ler de localStorage
-        if (importOldIds.length === 0) {
-          try {
-            var stored = JSON.parse(localStorage.getItem('oldPatientsBackup') || '{}');
-            if (stored && stored.oldIds && stored.oldIds.length > 0) {
-              importOldIds = stored.oldIds;
-              importCnsMap = stored.cnsMap || {};
-            }
-          } catch(_) {}
-        }
-        console.log('[Import] Re-link: oldIds=' + importOldIds.length + ' imported=' + imported);
-        if (importOldIds.length > 0 && imported > 0) {
-          try {
-            var token = pb.authStore.token || pb.authStore['token'] || '';
-            console.log('[Import] Token length:', token.length, 'oldIds sample:', importOldIds.slice(0, 3));
-            var relinkResp = await fetch(pb.baseURL + '/api/custom/relink-acompanhamentos', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': token },
-              body: JSON.stringify({ oldIds: importOldIds, cnsMap: importCnsMap }),
-            });
-            var relinkText = await relinkResp.text();
-            console.log('[Import] Re-link status:', relinkResp.status, 'body:', relinkText);
-            var relinkData = JSON.parse(relinkText);
-            if (relinkData.success && relinkData.relinked > 0) {
-              relinkInfo = ' | ' + relinkData.relinked + ' acompanhamentos re-vinculados';
-            }
-          } catch (relinkErr: any) {
-            console.error('[Import] Erro re-vincular:', relinkErr);
+        try {
+          var relinkResp = await pb.send('/api/custom/relink-by-cns', { method: 'POST' });
+          if (relinkResp && relinkResp.relinked > 0) {
+            relinkInfo = ' | ' + relinkResp.relinked + ' acompanhamentos re-vinculados';
           }
-          // Restore via backup
-          try {
-            var token2 = pb.authStore.token || '';
-            var restoreResp = await fetch(pb.baseURL + '/api/custom/backup-patient-links', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': token2 },
-              body: JSON.stringify({ action: 'restore' }),
-            });
-            var restoreData = await restoreResp.json();
-            if (restoreData && restoreData.relinked > 0) {
-              relinkInfo += ' | ' + restoreData.relinked + ' restaurados via backup';
-            }
-          } catch (_) {}
-          oldPatientsRef.current = { oldIds: [], cnsMap: {} };
-          try { localStorage.removeItem('oldPatientsBackup'); } catch(_) {}
+        } catch (relinkErr: any) {
+          console.error('[Import] Erro re-vincular:', relinkErr);
         }
 
         // Cria registro de log no histórico
@@ -593,33 +554,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       var wasCancelled = false;
 
       setDeleteStatus({ message: 'Iniciando exclusão...', type: 'deleting' });
-
-      // Backup do mapeamento paciente→acompanhamentos ANTES de deletar
-      try {
-        var token = pb.authStore.token || '';
-        await fetch(pb.baseURL + '/api/custom/backup-patient-links', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': token },
-          body: JSON.stringify({ action: 'save' }),
-        });
-      } catch (_) {}
-
-      // Coletar IDs antigos + CNS antes de deletar (para re-vincular acompanhamentos depois)
-      try {
-        var oldPatients = await pb.collection('amarcap53_pacientes').getFullList({ fields: 'id,cns' });
-        var oldIds: string[] = [];
-        var cnsMap: Record<string, string> = {};
-        for (var op of oldPatients) {
-          var cnsVal = (op as any).cns || '';
-          if (op.id && cnsVal) {
-            oldIds.push(op.id);
-            cnsMap[op.id] = cnsVal;
-          }
-        }
-        oldPatientsRef.current = { oldIds, cnsMap };
-        try { localStorage.setItem('oldPatientsBackup', JSON.stringify({ oldIds, cnsMap })); } catch(_) {}
-        console.log('[Delete] Pacientes capturados:', oldIds.length, 'com CNS:', Object.keys(cnsMap).length);
-      } catch (colErr) { console.error('[Delete] Erro coletar pacientes:', colErr); oldPatientsRef.current = { oldIds: [], cnsMap: {} }; }
 
       // Loop principal — continua até a coleção ficar vazia
       while (true) {

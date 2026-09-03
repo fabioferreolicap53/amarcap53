@@ -8,10 +8,8 @@ var LOG_COLLECTION = 'amarcap53_importacoes';
 var BATCH_SIZE = 500;
 var DATE_FIELDS = ['data_nascimento', 'cito_lab', 'cito_pep', 'dna_hpv_gal', 'dna_hpv_pep'];
 
-// Helper: obtém DB (compatível com todas versões do PocketBase)
-function getDb() {
-  try { return $app.db(); } catch(e) { return null; }
-}
+// Helper: obtém DB inline (evita problemas de scope no Goja)
+// Substituir getDb() por $app.db() diretamente
 
 function padLeft(str, len, ch) {
   var s = String(str);
@@ -138,7 +136,7 @@ function escSql(v) {
 }
 
 function doInsert(rows, mappedFields) {
-  var db = getDb();
+  var db = $app.db();
   if (!db) throw new Error('DB indisponivel');
   var newCount = 0;
   var totalErrors = 0;
@@ -173,7 +171,7 @@ function handleLegacyBody(c, body, auth) {
   var fileName = body.fileName || 'import.csv';
   var mode = body.mode === 'append' ? 'append' : 'replace';
   if (records.length > 30000) return c.json(413, { code: 413, message: 'Max 30000 registros por lote' });
-  var db = getDb();
+  var db = $app.db();
   if (!db) return c.json(500, { code: 500, message: 'DB indisponivel' });
   var oldCount = 0;
   var newCount = 0;
@@ -309,7 +307,7 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
       if (mappedFields[vi] === 'cns') hasCns = true;
     }
     if (!hasNome || !hasCns) return c.json(400, { code: 400, message: 'CSV precisa de "nome" e "cns". Encontradas: ' + mappedFields.join(', ') });
-    var db = getDb();
+    var db = $app.db();
     if (!db) return c.json(500, { code: 500, message: 'DB indisponivel' });
     var oldCount = 0;
     var oldIdCnsMap = {};
@@ -388,7 +386,7 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
 // ─── DELETE em massa ────────────────────────────────────
 routerAdd('POST', '/api/custom/delete-all', function(c) {
   try {
-    var db = getDb();
+    var db = $app.db();
     if (!db) return c.json(500, { code: 500, message: 'DB indisponivel' });
     var auth = c.auth;
     if (!auth) return c.json(401, { code: 401, message: 'Nao autenticado' });
@@ -443,7 +441,7 @@ routerAdd('POST', '/api/custom/relink-acompanhamentos', function(c) {
         }
       } catch(_) {}
     }
-    var db = getDb();
+    var db = $app.db();
     if (!db) return c.json(500, { code: 500, message: 'DB indisponivel' });
     var ACOMP = 'amarcap53_acompanhamentos';
     var PAC = 'amarcap53_pacientes';
