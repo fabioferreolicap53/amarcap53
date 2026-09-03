@@ -3,19 +3,19 @@
 // PocketBase JS API: onRecordCreate / onRecordUpdate / onRecordAuthRequest
 // Goja engine (ES5) — no modern JS features
 
-function esc(v) {
+var esc = function(v) {
   return String(v || '').replace(/"/g, '\\"');
-}
+};
 
-function getField(record, name) {
+var getField = function(record, name) {
   try {
     var val = record.get(name);
     if (val !== undefined && val !== null && val !== '') return String(val);
   } catch (_) {}
   return '';
-}
+};
 
-function buildFilter(record) {
+var buildFilter = function(record) {
   var role = getField(record, 'role');
   var unidade = getField(record, 'unidade_saude');
   var equipe = getField(record, 'equipe');
@@ -32,9 +32,9 @@ function buildFilter(record) {
     return 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "" || microarea = null || microarea = "N/A")';
   }
   return '';
-}
+};
 
-function hasDuplicate(filter) {
+var hasDuplicate = function(filter) {
   if (!filter) return false;
   try {
     var rows = $app.findRecordsByFilter('amarcap53_users', filter, '-created', 1, 0);
@@ -43,7 +43,7 @@ function hasDuplicate(filter) {
     console.error('[unique_user] hasDuplicate ERRO: ' + String(e));
     return false;
   }
-}
+};
 
 // ─── CREATE — check duplicate combo ───────────────────
 onRecordCreate(function(e) {
