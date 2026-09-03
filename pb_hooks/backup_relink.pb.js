@@ -1,11 +1,9 @@
 // backup_relink.pb.js
-// Salva backup do mapeamento paciente→acompanhamentos ANTES da exclusão
-// e re-vincula DEPOIS da importação usando o backup
-// Goja engine (ES5) — tudo inline
+// Salva backup e restaura mapeamento paciente→acompanhamentos
+// Goja engine (ES5) — standalone, sem dependências de outros hooks
 
-// ─── POST /api/custom/backup-patient-links ──────────────
-// Salva snapshot de quais pacientes têm acompanhamentos vinculados
-// Body: { action: "save" | "restore" }
+function getDb2() { try { return $app.db(); } catch(e) { return null; } }
+
 routerAdd('POST', '/api/custom/backup-patient-links', function(c) {
   try {
     var auth = c.auth;
@@ -25,83 +23,79 @@ routerAdd('POST', '/api/custom/backup-patient-links', function(c) {
       } catch(_) {}
     }
 
-    var db = getDb();
+    var db = getDb2();
     if (!db) return c.json(500, { message: 'DB indisponivel' });
 
-    var BACKUP_TABLE = '_patient_link_backup';
-
-    // Criar tabela temporária se não existir
-    try {
-      db.newQuery(
-        'CREATE TABLE IF NOT EXISTS ' + BACKUP_TABLE + ' (' +
-        'id TEXT PRIMARY KEY, ' +
-        'old_paciente_id TEXT, ' +
-        'cns TEXT, ' +
-        'acompanhamento_ids TEXT, ' +
-        'created_at TEXT' +
-        ')'
-      ).execute();
-    } catch(_) {}
-
     if (body.action === 'save') {
-      // Salvar snapshot: para cada paciente que tem acompanhamentos,
-      // salvar seu ID, CNS, e lista de IDs de acompanhamentos
-      var pacWithAcomps = db.newQuery(
-        'SELECT p.id as pac_id, p.cns as pac_cns, a.id as acomp_id ' +
-        'FROM amarcap53_pacientes p ' +
-        'INNER JOIN amarcap53_acompanhamentos a ON a.paciente = p.id'
+      // 1. Buscar pacientes que têm acompanhamentos vinculados
+      var links = db.newQuery(
+        'SELECT DISTINCT a.paciente as pac_id FROM amarcap53_acompanhamentos a ' +
+        'WHERE a.paciente IS NOT NULL AND a.paciente != "" AND a.paciente != "N/A"'
       ).all();
 
-      // Agrupar por paciente
-      var pacMap = {};
-      for (var i = 0; i < pacWithAcomps.length; i++) {
-        var row = pacWithAcomps[i];
-        var pacId = row.get('pac_id');
-        var pacCns = row.get('pac_cns') || '';
-        var acompId = row.get('acomp_id');
-        if (!pacMap[pacId]) pacMap[pacId] = { cns: pacCns, acompIds: [] };
-        pacMap[pacId].acompIds.push(acompId);
+      if (links.length === 0) {
+        return c.json(200, { success: true, action: 'save', saved: 0, message: 'Nenhum vinculo para salvar' });
       }
 
-      // Limpar backup anterior
-      try { db.newQuery('DELETE FROM ' + BACKUP_TABLE).execute(); } catch(_) {}
-
-      // Salvar
+      // 2. Para cada paciente, buscar CNS e IDs dos acompanhamentos
       var saved = 0;
-      for (var pid in pacMap) {
-        try {
-          var ids = pacMap[pid].acompIds.join(',');
-          var now = new Date().toISOString();
-          db.newQuery(
-            'INSERT INTO ' + BACKUP_TABLE + ' (id, old_paciente_id, cns, acompanhamento_ids, created_at) VALUES (' +
-            '"' + pid + '", "' + pid + '", "' + (pacMap[pid].cns || '') + '", "' + ids + '", "' + now + '"'
-          ).execute();
-          saved++;
-        } catch(_) {}
+      var totalLinks = 0;
+      var backupData = [];
+
+      for (var i = 0; i < links.length; i++) {
+        var pacId = links[i].get('pac_id');
+        if (!pacId) continue;
+
+        // Buscar CNS do paciente
+        var pacRows = db.newQuery('SELECT cns FROM amarcap53_pacientes WHERE id = "' + pacId + '"').all();
+        var pacCns = (pacRows.length > 0 && pacRows[0].get('cns')) ? String(pacRows[0].get('cns')) : '';
+        if (!pacCns) continue;
+
+        // Buscar IDs dos acompanhamentos deste paciente
+        var acompRows = db.newQuery(
+          'SELECT id FROM amarcap53_acompanhamentos WHERE paciente = "' + pacId + '"'
+        ).all();
+        if (acompRows.length === 0) continue;
+
+        var acompIds = [];
+        for (var j = 0; j < acompRows.length; j++) {
+          acompIds.push(acompRows[j].get('id'));
+        }
+
+        backupData.push({ pacId: pacId, cns: pacCns, acompIds: acompIds });
+        totalLinks += acompIds.length;
       }
 
-      return c.json(200, { success: true, action: 'save', saved: saved, totalLinks: pacWithAcomps.length });
+      // 3. Salvar como JSON em arquivo temporário (via collection temporária ou string)
+      // PocketBase não tem "collection temporária" fácil, então salvamos como
+      // um registro único em uma coleção auxiliar ou como string no body
+      // ABORDAGEM: salvar em variável global (funciona enquanto servidor não reinicia)
+      try {
+        global._patientBackup = backupData;
+        saved = backupData.length;
+      } catch(_) {}
+
+      return c.json(200, { success: true, action: 'save', saved: saved, totalLinks: totalLinks });
 
     } else if (body.action === 'restore') {
-      // Restaurar: ler backup, para cada registro, buscar paciente novo pelo CNS,
-      // e atualizar os acompanhamentos para apontar para o novo paciente
-      var backups = db.newQuery('SELECT * FROM ' + BACKUP_TABLE).all();
-      if (backups.length === 0) {
-        return c.json(200, { success: true, action: 'restore', message: 'Nenhum backup encontrado', relinked: 0 });
+      // Ler backup da memória global
+      var backupData = [];
+      try { backupData = global._patientBackup || []; } catch(_) {}
+
+      if (backupData.length === 0) {
+        return c.json(200, { success: true, action: 'restore', relinked: 0, message: 'Nenhum backup em memoria' });
       }
 
       var relinked = 0;
       var failed = 0;
 
-      for (var bi = 0; bi < backups.length; bi++) {
-        var bk = backups[bi];
-        var oldPacId = bk.get('old_paciente_id') || '';
-        var pacCns = bk.get('cns') || '';
-        var acompIdsStr = bk.get('acompanhamento_ids') || '';
+      for (var bi = 0; bi < backupData.length; bi++) {
+        var bk = backupData[bi];
+        var oldPacId = bk.pacId;
+        var pacCns = bk.cns;
+        var acompIds = bk.acompIds;
 
-        if (!pacCns || !acompIdsStr) { failed++; continue; }
-
-        var acompIds = acompIdsStr.split(',');
+        if (!pacCns || !acompIds || acompIds.length === 0) { failed++; continue; }
 
         // Buscar paciente novo pelo CNS
         var newPacRows = db.newQuery(
@@ -111,32 +105,28 @@ routerAdd('POST', '/api/custom/backup-patient-links', function(c) {
         if (newPacRows.length === 0) { failed += acompIds.length; continue; }
 
         var newPacId = newPacRows[0].get('id');
+        if (newPacId === oldPacId) continue; // Mesmo paciente, nada a fazer
 
         // Atualizar cada acompanhamento
         for (var ai = 0; ai < acompIds.length; ai++) {
-          var acompId = acompIds[ai].trim();
-          if (!acompId) continue;
-
-          // Verificar se o acompanhamento existe e se o paciente já está correto
-          var checkRows = db.newQuery(
-            'SELECT id, paciente FROM amarcap53_acompanhamentos WHERE id = "' + acompId + '"'
-          ).all();
-
-          if (checkRows.length === 0) continue; // Acompanhamento não existe mais
-
-          var currentPac = checkRows[0].get('paciente') || '';
-          if (currentPac === newPacId) continue; // Já vinculado
-
-          // Atualizar
-          db.newQuery(
-            'UPDATE amarcap53_acompanhamentos SET paciente = "' + newPacId + '" WHERE id = "' + acompId + '"'
-          ).execute();
-          relinked++;
+          var acompId = acompIds[ai];
+          try {
+            var curRows = db.newQuery(
+              'SELECT paciente FROM amarcap53_acompanhamentos WHERE id = "' + acompId + '"'
+            ).all();
+            if (curRows.length === 0) continue;
+            var curPac = curRows[0].get('paciente') || '';
+            if (curPac === newPacId) continue;
+            db.newQuery(
+              'UPDATE amarcap53_acompanhamentos SET paciente = "' + newPacId + '" WHERE id = "' + acompId + '"'
+            ).execute();
+            relinked++;
+          } catch(_) { failed++; }
         }
       }
 
-      // Limpar backup após restore
-      try { db.newQuery('DELETE FROM ' + BACKUP_TABLE).execute(); } catch(_) {}
+      // Limpar backup
+      try { global._patientBackup = []; } catch(_) {}
 
       return c.json(200, { success: true, action: 'restore', relinked: relinked, failed: failed });
 

@@ -398,6 +398,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         var relinkInfo = '';
         var importOldIds = oldPatientsRef.current.oldIds;
         var importCnsMap = oldPatientsRef.current.cnsMap;
+        // Fallback: ler de localStorage
+        if (importOldIds.length === 0) {
+          try {
+            var stored = JSON.parse(localStorage.getItem('oldPatientsBackup') || '{}');
+            if (stored && stored.oldIds && stored.oldIds.length > 0) {
+              importOldIds = stored.oldIds;
+              importCnsMap = stored.cnsMap || {};
+            }
+          } catch(_) {}
+        }
         console.log('[Import] Re-link: oldIds=' + importOldIds.length + ' imported=' + imported);
         if (importOldIds.length > 0 && imported > 0) {
           try {
@@ -431,6 +441,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
             }
           } catch (_) {}
           oldPatientsRef.current = { oldIds: [], cnsMap: {} };
+          try { localStorage.removeItem('oldPatientsBackup'); } catch(_) {}
         }
 
         // Cria registro de log no histórico
@@ -606,6 +617,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
           }
         }
         oldPatientsRef.current = { oldIds, cnsMap };
+        try { localStorage.setItem('oldPatientsBackup', JSON.stringify({ oldIds, cnsMap })); } catch(_) {}
         console.log('[Delete] Pacientes capturados:', oldIds.length, 'com CNS:', Object.keys(cnsMap).length);
       } catch (colErr) { console.error('[Delete] Erro coletar pacientes:', colErr); oldPatientsRef.current = { oldIds: [], cnsMap: {} }; }
 
