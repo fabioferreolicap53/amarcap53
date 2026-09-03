@@ -399,14 +399,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         var oldData = oldPatientsRef.current;
         if (oldData.oldIds.length > 0 && imported > 0) {
           try {
-            var relinkResp = await fetch(pb.baseURL + '/api/custom/relink-acompanhamentos', {
+            var relinkData = await pb.send('/api/custom/relink-acompanhamentos', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': pb.authStore.token },
-              body: JSON.stringify({ oldIds: oldData.oldIds, cnsMap: oldData.cnsMap }),
+              body: { oldIds: oldData.oldIds, cnsMap: oldData.cnsMap },
             });
-            var relinkData = await relinkResp.json();
             if (relinkData.success && relinkData.relinked > 0) {
               relinkInfo = ' | ' + relinkData.relinked + ' acompanhamentos re-vinculados';
+            }
+          } catch (relinkErr: any) {
+            console.error('[Import] Erro re-vincular:', relinkErr);
+          }
+          // Fallback: rota auto-detecção de huérfãos
+          try {
+            var fallbackData = await pb.send('/api/custom/relink-orphan-by-cns', { method: 'POST' });
+            if (fallbackData && fallbackData.relinked > 0) {
+              relinkInfo += ' | ' + fallbackData.relinked + ' re-vinculados (fallback)';
             }
           } catch (_) {}
           oldPatientsRef.current = { oldIds: [], cnsMap: {} };
