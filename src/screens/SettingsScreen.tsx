@@ -106,6 +106,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
   const deleteStartTimeRef = useRef(0);
   const deleteEtaTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const deleteSnapRef = useRef({ deleted: 0, total: 0, errors: 0, running: false });
+  const oldPatientCnsMapRef = useRef<Record<string, string>>({});
 
   // Sincroniza o estado do input com o usuário do contexto sempre que ele mudar
   useEffect(() => {
@@ -394,16 +395,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         var elapsed = Math.round((Date.now() - importStartTimeRef.current) / 1000);
 
         // Re-vincular acompanhamentos huérfãos por CNS
-        // Campo cns nos acompanhamentos permite re-vincular mesmo após delete+import
+        // Envia mapa antigo (oldId→cns) para preencher cns em huérfãos, depois re-vincula
         var relinkInfo = '';
         try {
-          var relinkResp = await pb.send('/api/custom/relink-by-cns', { method: 'POST' });
+          var oldMap = oldPatientCnsMapRef.current || {};
+          var relinkResp = await pb.send('/api/custom/relink-by-cns', {
+            method: 'POST',
+            body: { oldPatientCnsMap: oldMap },
+          });
           if (relinkResp && relinkResp.relinked > 0) {
             relinkInfo = ' | ' + relinkResp.relinked + ' acompanhamentos re-vinculados';
+          }
+          if (relinkResp && relinkResp.filled > 0) {
+            relinkInfo += ' | ' + relinkResp.filled + ' cns restaurados';
           }
         } catch (relinkErr: any) {
           console.error('[Import] Erro re-vincular:', relinkErr);
         }
+        oldPatientCnsMapRef.current = {};
 
         // Cria registro de log no histórico
         try {
@@ -554,6 +563,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       var wasCancelled = false;
 
       setDeleteStatus({ message: 'Iniciando exclusão...', type: 'deleting' });
+
+      // Capturar mapa oldPacienteId → cns ANTES de deletar
+      try {
+        var allPacs = await pb.collection('amarcap53_pacientes').getFullList({ fields: 'id,cns' });
+        var mapCaptured: Record<string, string> = {};
+        for (var p of allPacs) {
+          var cnsVal = (p as any).cns || '';
+          if (p.id && cnsVal) mapCaptured[p.id] = String(cnsVal);
+        }
+        oldPatientCnsMapRef.current = mapCaptured;
+      } catch(_) { oldPatientCnsMapRef.current = {}; }
 
       // Loop principal — continua até a coleção ficar vazia
       while (true) {
