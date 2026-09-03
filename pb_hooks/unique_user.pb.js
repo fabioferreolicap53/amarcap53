@@ -1,56 +1,34 @@
 // unique_user.pb.js
 // Enforce unique combination of role + unidade + equipe + microarea
-// PocketBase JS API: onRecordCreate / onRecordUpdate / onRecordAuthRequest
-// Goja engine (ES5) — no modern JS features
-
-var esc = function(v) {
-  return String(v || '').replace(/"/g, '\\"');
-};
-
-var getField = function(record, name) {
-  try {
-    var val = record.get(name);
-    if (val !== undefined && val !== null && val !== '') return String(val);
-  } catch (_) {}
-  return '';
-};
-
-var buildFilter = function(record) {
-  var role = getField(record, 'role');
-  var unidade = getField(record, 'unidade_saude');
-  var equipe = getField(record, 'equipe');
-  var microarea = getField(record, 'microarea');
-
-  if (role === 'cap') return 'role = "cap"';
-  if (role === 'unidade') return 'role = "unidade" && unidade_saude = "' + esc(unidade) + '"';
-  if (role === 'equipe') return 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '"';
-  if (role === 'microarea') {
-    var m = String(microarea).trim();
-    if (m && m !== '0' && m !== 'N/A') {
-      return 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "' + esc(m) + '" || microarea = ' + parseInt(m, 10) + ')';
-    }
-    return 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "" || microarea = null || microarea = "N/A")';
-  }
-  return '';
-};
-
-var hasDuplicate = function(filter) {
-  if (!filter) return false;
-  try {
-    var rows = $app.findRecordsByFilter('amarcap53_users', filter, '-created', 1, 0);
-    return rows && rows.length > 0;
-  } catch (e) {
-    console.error('[unique_user] hasDuplicate ERRO: ' + String(e));
-    return false;
-  }
-};
+// Goja engine (ES5) — funções inline no callback para evitar ReferenceError
 
 // ─── CREATE — check duplicate combo ───────────────────
 onRecordCreate(function(e) {
   try {
-    var filter = buildFilter(e.record);
-    if (filter && hasDuplicate(filter)) {
-      throw new Error('Ja existe um cadastro com esta combinacao de perfil e localizacao.');
+    var rec = e.record;
+    var role = '';
+    var unidade = '';
+    var equipe = '';
+    var microarea = '';
+    try { var v = rec.get('role'); if (v !== undefined && v !== null && v !== '') role = String(v); } catch(_) {}
+    try { var v = rec.get('unidade_saude'); if (v !== undefined && v !== null && v !== '') unidade = String(v); } catch(_) {}
+    try { var v = rec.get('equipe'); if (v !== undefined && v !== null && v !== '') equipe = String(v); } catch(_) {}
+    try { var v = rec.get('microarea'); if (v !== undefined && v !== null && v !== '') microarea = String(v); } catch(_) {}
+    var esc = function(s) { return String(s || '').replace(/"/g, '\\"'); };
+    var filter = '';
+    if (role === 'cap') filter = 'role = "cap"';
+    else if (role === 'unidade') filter = 'role = "unidade" && unidade_saude = "' + esc(unidade) + '"';
+    else if (role === 'equipe') filter = 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '"';
+    else if (role === 'microarea') {
+      var m = String(microarea).trim();
+      if (m && m !== '0' && m !== 'N/A') filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "' + esc(m) + '" || microarea = ' + parseInt(m, 10) + ')';
+      else filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "" || microarea = null || microarea = "N/A")';
+    }
+    if (filter) {
+      var rows = $app.findRecordsByFilter('amarcap53_users', filter, '-created', 1, 0);
+      if (rows && rows.length > 0) {
+        throw new Error('Ja existe um cadastro com esta combinacao de perfil e localizacao.');
+      }
     }
   } catch (err) {
     if (err && err.message && err.message.indexOf('Ja existe') === 0) throw err;
@@ -62,10 +40,28 @@ onRecordCreate(function(e) {
 // ─── UPDATE — check duplicate combo ───────────────────
 onRecordUpdate(function(e) {
   try {
-    var filter = buildFilter(e.record);
+    var rec = e.record;
+    var role = '';
+    var unidade = '';
+    var equipe = '';
+    var microarea = '';
+    try { var v = rec.get('role'); if (v !== undefined && v !== null && v !== '') role = String(v); } catch(_) {}
+    try { var v = rec.get('unidade_saude'); if (v !== undefined && v !== null && v !== '') unidade = String(v); } catch(_) {}
+    try { var v = rec.get('equipe'); if (v !== undefined && v !== null && v !== '') equipe = String(v); } catch(_) {}
+    try { var v = rec.get('microarea'); if (v !== undefined && v !== null && v !== '') microarea = String(v); } catch(_) {}
+    var esc = function(s) { return String(s || '').replace(/"/g, '\\"'); };
+    var filter = '';
+    if (role === 'cap') filter = 'role = "cap"';
+    else if (role === 'unidade') filter = 'role = "unidade" && unidade_saude = "' + esc(unidade) + '"';
+    else if (role === 'equipe') filter = 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '"';
+    else if (role === 'microarea') {
+      var m = String(microarea).trim();
+      if (m && m !== '0' && m !== 'N/A') filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "' + esc(m) + '" || microarea = ' + parseInt(m, 10) + ')';
+      else filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "" || microarea = null || microarea = "N/A")';
+    }
     if (filter) {
+      var selfId = rec.id;
       var rows = $app.findRecordsByFilter('amarcap53_users', filter, '-created', 10, 0);
-      var selfId = e.record.id;
       for (var i = 0; i < rows.length; i++) {
         if (rows[i].id !== selfId) {
           throw new Error('Ja existe um cadastro com esta combinacao de perfil e localizacao.');
