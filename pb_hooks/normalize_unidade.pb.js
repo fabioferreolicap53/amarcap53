@@ -6,14 +6,14 @@
 // ─── Fix existing records at bootstrap ─────────────────
 onBootstrap(function(e) {
   try {
-    var dao = $app.dao();
-    if (!dao) { e.next(); return; }
+    var db = $app.db();
+    if (!db) { e.next(); return; }
 
-    dao.db().newQuery("UPDATE amarcap53_pacientes SET unidade = trim(unidade) WHERE unidade != trim(unidade)").execute();
-    dao.db().newQuery("UPDATE amarcap53_pacientes SET unidade = REPLACE(unidade, '  ', ' ') WHERE unidade LIKE '%  %'").execute();
-    dao.db().newQuery("UPDATE amarcap53_pacientes SET unidade = REPLACE(unidade, '  ', ' ') WHERE unidade LIKE '%  %'").execute();
+    db.newQuery("UPDATE amarcap53_pacientes SET unidade = trim(unidade) WHERE unidade != trim(unidade)").execute();
+    db.newQuery("UPDATE amarcap53_pacientes SET unidade = REPLACE(unidade, '  ', ' ') WHERE unidade LIKE '%  %'").execute();
+    db.newQuery("UPDATE amarcap53_pacientes SET unidade = REPLACE(unidade, '  ', ' ') WHERE unidade LIKE '%  %'").execute();
   } catch (err) {
-    // table might not exist yet, ignore
+    // table might not exist yet or $app.db() not available, ignore
   }
   e.next();
 });
@@ -42,16 +42,16 @@ routerAdd('POST', '/api/custom/fix-unidade-whitespace', function(c) {
   if (!auth) return c.json(401, { message: 'Nao autenticado' });
 
   try {
-    var dao = $app.dao();
-    if (!dao) return c.json(500, { message: 'DAO indisponivel' });
+    var db = $app.db();
+    if (!db) return c.json(500, { message: 'DB indisponivel' });
 
     var affected = 0;
-    var before = dao.db().newQuery("SELECT COUNT(*) as total FROM amarcap53_pacientes WHERE unidade LIKE '%  %'").one();
+    var before = db.newQuery("SELECT COUNT(*) as total FROM amarcap53_pacientes WHERE unidade LIKE '%  %'").one();
     if (before && before.get) { affected = before.get('total') || 0; }
 
-    dao.db().newQuery("UPDATE amarcap53_pacientes SET unidade = trim(unidade) WHERE unidade != trim(unidade)").execute();
-    dao.db().newQuery("UPDATE amarcap53_pacientes SET unidade = REPLACE(unidade, '  ', ' ') WHERE unidade LIKE '%  %'").execute();
-    dao.db().newQuery("UPDATE amarcap53_pacientes SET unidade = REPLACE(unidade, '  ', ' ') WHERE unidade LIKE '%  %'").execute();
+    db.newQuery("UPDATE amarcap53_pacientes SET unidade = trim(unidade) WHERE unidade != trim(unidade)").execute();
+    db.newQuery("UPDATE amarcap53_pacientes SET unidade = REPLACE(unidade, '  ', ' ') WHERE unidade LIKE '%  %'").execute();
+    db.newQuery("UPDATE amarcap53_pacientes SET unidade = REPLACE(unidade, '  ', ' ') WHERE unidade LIKE '%  %'").execute();
 
     return c.json(200, { success: true, fixed: affected, message: 'Whitespace normalizado em ' + affected + ' registros' });
   } catch (e) {

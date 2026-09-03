@@ -8,9 +8,9 @@ var LOG_COLLECTION = 'amarcap53_importacoes';
 var BATCH_SIZE = 500;
 var DATE_FIELDS = ['data_nascimento', 'cito_lab', 'cito_pep', 'dna_hpv_gal', 'dna_hpv_pep'];
 
-// Helper: obtém DAO (funciona em v0.24+ e v0.25+)
-function getDao() {
-  try { return $app.dao(); } catch(e) { return null; }
+// Helper: obtém DB (compatível com todas versões do PocketBase)
+function getDb() {
+  try { return $app.db(); } catch(e) { return null; }
 }
 
 function padLeft(str, len, ch) {
@@ -131,29 +131,39 @@ function sanitizeValue(field, val) {
   return s;
 }
 
-function doInsert(dao, collection, rows, mappedFields) {
+function escSql(v) {
+  if (v === null || v === undefined || v === '') return 'NULL';
+  var s = String(v).replace(/'/g, "''");
+  return "'" + s + "'";
+}
+
+function doInsert(rows, mappedFields) {
+  var db = getDb();
+  if (!db) throw new Error('DB indisponivel');
   var newCount = 0;
   var totalErrors = 0;
   var errorDetails = [];
-  dao.runInTransaction(function(txDao) {
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i];
-      try {
-        var rec = txDao.createRecord(collection);
-        for (var fi = 0; fi < mappedFields.length; fi++) {
-          var val = sanitizeValue(mappedFields[fi], r[mappedFields[fi]]);
-          if (val !== null) rec.set(mappedFields[fi], val);
-        }
-        txDao.saveRecord(rec);
-        newCount++;
-      } catch (e) {
-        totalErrors++;
-        var errMsg = (e && e.message) ? e.message : 'Erro';
-        errorDetails.push('#' + (i + 1) + ' ' + (r.cns || r.nome || '?') + ': ' + errMsg);
+  var fields = mappedFields.join(', ');
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    try {
+      var vals = [];
+      for (var fi = 0; fi < mappedFields.length; fi++) {
+        var val = sanitizeValue(mappedFields[fi], r[mappedFields[fi]]);
+        if (val === null || val === undefined || val === '') { vals.push('NULL'); continue; }
+        var fname = mappedFields[fi];
+        if (fname === 'microarea' || fname === 'idade') { vals.push(parseInt(val, 10) || 0); }
+        else { vals.push(escSql(val)); }
       }
+      db.newQuery('INSERT INTO ' + COLLECTION + ' (' + fields + ') VALUES (' + vals.join(', ') + ')').execute();
+      newCount++;
+    } catch (e) {
+      totalErrors++;
+      var errMsg = (e && e.message) ? e.message : 'Erro';
+      errorDetails.push('#' + (i + 1) + ' ' + (r.cns || r.nome || '?') + ': ' + errMsg);
     }
-    if (newCount === 0 && rows.length > 0) throw new Error('Nenhum registro inserido');
-  });
+  }
+  if (newCount === 0 && rows.length > 0) throw new Error('Nenhum registro inserido');
   return { newCount: newCount, totalErrors: totalErrors, errorDetails: errorDetails };
 }
 
@@ -163,54 +173,61 @@ function handleLegacyBody(c, body, auth) {
   var fileName = body.fileName || 'import.csv';
   var mode = body.mode === 'append' ? 'append' : 'replace';
   if (records.length > 30000) return c.json(413, { code: 413, message: 'Max 30000 registros por lote' });
-  var dao = getDao();
-  if (!dao) return c.json(500, { code: 500, message: 'DAO API indisponivel' });
-  var coll = dao.findCollectionByNameOrId(COLLECTION);
-  if (!coll) return c.json(500, { code: 500, message: 'Collection nao encontrada' });
+  var db = getDb();
+  if (!db) return c.json(500, { code: 500, message: 'DB indisponivel' });
   var oldCount = 0;
   var newCount = 0;
   var errors = [];
   var oldIdCnsMap = {};
   try {
-    dao.runInTransaction(function(txDao) {
-      if (mode === 'replace') {
-        try { var row = txDao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one(); oldCount = (row && row.get) ? (row.get('total') || 0) : 0; } catch (_) { oldCount = 0; }
-        // Coletar IDs antigos + CNS para re-vincular depois
-        try {
-          var oldRows = txDao.db().newQuery('SELECT id, cns FROM ' + COLLECTION).all();
-          for (var oi = 0; oi < oldRows.length; oi++) {
-            var oId = oldRows[oi].get('id');
-            var oCns = oldRows[oi].get('cns');
-            if (oId && oCns) oldIdCnsMap[oId] = oCns;
-          }
-        } catch (_) {}
-        txDao.db().newQuery('DELETE FROM ' + COLLECTION).execute();
-      }
-      for (var i = 0; i < records.length; i++) {
-        var r = records[i];
-        try {
-          var rec = txDao.createRecord(coll);
-          if (r.unidade) rec.set('unidade', String(r.unidade).trim());
-          if (r.equipe) rec.set('equipe', String(r.equipe).trim());
-          if (r.microarea !== undefined && r.microarea !== null && r.microarea !== '') rec.set('microarea', parseInt(r.microarea, 10) || 0);
-          if (r.cns) rec.set('cns', padLeft(String(r.cns).replace(/\D/g, ''), 15, '0').slice(-15));
-          if (r.nome) rec.set('nome', String(r.nome).trim());
-          if (r.data_nascimento) rec.set('data_nascimento', r.data_nascimento);
-          if (r.idade !== undefined && r.idade !== null && r.idade !== '') rec.set('idade', parseInt(r.idade, 10) || 0);
-          if (r.grupo !== undefined && r.grupo !== null) rec.set('grupo', String(r.grupo).trim());
-          if (r.cito_lab) rec.set('cito_lab', r.cito_lab);
-          if (r.cito_pep) rec.set('cito_pep', r.cito_pep);
-          if (r.dna_hpv_gal) rec.set('dna_hpv_gal', r.dna_hpv_gal);
-          if (r.unidade_solicitante) rec.set('unidade_solicitante', String(r.unidade_solicitante).trim());
-          if (r.alertas_rastreamento) rec.set('alertas_rastreamento', r.alertas_rastreamento);
-          txDao.saveRecord(rec);
-          newCount++;
-        } catch (e) {
-          errors.push('#' + (i + 1) + ' CNS=' + (r.cns || '?') + ': ' + ((e && e.message) || 'Erro'));
+    if (mode === 'replace') {
+      try { var row = db.newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one(); oldCount = (row && row.get) ? (row.get('total') || 0) : 0; } catch (_) { oldCount = 0; }
+      try {
+        var oldRows = db.newQuery('SELECT id, cns FROM ' + COLLECTION).all();
+        for (var oi = 0; oi < oldRows.length; oi++) {
+          var oId = oldRows[oi].get('id');
+          var oCns = oldRows[oi].get('cns');
+          if (oId && oCns) oldIdCnsMap[oId] = oCns;
         }
+      } catch (_) {}
+      db.newQuery('DELETE FROM ' + COLLECTION).execute();
+    }
+    var LEG_FIELDS = ['unidade','equipe','microarea','cns','nome','data_nascimento','idade','grupo','cito_lab','cito_pep','dna_hpv_gal','unidade_solicitante','alertas_rastreamento'];
+    for (var i = 0; i < records.length; i++) {
+      var r = records[i];
+      try {
+        var fnames = [];
+        var fvals = [];
+        for (var fi = 0; fi < LEG_FIELDS.length; fi++) {
+          var f = LEG_FIELDS[fi];
+          var v = null;
+          if (f === 'unidade' && r.unidade) v = String(r.unidade).trim();
+          else if (f === 'equipe' && r.equipe) v = String(r.equipe).trim();
+          else if (f === 'microarea' && r.microarea !== undefined && r.microarea !== null && r.microarea !== '') v = parseInt(r.microarea, 10) || 0;
+          else if (f === 'cns' && r.cns) v = padLeft(String(r.cns).replace(/\D/g, ''), 15, '0').slice(-15);
+          else if (f === 'nome' && r.nome) v = String(r.nome).trim();
+          else if (f === 'data_nascimento' && r.data_nascimento) v = r.data_nascimento;
+          else if (f === 'idade' && r.idade !== undefined && r.idade !== null && r.idade !== '') v = parseInt(r.idade, 10) || 0;
+          else if (f === 'grupo' && r.grupo !== undefined && r.grupo !== null) v = String(r.grupo).trim();
+          else if (f === 'cito_lab' && r.cito_lab) v = r.cito_lab;
+          else if (f === 'cito_pep' && r.cito_pep) v = r.cito_pep;
+          else if (f === 'dna_hpv_gal' && r.dna_hpv_gal) v = r.dna_hpv_gal;
+          else if (f === 'unidade_solicitante' && r.unidade_solicitante) v = String(r.unidade_solicitante).trim();
+          else if (f === 'alertas_rastreamento' && r.alertas_rastreamento) v = r.alertas_rastreamento;
+          if (v !== null && v !== undefined && v !== '') {
+            fnames.push(f);
+            if (f === 'microarea' || f === 'idade') fvals.push(parseInt(v, 10) || 0);
+            else fvals.push(escSql(v));
+          }
+        }
+        if (fnames.length === 0) continue;
+        db.newQuery('INSERT INTO ' + COLLECTION + ' (' + fnames.join(', ') + ') VALUES (' + fvals.join(', ') + ')').execute();
+        newCount++;
+      } catch (e) {
+        errors.push('#' + (i + 1) + ' CNS=' + (r.cns || '?') + ': ' + ((e && e.message) || 'Erro'));
       }
-      if (newCount === 0 && records.length > 0) throw new Error('Nenhum registro inserido');
-    });
+    }
+    if (newCount === 0 && records.length > 0) throw new Error('Nenhum registro inserido');
   } catch (e) {
     return c.json(500, { code: 500, message: (e && e.message) || 'Erro', oldCount: oldCount, rollback: true });
   }
@@ -227,14 +244,14 @@ function handleLegacyBody(c, body, auth) {
           var oldPacId = oldIds[ri];
           var pacCns = oldIdCnsMap[oldPacId];
           if (!pacCns) continue;
-          var orphRows = dao.db().newQuery('SELECT id, paciente FROM ' + ACOMP + ' WHERE paciente = "' + oldPacId + '"').all();
+          var orphRows = db.newQuery('SELECT id, paciente FROM ' + ACOMP + ' WHERE paciente = "' + oldPacId + '"').all();
           if (orphRows.length === 0) continue;
-          var newPacRows = dao.db().newQuery('SELECT id FROM ' + COLLECTION + ' WHERE cns = "' + pacCns + '" LIMIT 1').all();
+          var newPacRows = db.newQuery('SELECT id FROM ' + COLLECTION + ' WHERE cns = "' + pacCns + '" LIMIT 1').all();
           if (newPacRows.length === 0) { relFailed += orphRows.length; continue; }
           var newPacId = newPacRows[0].get('id');
           for (var ri2 = 0; ri2 < orphRows.length; ri2++) {
             if (newPacId === oldPacId) continue;
-            dao.db().newQuery('UPDATE ' + ACOMP + ' SET paciente = "' + newPacId + '" WHERE id = "' + orphRows[ri2].get('id') + '"').execute();
+            db.newQuery('UPDATE ' + ACOMP + ' SET paciente = "' + newPacId + '" WHERE id = "' + orphRows[ri2].get('id') + '"').execute();
             relinked++;
           }
         }
@@ -242,7 +259,12 @@ function handleLegacyBody(c, body, auth) {
       }
     } catch (_) {}
   }
-  try { var logColl = dao.findCollectionByNameOrId(LOG_COLLECTION); if (logColl) { var log = dao.createRecord(logColl); log.set('filename', fileName); log.set('total_records', records.length); log.set('success_count', newCount); log.set('error_count', records.length - newCount); log.set('user_id', auth.getId()); if (errors.length > 0) log.set('details', errors.slice(0, 100).join('\n')); dao.saveRecord(log); } } catch (_) {}
+  // Log
+  try {
+    db.newQuery('INSERT INTO ' + LOG_COLLECTION + ' (filename, total_records, success_count, error_count, user_id, details) VALUES (' +
+      escSql(fileName) + ', ' + records.length + ', ' + newCount + ', ' + (records.length - newCount) + ', ' +
+      escSql(auth.getId()) + ', ' + escSql(errors.slice(0, 100).join('\n')) + ')').execute();
+  } catch (_) {}
   return c.json(200, { success: true, mode: mode, total: records.length, imported: newCount, errors: records.length - newCount, oldCount: oldCount, relink: relinkResult, errorDetails: errors.slice(0, 10) });
 }
 
@@ -282,17 +304,14 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
       if (mappedFields[vi] === 'cns') hasCns = true;
     }
     if (!hasNome || !hasCns) return c.json(400, { code: 400, message: 'CSV precisa de "nome" e "cns". Encontradas: ' + mappedFields.join(', ') });
-    var dao = getDao();
-    if (!dao) return c.json(500, { code: 500, message: 'DAO API indisponivel' });
-    var collection = dao.findCollectionByNameOrId(COLLECTION);
-    if (!collection) return c.json(500, { code: 500, message: 'Collection nao encontrada' });
+    var db = getDb();
+    if (!db) return c.json(500, { code: 500, message: 'DB indisponivel' });
     var oldCount = 0;
     var oldIdCnsMap = {};
     if (mode === 'replace') {
-      try { var cntRow = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one(); oldCount = (cntRow && cntRow.get) ? (cntRow.get('total') || 0) : 0; } catch (_) { oldCount = 0; }
+      try { var cntRow = db.newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one(); oldCount = (cntRow && cntRow.get) ? (cntRow.get('total') || 0) : 0; } catch (_) { oldCount = 0; }
       if (oldCount > 0) {
-        // Coletar IDs antigos + CNS para re-vincular acompanhamentos depois
-        var oldRows = dao.db().newQuery('SELECT id, cns FROM ' + COLLECTION).all();
+        var oldRows = db.newQuery('SELECT id, cns FROM ' + COLLECTION).all();
         for (var oi = 0; oi < oldRows.length; oi++) {
           var oldId = oldRows[oi].get('id');
           var oldCns = oldRows[oi].get('cns');
@@ -300,13 +319,13 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
         }
         var delIter = 0;
         while (delIter < 500) {
-          var chk = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
+          var chk = db.newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
           var rem = (chk && chk.get) ? (chk.get('total') || 0) : 0;
           if (rem === 0) break;
-          dao.db().newQuery('DELETE FROM ' + COLLECTION + ' WHERE id IN (SELECT id FROM ' + COLLECTION + ' LIMIT 10000)').execute();
+          db.newQuery('DELETE FROM ' + COLLECTION + ' WHERE id IN (SELECT id FROM ' + COLLECTION + ' LIMIT 10000)').execute();
           delIter++;
         }
-        var finalRow = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
+        var finalRow = db.newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
         var leftover = (finalRow && finalRow.get) ? (finalRow.get('total') || 0) : 0;
         if (leftover > 0) return c.json(500, { code: 500, message: leftover + ' registros nao removidos' });
       }
@@ -314,7 +333,7 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
     var insertResult = { newCount: 0, totalErrors: 0, errorDetails: [] };
     if (rows.length > 0) {
       try {
-        insertResult = doInsert(dao, collection, rows, mappedFields);
+        insertResult = doInsert(rows, mappedFields);
       } catch (e) {
         return c.json(500, { code: 500, message: 'DELETE ok mas INSERT falhou: ' + ((e && e.message) || '?'), oldCount: oldCount, imported: 0, errors: rows.length });
       }
@@ -333,14 +352,14 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
             var oldPacId = oldIds[ri];
             var pacCns = oldIdCnsMap[oldPacId];
             if (!pacCns) continue;
-            var orphRows = dao.db().newQuery('SELECT id, paciente FROM ' + ACOMP + ' WHERE paciente = "' + oldPacId + '"').all();
+            var orphRows = db.newQuery('SELECT id, paciente FROM ' + ACOMP + ' WHERE paciente = "' + oldPacId + '"').all();
             if (orphRows.length === 0) continue;
-            var newPacRows = dao.db().newQuery('SELECT id FROM ' + PAC + ' WHERE cns = "' + pacCns + '" LIMIT 1').all();
+            var newPacRows = db.newQuery('SELECT id FROM ' + PAC + ' WHERE cns = "' + pacCns + '" LIMIT 1').all();
             if (newPacRows.length === 0) { relFailed += orphRows.length; continue; }
             var newPacId = newPacRows[0].get('id');
             for (var ri2 = 0; ri2 < orphRows.length; ri2++) {
               if (newPacId === oldPacId) { continue; }
-              dao.db().newQuery('UPDATE ' + ACOMP + ' SET paciente = "' + newPacId + '" WHERE id = "' + orphRows[ri2].get('id') + '"').execute();
+              db.newQuery('UPDATE ' + ACOMP + ' SET paciente = "' + newPacId + '" WHERE id = "' + orphRows[ri2].get('id') + '"').execute();
               relinked++;
             }
           }
@@ -348,7 +367,11 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
         }
       } catch (relErr) { relinkResult = { relinked: 0, failed: 0, error: (relErr && relErr.message) || 'Erro' }; }
     }
-    try { var logColl = dao.findCollectionByNameOrId(LOG_COLLECTION); if (logColl) { var log = dao.createRecord(logColl); log.set('filename', fileName); log.set('total_records', rows.length); log.set('success_count', insertResult.newCount); log.set('error_count', insertResult.totalErrors); log.set('user_id', auth.getId()); if (insertResult.errorDetails.length > 0) log.set('details', insertResult.errorDetails.slice(0, 100).join('\n')); dao.saveRecord(log); } } catch (_) {}
+    try {
+      db.newQuery('INSERT INTO ' + LOG_COLLECTION + ' (filename, total_records, success_count, error_count, user_id, details) VALUES (' +
+        escSql(fileName) + ', ' + rows.length + ', ' + insertResult.newCount + ', ' + insertResult.totalErrors + ', ' +
+        escSql(auth.getId()) + ', ' + escSql(insertResult.errorDetails.slice(0, 100).join('\n')) + ')').execute();
+    } catch (_) {}
     return c.json(200, { success: true, mode: mode, total: rows.length, imported: insertResult.newCount, errors: insertResult.totalErrors, oldCount: oldCount, relink: relinkResult, mappedFields: mappedFields, errorDetails: insertResult.errorDetails.slice(0, 10) });
   } catch (err) {
     var msg = (err && err.message) ? err.message : 'Erro inesperado';
@@ -360,8 +383,8 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
 // ─── DELETE em massa ────────────────────────────────────
 routerAdd('POST', '/api/custom/delete-all', function(c) {
   try {
-    var dao = getDao();
-    if (!dao) return c.json(500, { code: 500, message: 'DAO API indisponivel' });
+    var db = getDb();
+    if (!db) return c.json(500, { code: 500, message: 'DB indisponivel' });
     var auth = c.auth;
     if (!auth) return c.json(401, { code: 401, message: 'Nao autenticado' });
     var role = auth.get('role');
@@ -370,7 +393,6 @@ routerAdd('POST', '/api/custom/delete-all', function(c) {
     try { var info = c.requestInfo(); if (info && info.body) { body = (typeof info.body === 'object') ? info.body : {}; if (body && typeof body.get === 'function') { body = { collection: body.get('collection') }; } } else { body = {}; } } catch (_) { try { body = c.parseBody() || {}; } catch (_2) { body = {}; } }
     var collName = body.collection;
     if (!collName || typeof collName !== 'string') return c.json(400, { code: 400, message: 'Envie collection' });
-    var db = dao.db();
     var row = db.newQuery('SELECT COUNT(*) as total FROM ' + collName).one();
     var before = (row && row.get) ? (row.get('total') || 0) : 0;
     db.newQuery('DELETE FROM ' + collName).execute();
@@ -401,7 +423,8 @@ routerAdd('POST', '/api/custom/relink-acompanhamentos', function(c) {
         }
       } else { body = {}; }
     } catch (_) { try { body = c.parseBody() || {}; } catch (_2) { body = {}; } }
-    var db = dao.db();
+    var db = getDb();
+    if (!db) return c.json(500, { code: 500, message: 'DB indisponivel' });
     var ACOMP = 'amarcap53_acompanhamentos';
     var PAC = 'amarcap53_pacientes';
     var relinked = 0;

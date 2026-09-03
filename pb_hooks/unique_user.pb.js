@@ -34,10 +34,10 @@ function buildFilter(record) {
   return '';
 }
 
-function hasDuplicate(dao, filter) {
+function hasDuplicate(filter) {
   if (!filter) return false;
   try {
-    var rows = dao.findRecordsByFilter('amarcap53_users', filter, '-created', 1, 0);
+    var rows = $app.findRecordsByFilter('amarcap53_users', filter, '-created', 1, 0);
     return rows && rows.length > 0;
   } catch (e) {
     console.error('[unique_user] hasDuplicate ERRO: ' + String(e));
@@ -48,12 +48,9 @@ function hasDuplicate(dao, filter) {
 // ─── CREATE — check duplicate combo ───────────────────
 onRecordCreate(function(e) {
   try {
-    var dao = $app.dao();
-    if (dao) {
-      var filter = buildFilter(e.record);
-      if (filter && hasDuplicate(dao, filter)) {
-        throw new Error('Ja existe um cadastro com esta combinacao de perfil e localizacao.');
-      }
+    var filter = buildFilter(e.record);
+    if (filter && hasDuplicate(filter)) {
+      throw new Error('Ja existe um cadastro com esta combinacao de perfil e localizacao.');
     }
   } catch (err) {
     if (err && err.message && err.message.indexOf('Ja existe') === 0) throw err;
@@ -65,16 +62,13 @@ onRecordCreate(function(e) {
 // ─── UPDATE — check duplicate combo ───────────────────
 onRecordUpdate(function(e) {
   try {
-    var dao = $app.dao();
-    if (dao) {
-      var filter = buildFilter(e.record);
-      if (filter) {
-        var rows = dao.findRecordsByFilter('amarcap53_users', filter, '-created', 10, 0);
-        var selfId = e.record.id;
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i].id !== selfId) {
-            throw new Error('Ja existe um cadastro com esta combinacao de perfil e localizacao.');
-          }
+    var filter = buildFilter(e.record);
+    if (filter) {
+      var rows = $app.findRecordsByFilter('amarcap53_users', filter, '-created', 10, 0);
+      var selfId = e.record.id;
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].id !== selfId) {
+          throw new Error('Ja existe um cadastro com esta combinacao de perfil e localizacao.');
         }
       }
     }
