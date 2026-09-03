@@ -106,6 +106,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
   const deleteStartTimeRef = useRef(0);
   const deleteEtaTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const deleteSnapRef = useRef({ deleted: 0, total: 0, errors: 0, running: false });
+  const oldPatientsRef = useRef<{ oldIds: string[]; cnsMap: Record<string, string> }>({ oldIds: [], cnsMap: {} });
 
   // Sincroniza o estado do input com o usuário do contexto sempre que ele mudar
   useEffect(() => {
@@ -393,6 +394,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         if (importEtaTimerRef.current) clearInterval(importEtaTimerRef.current);
         var elapsed = Math.round((Date.now() - importStartTimeRef.current) / 1000);
 
+        // Re-vincular acompanhamentos huérfãos por CNS (se houve exclusão prévia)
+        var relinkInfo = '';
+        var oldData = oldPatientsRef.current;
+        if (oldData.oldIds.length > 0 && imported > 0) {
+          try {
+            var relinkResp = await fetch(pb.baseURL + '/api/custom/relink-acompanhamentos', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': pb.authStore.token },
+              body: JSON.stringify({ oldIds: oldData.oldIds, cnsMap: oldData.cnsMap }),
+            });
+            var relinkData = await relinkResp.json();
+            if (relinkData.success && relinkData.relinked > 0) {
+              relinkInfo = ' | ' + relinkData.relinked + ' acompanhamentos re-vinculados';
+            }
+          } catch (_) {}
+          oldPatientsRef.current = { oldIds: [], cnsMap: {} };
+        }
+
         // Cria registro de log no histórico
         try {
           await pb.collection('amarcap53_importacoes').create({
@@ -412,10 +431,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
         if (wasCancelled) {
           setImportSummary({ elapsedSec: elapsed, errors: errors, total: imported, cancelled: true });
-          setUploadStatus({ stage: 'completed', message: imported + ' registros importados. Operação interrompida.', current: imported, total: records.length, fileName: file.name });
+          setUploadStatus({ stage: 'completed', message: imported + ' registros importados. Operação interrompida.' + relinkInfo, current: imported, total: records.length, fileName: file.name });
         } else {
           setImportSummary({ elapsedSec: elapsed, errors: errors, total: imported, cancelled: false });
-          setUploadStatus({ stage: 'completed', message: 'Sucesso! ' + imported + ' registros importados' + (errors > 0 ? ', ' + errors + ' falhas' : '') + '.', current: imported, total: records.length, fileName: file.name });
+          setUploadStatus({ stage: 'completed', message: 'Sucesso! ' + imported + ' registros importados' + (errors > 0 ? ', ' + errors + ' falhas' : '') + '.' + relinkInfo, current: imported, total: records.length, fileName: file.name });
         }
         setImportControl('idle');
       } catch (err: any) {
@@ -542,6 +561,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       var wasCancelled = false;
 
       setDeleteStatus({ message: 'Iniciando exclusão...', type: 'deleting' });
+
+      // Coletar IDs antigos + CNS antes de deletar (para re-vincular acompanhamentos depois)
+      try {
+        var oldPatients = await pb.collection('amarcap53_pacientes').getFullList({ fields: 'id,cns' });
+        var oldIds: string[] = [];
+        var cnsMap: Record<string, string> = {};
+        for (var op of oldPatients) {
+          if (op.id && (op as any).cns) {
+            oldIds.push(op.id);
+            cnsMap[op.id] = (op as any).cns;
+          }
+        }
+        oldPatientsRef.current = { oldIds, cnsMap };
+      } catch (_) { oldPatientsRef.current = { oldIds: [], cnsMap: {} }; }
 
       // Loop principal — continua até a coleção ficar vazia
       while (true) {

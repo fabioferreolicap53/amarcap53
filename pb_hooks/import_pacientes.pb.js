@@ -170,10 +170,20 @@ function handleLegacyBody(c, body, auth) {
   var oldCount = 0;
   var newCount = 0;
   var errors = [];
+  var oldIdCnsMap = {};
   try {
     dao.runInTransaction(function(txDao) {
       if (mode === 'replace') {
         try { var row = txDao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one(); oldCount = (row && row.get) ? (row.get('total') || 0) : 0; } catch (_) { oldCount = 0; }
+        // Coletar IDs antigos + CNS para re-vincular depois
+        try {
+          var oldRows = txDao.db().newQuery('SELECT id, cns FROM ' + COLLECTION).all();
+          for (var oi = 0; oi < oldRows.length; oi++) {
+            var oId = oldRows[oi].get('id');
+            var oCns = oldRows[oi].get('cns');
+            if (oId && oCns) oldIdCnsMap[oId] = oCns;
+          }
+        } catch (_) {}
         txDao.db().newQuery('DELETE FROM ' + COLLECTION).execute();
       }
       for (var i = 0; i < records.length; i++) {
@@ -204,8 +214,36 @@ function handleLegacyBody(c, body, auth) {
   } catch (e) {
     return c.json(500, { code: 500, message: (e && e.message) || 'Erro', oldCount: oldCount, rollback: true });
   }
+  // Re-vincular acompanhamentos huérfãos por CNS (modo replace)
+  var relinkResult = { relinked: 0, failed: 0 };
+  if (mode === 'replace' && newCount > 0) {
+    try {
+      var oldIds = [];
+      for (var rKey in oldIdCnsMap) { oldIds.push(rKey); }
+      if (oldIds.length > 0) {
+        var ACOMP = 'amarcap53_acompanhamentos';
+        var relinked = 0, relFailed = 0;
+        for (var ri = 0; ri < oldIds.length; ri++) {
+          var oldPacId = oldIds[ri];
+          var pacCns = oldIdCnsMap[oldPacId];
+          if (!pacCns) continue;
+          var orphRows = dao.db().newQuery('SELECT id, paciente FROM ' + ACOMP + ' WHERE paciente = "' + oldPacId + '"').all();
+          if (orphRows.length === 0) continue;
+          var newPacRows = dao.db().newQuery('SELECT id FROM ' + COLLECTION + ' WHERE cns = "' + pacCns + '" LIMIT 1').all();
+          if (newPacRows.length === 0) { relFailed += orphRows.length; continue; }
+          var newPacId = newPacRows[0].get('id');
+          for (var ri2 = 0; ri2 < orphRows.length; ri2++) {
+            if (newPacId === oldPacId) continue;
+            dao.db().newQuery('UPDATE ' + ACOMP + ' SET paciente = "' + newPacId + '" WHERE id = "' + orphRows[ri2].get('id') + '"').execute();
+            relinked++;
+          }
+        }
+        relinkResult = { relinked: relinked, failed: relFailed };
+      }
+    } catch (_) {}
+  }
   try { var logColl = dao.findCollectionByNameOrId(LOG_COLLECTION); if (logColl) { var log = dao.createRecord(logColl); log.set('filename', fileName); log.set('total_records', records.length); log.set('success_count', newCount); log.set('error_count', records.length - newCount); log.set('user_id', auth.getId()); if (errors.length > 0) log.set('details', errors.slice(0, 100).join('\n')); dao.saveRecord(log); } } catch (_) {}
-  return c.json(200, { success: true, mode: mode, total: records.length, imported: newCount, errors: records.length - newCount, oldCount: oldCount, errorDetails: errors.slice(0, 10) });
+  return c.json(200, { success: true, mode: mode, total: records.length, imported: newCount, errors: records.length - newCount, oldCount: oldCount, relink: relinkResult, errorDetails: errors.slice(0, 10) });
 }
 
 // ─── Router: POST /api/custom/import-pacientes ──────────
@@ -249,9 +287,17 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
     var collection = dao.findCollectionByNameOrId(COLLECTION);
     if (!collection) return c.json(500, { code: 500, message: 'Collection nao encontrada' });
     var oldCount = 0;
+    var oldIdCnsMap = {};
     if (mode === 'replace') {
       try { var cntRow = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one(); oldCount = (cntRow && cntRow.get) ? (cntRow.get('total') || 0) : 0; } catch (_) { oldCount = 0; }
       if (oldCount > 0) {
+        // Coletar IDs antigos + CNS para re-vincular acompanhamentos depois
+        var oldRows = dao.db().newQuery('SELECT id, cns FROM ' + COLLECTION).all();
+        for (var oi = 0; oi < oldRows.length; oi++) {
+          var oldId = oldRows[oi].get('id');
+          var oldCns = oldRows[oi].get('cns');
+          if (oldId && oldCns) oldIdCnsMap[oldId] = oldCns;
+        }
         var delIter = 0;
         while (delIter < 500) {
           var chk = dao.db().newQuery('SELECT COUNT(*) as total FROM ' + COLLECTION).one();
@@ -273,8 +319,37 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
         return c.json(500, { code: 500, message: 'DELETE ok mas INSERT falhou: ' + ((e && e.message) || '?'), oldCount: oldCount, imported: 0, errors: rows.length });
       }
     }
+    // Re-vincular acompanhamentos huérfãos por CNS (modo replace)
+    var relinkResult = { relinked: 0, failed: 0 };
+    if (mode === 'replace' && insertResult.newCount > 0) {
+      try {
+        var oldIds = [];
+        for (var rKey in oldIdCnsMap) { oldIds.push(rKey); }
+        if (oldIds.length > 0) {
+          var ACOMP = 'amarcap53_acompanhamentos';
+          var PAC = COLLECTION;
+          var relinked = 0, relFailed = 0;
+          for (var ri = 0; ri < oldIds.length; ri++) {
+            var oldPacId = oldIds[ri];
+            var pacCns = oldIdCnsMap[oldPacId];
+            if (!pacCns) continue;
+            var orphRows = dao.db().newQuery('SELECT id, paciente FROM ' + ACOMP + ' WHERE paciente = "' + oldPacId + '"').all();
+            if (orphRows.length === 0) continue;
+            var newPacRows = dao.db().newQuery('SELECT id FROM ' + PAC + ' WHERE cns = "' + pacCns + '" LIMIT 1').all();
+            if (newPacRows.length === 0) { relFailed += orphRows.length; continue; }
+            var newPacId = newPacRows[0].get('id');
+            for (var ri2 = 0; ri2 < orphRows.length; ri2++) {
+              if (newPacId === oldPacId) { continue; }
+              dao.db().newQuery('UPDATE ' + ACOMP + ' SET paciente = "' + newPacId + '" WHERE id = "' + orphRows[ri2].get('id') + '"').execute();
+              relinked++;
+            }
+          }
+          relinkResult = { relinked: relinked, failed: relFailed };
+        }
+      } catch (relErr) { relinkResult = { relinked: 0, failed: 0, error: (relErr && relErr.message) || 'Erro' }; }
+    }
     try { var logColl = dao.findCollectionByNameOrId(LOG_COLLECTION); if (logColl) { var log = dao.createRecord(logColl); log.set('filename', fileName); log.set('total_records', rows.length); log.set('success_count', insertResult.newCount); log.set('error_count', insertResult.totalErrors); log.set('user_id', auth.getId()); if (insertResult.errorDetails.length > 0) log.set('details', insertResult.errorDetails.slice(0, 100).join('\n')); dao.saveRecord(log); } } catch (_) {}
-    return c.json(200, { success: true, mode: mode, total: rows.length, imported: insertResult.newCount, errors: insertResult.totalErrors, oldCount: oldCount, mappedFields: mappedFields, errorDetails: insertResult.errorDetails.slice(0, 10) });
+    return c.json(200, { success: true, mode: mode, total: rows.length, imported: insertResult.newCount, errors: insertResult.totalErrors, oldCount: oldCount, relink: relinkResult, mappedFields: mappedFields, errorDetails: insertResult.errorDetails.slice(0, 10) });
   } catch (err) {
     var msg = (err && err.message) ? err.message : 'Erro inesperado';
     console.error('import-pacientes CRASH:', msg);
@@ -303,6 +378,69 @@ routerAdd('POST', '/api/custom/delete-all', function(c) {
   } catch (err) {
     console.error('delete-all ERROR:', (err && err.message) || err);
     return c.json(500, { code: 500, message: (err && err.message) || 'Erro' });
+  }
+});
+
+// ─── Re-vincular acompanhamentos por CNS ─────────────────
+// POST /api/custom/relink-acompanhamentos
+// Body: { oldIds: ["id1","id2",...], cnsMap: {"id1":"000...","id2":"001..."} }
+// Re-vincula acompanhamentos huérfãos: busca paciente novo pelo CNS, atualiza campo "paciente"
+routerAdd('POST', '/api/custom/relink-acompanhamentos', function(c) {
+  try {
+    var auth = c.auth;
+    if (!auth) return c.json(401, { code: 401, message: 'Nao autenticado' });
+    var role = auth.get('role');
+    if (role !== 'cap' && role !== 'admin') return c.json(403, { code: 403, message: 'Apenas CAP ou admin' });
+    var body;
+    try {
+      var info = c.requestInfo();
+      if (info && info.body) {
+        body = (typeof info.body === 'object') ? info.body : {};
+        if (body && typeof body.get === 'function') {
+          body = { oldIds: body.get('oldIds'), cnsMap: body.get('cnsMap') };
+        }
+      } else { body = {}; }
+    } catch (_) { try { body = c.parseBody() || {}; } catch (_2) { body = {}; } }
+    var db = dao.db();
+    var ACOMP = 'amarcap53_acompanhamentos';
+    var PAC = 'amarcap53_pacientes';
+    var relinked = 0;
+    var already = 0;
+    var failed = 0;
+    // Coletar IDs antigos de pacientes deletados
+    var oldIds = body.oldIds || [];
+    var cnsMap = body.cnsMap || {};
+    if (oldIds.length === 0) {
+      return c.json(200, { success: true, relinked: 0, already: 0, failed: 0, message: 'Nenhum oldId fornecido' });
+    }
+    // Para cada ID antigo, buscar acompanhamentos que referenciam esse ID
+    var orphans = [];
+    for (var k = 0; k < oldIds.length; k++) {
+      var orphRows = db.newQuery('SELECT id, paciente FROM ' + ACOMP + ' WHERE paciente = "' + oldIds[k] + '"').all();
+      for (var oi = 0; oi < orphRows.length; oi++) {
+        orphans.push({ id: orphRows[oi].get('id'), oldPacienteId: orphRows[oi].get('paciente') });
+      }
+    }
+    if (orphans.length === 0) {
+      return c.json(200, { success: true, relinked: 0, already: 0, failed: 0, message: 'Nenhum acompanhamento huérfão' });
+    }
+    // Re-vincular: para cada huérfão, buscar paciente novo pelo CNS
+    for (var bi = 0; bi < orphans.length; bi++) {
+      var orph = orphans[bi];
+      var pacienteCns = cnsMap[orph.oldPacienteId];
+      if (!pacienteCns) { failed++; continue; }
+      var newPacRows = db.newQuery('SELECT id FROM ' + PAC + ' WHERE cns = "' + pacienteCns + '" LIMIT 1').all();
+      if (newPacRows.length === 0) { failed++; continue; }
+      var newPacienteId = newPacRows[0].get('id');
+      if (newPacienteId === orph.oldPacienteId) { already++; continue; }
+      db.newQuery('UPDATE ' + ACOMP + ' SET paciente = "' + newPacienteId + '" WHERE id = "' + orph.id + '"').execute();
+      relinked++;
+    }
+    return c.json(200, { success: true, relinked: relinked, already: already, failed: failed, total: orphans.length });
+  } catch (err) {
+    var msg = (err && err.message) ? err.message : 'Erro inesperado';
+    console.error('relink-acompanhamentos CRASH:', msg);
+    return c.json(500, { code: 500, message: msg });
   }
 });
 
