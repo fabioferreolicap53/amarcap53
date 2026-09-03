@@ -275,16 +275,21 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
     if (!auth) return c.json(401, { code: 401, message: 'Nao autenticado' });
     var role = auth.get('role');
     if (role !== 'cap' && role !== 'admin') return c.json(403, { code: 403, message: 'Apenas CAP ou admin' });
-    var body;
-    try {
-      var info = c.requestInfo();
-      if (info && info.body) {
-        body = (typeof info.body === 'object') ? info.body : {};
-        if (body && typeof body.get === 'function') {
-          body = { csvText: body.get('csvText'), fileName: body.get('fileName'), records: body.get('records'), mode: body.get('mode') };
+    var body = {};
+    try { body = c.parseBody() || {}; } catch(_) {}
+    if (!body.csvText && !body.records) {
+      try {
+        var info = c.requestInfo();
+        if (info && info.body && typeof info.body === 'object') {
+          var ib = info.body;
+          if (typeof ib.get === 'function') {
+            body = { csvText: ib.get('csvText'), fileName: ib.get('fileName'), records: ib.get('records'), mode: ib.get('mode') };
+          } else {
+            body = { csvText: ib.csvText, fileName: ib.fileName, records: ib.records, mode: ib.mode };
+          }
         }
-      } else { body = {}; }
-    } catch (_) { try { body = c.parseBody() || {}; } catch (_2) { body = {}; } }
+      } catch(_) {}
+    }
     var bodyMode = body.mode || 'replace';
     if (body.records && Array.isArray(body.records)) return handleLegacyBody(c, body, auth);
     var csvText = body.csvText;
@@ -389,8 +394,18 @@ routerAdd('POST', '/api/custom/delete-all', function(c) {
     if (!auth) return c.json(401, { code: 401, message: 'Nao autenticado' });
     var role = auth.get('role');
     if (role !== 'cap' && role !== 'admin') return c.json(403, { code: 403, message: 'Apenas CAP ou admin' });
-    var body;
-    try { var info = c.requestInfo(); if (info && info.body) { body = (typeof info.body === 'object') ? info.body : {}; if (body && typeof body.get === 'function') { body = { collection: body.get('collection') }; } } else { body = {}; } } catch (_) { try { body = c.parseBody() || {}; } catch (_2) { body = {}; } }
+    var body = {};
+    try { body = c.parseBody() || {}; } catch(_) {}
+    if (!body.collection) {
+      try {
+        var info = c.requestInfo();
+        if (info && info.body && typeof info.body === 'object') {
+          var ib = info.body;
+          if (typeof ib.get === 'function') { body = { collection: ib.get('collection') }; }
+          else { body = { collection: ib.collection }; }
+        }
+      } catch(_) {}
+    }
     var collName = body.collection;
     if (!collName || typeof collName !== 'string') return c.json(400, { code: 400, message: 'Envie collection' });
     var row = db.newQuery('SELECT COUNT(*) as total FROM ' + collName).one();
@@ -413,16 +428,21 @@ routerAdd('POST', '/api/custom/relink-acompanhamentos', function(c) {
     if (!auth) return c.json(401, { code: 401, message: 'Nao autenticado' });
     var role = auth.get('role');
     if (role !== 'cap' && role !== 'admin') return c.json(403, { code: 403, message: 'Apenas CAP ou admin' });
-    var body;
-    try {
-      var info = c.requestInfo();
-      if (info && info.body) {
-        body = (typeof info.body === 'object') ? info.body : {};
-        if (body && typeof body.get === 'function') {
-          body = { oldIds: body.get('oldIds'), cnsMap: body.get('cnsMap') };
+    var body = {};
+    try { body = c.parseBody() || {}; } catch(_) {}
+    if (!body.oldIds) {
+      try {
+        var info = c.requestInfo();
+        if (info && info.body && typeof info.body === 'object') {
+          var ib = info.body;
+          if (typeof ib.get === 'function') {
+            body = { oldIds: ib.get('oldIds'), cnsMap: ib.get('cnsMap') };
+          } else {
+            body = { oldIds: ib.oldIds, cnsMap: ib.cnsMap };
+          }
         }
-      } else { body = {}; }
-    } catch (_) { try { body = c.parseBody() || {}; } catch (_2) { body = {}; } }
+      } catch(_) {}
+    }
     var db = getDb();
     if (!db) return c.json(500, { code: 500, message: 'DB indisponivel' });
     var ACOMP = 'amarcap53_acompanhamentos';

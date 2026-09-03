@@ -394,28 +394,29 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         if (importEtaTimerRef.current) clearInterval(importEtaTimerRef.current);
         var elapsed = Math.round((Date.now() - importStartTimeRef.current) / 1000);
 
-        // Re-vincular acompanhamentos huérfãos por CNS (se houve exclusão prévia)
+        // Re-vincular acompanhamentos huérfãos por CNS
         var relinkInfo = '';
-        var oldData = oldPatientsRef.current;
-        if (oldData.oldIds.length > 0 && imported > 0) {
+        var importOldIds = oldPatientsRef.current.oldIds;
+        var importCnsMap = oldPatientsRef.current.cnsMap;
+        console.log('[Import] Re-link: oldIds=' + importOldIds.length + ' imported=' + imported);
+        if (importOldIds.length > 0 && imported > 0) {
           try {
-            var relinkData = await pb.send('/api/custom/relink-acompanhamentos', {
+            var token = pb.authStore.token || pb.authStore['token'] || '';
+            console.log('[Import] Token length:', token.length, 'oldIds sample:', importOldIds.slice(0, 3));
+            var relinkResp = await fetch(pb.baseURL + '/api/custom/relink-acompanhamentos', {
               method: 'POST',
-              body: { oldIds: oldData.oldIds, cnsMap: oldData.cnsMap },
+              headers: { 'Content-Type': 'application/json', 'Authorization': token },
+              body: JSON.stringify({ oldIds: importOldIds, cnsMap: importCnsMap }),
             });
+            var relinkText = await relinkResp.text();
+            console.log('[Import] Re-link status:', relinkResp.status, 'body:', relinkText);
+            var relinkData = JSON.parse(relinkText);
             if (relinkData.success && relinkData.relinked > 0) {
               relinkInfo = ' | ' + relinkData.relinked + ' acompanhamentos re-vinculados';
             }
           } catch (relinkErr: any) {
             console.error('[Import] Erro re-vincular:', relinkErr);
           }
-          // Fallback: rota auto-detecção de huérfãos
-          try {
-            var fallbackData = await pb.send('/api/custom/relink-orphan-by-cns', { method: 'POST' });
-            if (fallbackData && fallbackData.relinked > 0) {
-              relinkInfo += ' | ' + fallbackData.relinked + ' re-vinculados (fallback)';
-            }
-          } catch (_) {}
           oldPatientsRef.current = { oldIds: [], cnsMap: {} };
         }
 
@@ -575,13 +576,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         var oldIds: string[] = [];
         var cnsMap: Record<string, string> = {};
         for (var op of oldPatients) {
-          if (op.id && (op as any).cns) {
+          var cnsVal = (op as any).cns || '';
+          if (op.id && cnsVal) {
             oldIds.push(op.id);
-            cnsMap[op.id] = (op as any).cns;
+            cnsMap[op.id] = cnsVal;
           }
         }
         oldPatientsRef.current = { oldIds, cnsMap };
-      } catch (_) { oldPatientsRef.current = { oldIds: [], cnsMap: {} }; }
+        console.log('[Delete] Pacientes capturados:', oldIds.length, 'com CNS:', Object.keys(cnsMap).length);
+      } catch (colErr) { console.error('[Delete] Erro coletar pacientes:', colErr); oldPatientsRef.current = { oldIds: [], cnsMap: {} }; }
 
       // Loop principal — continua até a coleção ficar vazia
       while (true) {
