@@ -394,18 +394,35 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         if (importEtaTimerRef.current) clearInterval(importEtaTimerRef.current);
         var elapsed = Math.round((Date.now() - importStartTimeRef.current) / 1000);
 
-        // Re-vincular acompanhamentos huérfãos por CNS
-        // GET direto — SQL compara cns entre tabelas
+        // Re-vincular acompanhamentos huérfãos por CNS (via SDK frontend)
         var relinkInfo = '';
         try {
-          var fixResp = await fetch(pb.baseURL + '/api/custom/fix-relink-cns', {
-            headers: { 'Authorization': pb.authStore.token || '' },
-          });
-          var fixData = await fixResp.json();
-          console.log('[Import] Fix relink:', fixData);
-          if (fixData && fixData.comPacienteValido !== undefined) {
-            relinkInfo = ' | ' + fixData.comPacienteValido + ' vinculados, ' + (fixData.semPacienteValido || 0) + ' sem vínculo';
+          var pacMap: Record<string, string> = {};
+          var pg = 1;
+          while (true) {
+            var pacs = await pb.collection('amarcap53_pacientes').getList(pg, 500, { fields: 'id,cns', filter: 'cns != ""' });
+            for (var p of pacs.items) { if (p.cns) pacMap[p.cns] = p.id; }
+            if (pg >= pacs.totalPages) break; pg++;
           }
+          var orphans: any[] = [];
+          pg = 1;
+          while (true) {
+            var ac = await pb.collection('amarcap53_acompanhamentos').getList(pg, 500, { filter: 'cns != ""', fields: 'id,paciente,cns' });
+            for (var a of ac.items) {
+              if (!a.paciente || !pacMap[a.cns]) continue;
+              try { await pb.collection('amarcap53_pacientes').getFirstListItem('id = "' + a.paciente + '"'); }
+              catch { orphans.push(a); }
+            }
+            if (pg >= ac.totalPages) break; pg++;
+          }
+          var relinked = 0;
+          for (var o of orphans) {
+            var nid = pacMap[o.cns];
+            if (!nid) continue;
+            try { await pb.collection('amarcap53_acompanhamentos').update(o.id, { paciente: nid }); relinked++; } catch {}
+          }
+          if (relinked > 0) relinkInfo = ' | ' + relinked + ' re-vinculados';
+          console.log('[Import] Re-link:', relinked, 'de', orphans.length);
         } catch (relinkErr: any) {
           console.error('[Import] Erro re-vincular:', relinkErr);
         }
@@ -1309,9 +1326,46 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                     <button
                       onClick={async () => {
                         try {
-                          var r = await fetch(pb.baseURL + '/api/custom/fix-relink-cns', { headers: { 'Authorization': pb.authStore.token || '' } });
-                          var d = await r.json();
-                          alert(d.ok ? 'Re-vinculados: ' + (d.before - d.after) + ' de ' + d.before + ' huérfãos\nAntes: ' + d.before + ' sem vínculo\nDepois: ' + d.after + ' sem vínculo' : 'Erro: ' + d.err);
+                          // 1. Carregar todos pacientes e indexar por CNS
+                          var pacMap: Record<string, string> = {};
+                          var page = 1;
+                          while (true) {
+                            var pacs = await pb.collection('amarcap53_pacientes').getList(page, 500, { fields: 'id,cns', filter: 'cns != ""' });
+                            for (var p of pacs.items) {
+                              if (p.cns) pacMap[p.cns] = p.id;
+                            }
+                            if (page >= pacs.totalPages) break;
+                            page++;
+                          }
+                          // 2. Buscar acompanhamentos huérfãos (sem paciente válido)
+                          var orphans: any[] = [];
+                          page = 1;
+                          while (true) {
+                            var acomps = await pb.collection('amarcap53_acompanhamentos').getList(page, 500, {
+                              filter: 'cns != ""',
+                              fields: 'id,paciente,cns',
+                            });
+                            for (var a of acomps.items) {
+                              if (!a.paciente || !pacMap[a.cns]) continue;
+                              try {
+                                await pb.collection('amarcap53_pacientes').getFirstListItem('id = "' + a.paciente + '"');
+                              } catch { orphans.push(a); }
+                            }
+                            if (page >= acomps.totalPages) break;
+                            page++;
+                          }
+
+                          // 3. Re-vincular
+                          var relinked = 0;
+                          for (var o of orphans) {
+                            var newId = pacMap[o.cns];
+                            if (!newId) continue;
+                            try {
+                              await pb.collection('amarcap53_acompanhamentos').update(o.id, { paciente: newId });
+                              relinked++;
+                            } catch {}
+                          }
+                          alert('Re-vinculados: ' + relinked + ' de ' + orphans.length + ' huérfãos');
                           fetchStats();
                           fetchImportHistory();
                         } catch(e: any) { alert('Erro: ' + e.message); }
