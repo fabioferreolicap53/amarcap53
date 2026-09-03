@@ -399,16 +399,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         var relinkInfo = '';
         try {
           var oldMap = oldPatientCnsMapRef.current || {};
-          var relinkResp = await pb.send('/api/custom/relink-by-cns', {
+          var token = pb.authStore.token || '';
+          var relinkResp = await fetch(pb.baseURL + '/api/custom/relink-by-cns', {
             method: 'POST',
-            body: { oldPatientCnsMap: oldMap },
+            headers: { 'Content-Type': 'application/json', 'Authorization': token },
+            body: JSON.stringify({ oldPatientCnsMap: oldMap }),
           });
-          if (relinkResp && relinkResp.relinked > 0) {
-            relinkInfo = ' | ' + relinkResp.relinked + ' acompanhamentos re-vinculados';
+          var relinkData = await relinkResp.json();
+          if (relinkData && relinkData.relinked > 0) {
+            relinkInfo = ' | ' + relinkData.relinked + ' re-vinculados';
           }
-          if (relinkResp && relinkResp.filled > 0) {
-            relinkInfo += ' | ' + relinkResp.filled + ' cns restaurados';
+          if (relinkData && relinkData.filled > 0) {
+            relinkInfo += ' | ' + relinkData.filled + ' cns restaurados';
           }
+          console.log('[Import] Re-link:', relinkData);
         } catch (relinkErr: any) {
           console.error('[Import] Erro re-vincular:', relinkErr);
         }
