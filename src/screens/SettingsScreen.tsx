@@ -394,68 +394,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         if (importEtaTimerRef.current) clearInterval(importEtaTimerRef.current);
         var elapsed = Math.round((Date.now() - importStartTimeRef.current) / 1000);
 
-        // Re-vincular acompanhamentos huérfãos por CNS (via SDK frontend)
+        // Re-vincular acompanhamentos huérfãos por CNS via BACKEND
         var relinkInfo = '';
         try {
-          // Recuperar mapa antigo do ref ou localStorage
-          var oldMap = oldPatientCnsMapRef.current || {};
-          if (Object.keys(oldMap).length === 0) {
-            try {
-              var saved = localStorage.getItem('amarcap53_old_patient_cns_map');
-              if (saved) oldMap = JSON.parse(saved);
-            } catch {}
+          setUploadStatus(prev => ({ ...prev, message: 'Re-vinculando acompanhamentos...' }));
+          const relinkRes = await pb.send('/api/custom/fix-relink-cns', { method: 'POST' });
+          if (relinkRes && relinkRes.relinked > 0) {
+            relinkInfo = ` | ${relinkRes.relinked} re-vinculados`;
           }
-
-          var pacMap: Record<string, string> = {};
-          var pg = 1;
-          while (true) {
-            var pacs = await pb.collection('amarcap53_pacientes').getList(pg, 500, { fields: 'id,cns', filter: 'cns != ""' });
-            for (var p of pacs.items) { if (p.cns) pacMap[p.cns] = p.id; }
-            if (pg >= pacs.totalPages) break; pg++;
-          }
-          
-          var orphans: any[] = [];
-          pg = 1;
-          while (true) {
-            var ac = await pb.collection('amarcap53_acompanhamentos').getList(pg, 500, { fields: 'id,paciente,cns' });
-            for (var a of ac.items) {
-              // Verifica se o paciente atual existe
-              var exists = false;
-              if (a.paciente) {
-                try {
-                  await pb.collection('amarcap53_pacientes').getOne(a.paciente, { fields: 'id' });
-                  exists = true;
-                } catch {}
-              }
-
-              if (!exists) {
-                // Se não existe, tentamos descobrir o CNS
-                var cnsToUse = a.cns || oldMap[a.paciente];
-                if (cnsToUse && pacMap[cnsToUse]) {
-                  orphans.push({ id: a.id, cns: cnsToUse });
-                }
-              }
-            }
-            if (pg >= ac.totalPages) break; pg++;
-          }
-          
-          var relinked = 0;
-          for (var o of orphans) {
-            var nid = pacMap[o.cns];
-            if (!nid) continue;
-            try {
-              // Atualiza o paciente E garante que o CNS esteja salvo para o futuro
-              await pb.collection('amarcap53_acompanhamentos').update(o.id, { 
-                paciente: nid,
-                cns: o.cns 
-              }); 
-              relinked++; 
-            } catch {}
-          }
-          if (relinked > 0) relinkInfo = ' | ' + relinked + ' re-vinculados';
-          console.log('[Import] Re-link:', relinked, 'de', orphans.length);
-          
-          // Limpa o mapa após sucesso
           localStorage.removeItem('amarcap53_old_patient_cns_map');
           oldPatientCnsMapRef.current = {};
         } catch (relinkErr: any) {
@@ -695,6 +641,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     deleteFlagsRef.current.cancelled = true;
     deleteFlagsRef.current.paused = false;
     setDeleteControl('idle');
+  };
+
+  const handleManualRelink = async () => {
+    if (!window.confirm('Deseja executar a re-vinculação manual dos acompanhamentos por CNS?')) return;
+    try {
+      setDeleteStatus({ message: 'Re-vinculando acompanhamentos...', type: 'deleting' });
+      const res = await pb.send('/api/custom/fix-relink-cns', { method: 'POST' });
+      alert(`Processo concluído: ${res.relinked} registros re-vinculados.`);
+      setDeleteStatus({ message: '', type: 'idle' });
+      fetchStats();
+    } catch (err: any) {
+      alert('Erro: ' + (err.message || 'Falha na comunicação'));
+      setDeleteStatus({ message: '', type: 'idle' });
+    }
   };
 
   const closePasswordModal = () => {
@@ -1368,59 +1328,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                     </div>
                     <p className="text-[10px] text-slate-500 mb-4">Após excluir e reimportar pacientes, clique para restaurar os vínculos dos acompanhamentos usando o campo CNS.</p>
                     <button
-                      onClick={async () => {
-                        try {
-                          // 1. Carregar todos pacientes e indexar por CNS
-                          var pacMap: Record<string, string> = {};
-                          var page = 1;
-                          while (true) {
-                            var pacs = await pb.collection('amarcap53_pacientes').getList(page, 500, { fields: 'id,cns', filter: 'cns != ""' });
-                            for (var p of pacs.items) {
-                              if (p.cns) pacMap[p.cns] = p.id;
-                            }
-                            if (page >= pacs.totalPages) break;
-                            page++;
-                          }
-
-                          // 2. Buscar acompanhamentos huérfãos (sem paciente válido)
-                          var orphans: any[] = [];
-                          page = 1;
-                          while (true) {
-                            var acomps = await pb.collection('amarcap53_acompanhamentos').getList(page, 500, {
-                              fields: 'id,paciente,cns',
-                            });
-                            for (var a of acomps.items) {
-                              var exists = false;
-                              if (a.paciente) {
-                                try {
-                                  await pb.collection('amarcap53_pacientes').getOne(a.paciente, { fields: 'id' });
-                                  exists = true;
-                                } catch {}
-                              }
-                              
-                              if (!exists && a.cns && pacMap[a.cns]) {
-                                orphans.push(a);
-                              }
-                            }
-                            if (page >= acomps.totalPages) break;
-                            page++;
-                          }
-
-                          // 3. Re-vincular
-                          var relinked = 0;
-                          for (var o of orphans) {
-                            var newId = pacMap[o.cns];
-                            if (!newId) continue;
-                            try {
-                              await pb.collection('amarcap53_acompanhamentos').update(o.id, { paciente: newId });
-                              relinked++;
-                            } catch {}
-                          }
-                          alert('Re-vinculados: ' + relinked + ' de ' + orphans.length + ' huérfãos');
-                          fetchStats();
-                          fetchImportHistory();
-                        } catch(e: any) { alert('Erro: ' + e.message); }
-                      }}
+                      onClick={handleManualRelink}
                       className="w-full py-3 bg-blue-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 text-xs"
                     >
                       Re-vincular por CNS

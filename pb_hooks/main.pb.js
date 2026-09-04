@@ -117,7 +117,7 @@ onRecordUpdate(function(e) {
   e.next();
 }, PACIENTES_COLL);
 
-// ─── HOOKS: ACOMPANHAMENTOS (Auto-CNS) ──────────────────
+// ─── HOOKS: ACOMPANHAMENTOS (Auto-CNS & Sync) ───────────
 onRecordCreate(function(e) {
   try {
     var rec = e.record;
@@ -143,55 +143,90 @@ onRecordCreate(function(e) {
   e.next();
 }, ACOMP_COLL);
 
-// ─── ROTAS CUSTOMIZADAS ─────────────────────────────────
-
-// 1. Re-vincular acompanhamentos por CNS (GET)
-routerAdd('GET', '/api/custom/fix-relink-cns', function(c) {
-  var result = { ok: false, before: 0, after: 0, relinked: 0, details: [], err: '' };
+// Sincronizar CNS antes de qualquer deleção de paciente
+onRecordBeforeDeleteRequest(function(e) {
   try {
     var db = $app.db();
-    var getCount = function() {
-      var r = db.newQuery("SELECT COUNT(*) as cnt FROM " + ACOMP_COLL + " a WHERE (a.paciente IS NULL OR a.paciente = '') OR NOT EXISTS (SELECT 1 FROM " + PACIENTES_COLL + " p WHERE p.id = a.paciente)").all();
-      return (r && r.length > 0) ? parseInt(String(r[0].get('cnt')), 10) : 0;
-    };
-    result.before = getCount();
+    var pacId = e.record.id;
+    var cns = e.record.get('cns');
+    if (pacId && cns) {
+      db.newQuery(
+        "UPDATE amarcap53_acompanhamentos SET cns = '" + cns + "' " +
+        "WHERE paciente = '" + pacId + "' AND (cns = '' OR cns IS NULL)"
+      ).execute();
+    }
+  } catch(err) {
+    console.error('[paciente_delete] Sync CNS error:', err);
+  }
+  e.next();
+}, PACIENTES_COLL);
+
+// ─── ROTAS CUSTOMIZADAS ─────────────────────────────────
+
+// 1. Sincronizar CNS nos acompanhamentos (POST)
+routerAdd('POST', '/api/custom/migrate-acompanhamento-cns', function(c) {
+  try {
+    var db = $app.db();
+    db.newQuery(
+      "UPDATE amarcap53_acompanhamentos " +
+      "SET cns = (SELECT cns FROM amarcap53_pacientes WHERE id = amarcap53_acompanhamentos.paciente) " +
+      "WHERE (cns = '' OR cns IS NULL) " +
+      "AND paciente IN (SELECT id FROM amarcap53_pacientes)"
+    ).execute();
+    return c.json(200, { success: true });
+  } catch(err) {
+    return c.json(500, { message: String(err) });
+  }
+});
+
+// 2. Re-vincular acompanhamentos por CNS (POST)
+routerAdd('POST', '/api/custom/fix-relink-cns', function(c) {
+  var result = { ok: false, relinked: 0, scanned: 0, details: [], err: '' };
+  try {
+    var db = $app.db();
     
-    // 1. Mapear pacientes atuais por CNS (String keys)
+    // Mapear pacientes atuais: CNS -> ID
     var pacMap = {};
-    var pacRows = db.newQuery("SELECT id, cns FROM " + PACIENTES_COLL + " WHERE cns IS NOT NULL AND cns != ''").all();
-    if (pacRows) {
-      for (var i = 0; i < pacRows.length; i++) {
-        var pCns = String(pacRows[i].get('cns') || '').trim();
-        var pId = String(pacRows[i].get('id') || '').trim();
-        if (pCns && pId) pacMap[pCns] = pId;
-      }
+    var pacRows = db.newQuery("SELECT id, cns FROM amarcap53_pacientes WHERE cns != '' AND cns IS NOT NULL").all();
+    for (var i = 0; i < pacRows.length; i++) {
+      var row = pacRows[i];
+      var cns = String(row.cns || (row.get ? row.get('cns') : '') || '').replace(/\D/g, '').trim();
+      var id = String(row.id || (row.get ? row.get('id') : '') || '').trim();
+      if (cns && id) pacMap[cns] = id;
     }
     
-    // 2. Buscar acompanhamentos huérfãos que tenham CNS preenchido
-    var orphRows = db.newQuery(
-      "SELECT id, cns FROM " + ACOMP_COLL + " " +
-      "WHERE cns IS NOT NULL AND cns != '' " +
-      "AND ((paciente IS NULL OR paciente = '') OR NOT EXISTS (SELECT 1 FROM " + PACIENTES_COLL + " p WHERE p.id = " + ACOMP_COLL + ".paciente))"
+    // Buscar acompanhamentos sem vínculo válido que tenham CNS
+    var acompRows = db.newQuery(
+      "SELECT id, cns, paciente FROM amarcap53_acompanhamentos " +
+      "WHERE cns != '' AND cns IS NOT NULL"
     ).all();
 
-    if (orphRows) {
-      for (var j = 0; j < orphRows.length; j++) {
-        var aId = String(orphRows[j].get('id') || '').trim();
-        var aCns = String(orphRows[j].get('cns') || '').trim();
-        
+    result.scanned = acompRows.length;
+
+    for (var j = 0; j < acompRows.length; j++) {
+      var aRow = acompRows[j];
+      var aId = String(aRow.id || (aRow.get ? aRow.get('id') : '') || '');
+      var aCns = String(aRow.cns || (aRow.get ? aRow.get('cns') : '') || '').replace(/\D/g, '').trim();
+      var currentPac = String(aRow.paciente || (aRow.get ? aRow.get('paciente') : '') || '');
+      
+      // Verifica se o vínculo atual é inválido
+      var isInvalid = !currentPac;
+      if (currentPac) {
+        try {
+          var exists = db.newQuery("SELECT 1 FROM amarcap53_pacientes WHERE id = '" + currentPac + "'").all();
+          if (!exists || exists.length === 0) isInvalid = true;
+        } catch(e) { isInvalid = true; }
+      }
+
+      if (isInvalid) {
         var newPacId = pacMap[aCns];
         if (aId && newPacId) {
-          try {
-            db.newQuery("UPDATE " + ACOMP_COLL + " SET paciente = '" + newPacId + "' WHERE id = '" + aId + "'").execute();
-            result.relinked++;
-          } catch(updErr) {
-            result.details.push('Error updating ' + aId + ': ' + String(updErr));
-          }
+          db.newQuery("UPDATE amarcap53_acompanhamentos SET paciente = '" + newPacId + "' WHERE id = '" + aId + "'").execute();
+          result.relinked++;
         }
       }
     }
     
-    result.after = getCount();
     result.ok = true;
     return c.json(200, result);
   } catch(err) {
@@ -200,7 +235,7 @@ routerAdd('GET', '/api/custom/fix-relink-cns', function(c) {
   }
 });
 
-// 2. Importar pacientes (Simplificado - re-link feito no frontend/fix-endpoint)
+// 3. Importar pacientes (Corrigido com ID e Timestamps)
 routerAdd('POST', '/api/custom/import-pacientes', function(c) {
   try {
     var auth = c.auth;
@@ -214,28 +249,33 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
     var db = $app.db();
     
     if (mode === 'replace') {
-      // SEGURANÇA: Sincronizar CNS antes de deletar
+      // Backup CNS
       try {
         db.newQuery(
-          "UPDATE " + ACOMP_COLL + " SET cns = (" +
-          "  SELECT p.cns FROM " + PACIENTES_COLL + " p WHERE p.id = " + ACOMP_COLL + ".paciente" +
-          ") WHERE paciente IS NOT NULL AND paciente != '' AND (cns IS NULL OR cns = '') AND EXISTS (" +
-          "  SELECT 1 FROM " + PACIENTES_COLL + " p WHERE p.id = " + ACOMP_COLL + ".paciente AND p.cns IS NOT NULL AND p.cns != ''" +
-          ")"
+          "UPDATE amarcap53_acompanhamentos " +
+          "SET cns = (SELECT cns FROM amarcap53_pacientes WHERE id = amarcap53_acompanhamentos.paciente) " +
+          "WHERE (cns = '' OR cns IS NULL) " +
+          "AND paciente IN (SELECT id FROM amarcap53_pacientes)"
         ).execute();
-      } catch(e) { console.error('[import] Sync CNS error:', e); }
-
+      } catch(e) {}
       db.newQuery("DELETE FROM " + PACIENTES_COLL).execute();
     }
     
     var imported = 0;
+    var now = new Date().toISOString().replace('T', ' ').split('.')[0];
+    
     for (var i = 0; i < records.length; i++) {
       var r = records[i];
       try {
         var cns = padLeft(String(r.cns || '').replace(/\D/g, ''), 15, '0').slice(-15);
         if (!cns || !r.nome) continue;
         
-        db.newQuery("INSERT INTO " + PACIENTES_COLL + " (unidade, equipe, microarea, cns, nome, data_nascimento, idade, grupo) VALUES (" +
+        // Gerar ID aleatório de 15 caracteres (padrão PocketBase)
+        var id = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 9);
+        id = id.substring(0, 15);
+        
+        db.newQuery("INSERT INTO " + PACIENTES_COLL + " (id, created, updated, unidade, equipe, microarea, cns, nome, data_nascimento, idade, grupo) VALUES (" +
+          escSql(id) + ", " + escSql(now) + ", " + escSql(now) + ", " +
           escSql(r.unidade) + ", " + escSql(r.equipe) + ", " + (parseInt(r.microarea, 10) || 0) + ", " +
           escSql(cns) + ", " + escSql(r.nome) + ", " + escSql(r.data_nascimento) + ", " +
           (parseInt(r.idade, 10) || 0) + ", " + escSql(r.grupo) + ")").execute();
@@ -261,12 +301,12 @@ routerAdd('POST', '/api/custom/delete-all', function(c) {
     // Se for excluir pacientes, sincroniza CNS nos acompanhamentos primeiro
     if (coll === PACIENTES_COLL) {
       try {
+        // SQLite: Update com Join simplificado
         db.newQuery(
-          "UPDATE " + ACOMP_COLL + " SET cns = (" +
-          "  SELECT p.cns FROM " + PACIENTES_COLL + " p WHERE p.id = " + ACOMP_COLL + ".paciente" +
-          ") WHERE paciente IS NOT NULL AND paciente != '' AND (cns IS NULL OR cns = '') AND EXISTS (" +
-          "  SELECT 1 FROM " + PACIENTES_COLL + " p WHERE p.id = " + ACOMP_COLL + ".paciente AND p.cns IS NOT NULL AND p.cns != ''" +
-          ")"
+          "UPDATE amarcap53_acompanhamentos " +
+          "SET cns = (SELECT cns FROM amarcap53_pacientes WHERE id = amarcap53_acompanhamentos.paciente) " +
+          "WHERE (cns = '' OR cns IS NULL) " +
+          "AND paciente IN (SELECT id FROM amarcap53_pacientes)"
         ).execute();
       } catch(e) { console.error('[delete-all] Sync CNS error:', e); }
     }
