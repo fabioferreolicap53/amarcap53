@@ -397,6 +397,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         // Re-vincular acompanhamentos huérfãos por CNS (via SDK frontend)
         var relinkInfo = '';
         try {
+          // Recuperar mapa antigo do ref ou localStorage
+          var oldMap = oldPatientCnsMapRef.current || {};
+          if (Object.keys(oldMap).length === 0) {
+            try {
+              var saved = localStorage.getItem('amarcap53_old_patient_cns_map');
+              if (saved) oldMap = JSON.parse(saved);
+            } catch {}
+          }
+
           var pacMap: Record<string, string> = {};
           var pg = 1;
           while (true) {
@@ -404,25 +413,51 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
             for (var p of pacs.items) { if (p.cns) pacMap[p.cns] = p.id; }
             if (pg >= pacs.totalPages) break; pg++;
           }
+          
           var orphans: any[] = [];
           pg = 1;
           while (true) {
-            var ac = await pb.collection('amarcap53_acompanhamentos').getList(pg, 500, { filter: 'cns != ""', fields: 'id,paciente,cns' });
+            var ac = await pb.collection('amarcap53_acompanhamentos').getList(pg, 500, { fields: 'id,paciente,cns' });
             for (var a of ac.items) {
-              if (!a.paciente || !pacMap[a.cns]) continue;
-              try { await pb.collection('amarcap53_pacientes').getFirstListItem('id = "' + a.paciente + '"'); }
-              catch { orphans.push(a); }
+              // Verifica se o paciente atual existe
+              var exists = false;
+              if (a.paciente) {
+                try {
+                  await pb.collection('amarcap53_pacientes').getOne(a.paciente, { fields: 'id' });
+                  exists = true;
+                } catch {}
+              }
+
+              if (!exists) {
+                // Se não existe, tentamos descobrir o CNS
+                var cnsToUse = a.cns || oldMap[a.paciente];
+                if (cnsToUse && pacMap[cnsToUse]) {
+                  orphans.push({ id: a.id, cns: cnsToUse });
+                }
+              }
             }
             if (pg >= ac.totalPages) break; pg++;
           }
+          
           var relinked = 0;
           for (var o of orphans) {
             var nid = pacMap[o.cns];
             if (!nid) continue;
-            try { await pb.collection('amarcap53_acompanhamentos').update(o.id, { paciente: nid }); relinked++; } catch {}
+            try {
+              // Atualiza o paciente E garante que o CNS esteja salvo para o futuro
+              await pb.collection('amarcap53_acompanhamentos').update(o.id, { 
+                paciente: nid,
+                cns: o.cns 
+              }); 
+              relinked++; 
+            } catch {}
           }
           if (relinked > 0) relinkInfo = ' | ' + relinked + ' re-vinculados';
           console.log('[Import] Re-link:', relinked, 'de', orphans.length);
+          
+          // Limpa o mapa após sucesso
+          localStorage.removeItem('amarcap53_old_patient_cns_map');
+          oldPatientCnsMapRef.current = {};
         } catch (relinkErr: any) {
           console.error('[Import] Erro re-vincular:', relinkErr);
         }
@@ -575,6 +610,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       var errorsCount = 0;
       var wasCancelled = false;
 
+      setDeleteStatus({ message: 'Sincronizando CNS nos acompanhamentos...', type: 'deleting' });
+      try {
+        await pb.send('/api/custom/migrate-acompanhamento-cns', { method: 'POST' });
+      } catch (e) {
+        console.error('[Delete] CNS Sync error:', e);
+      }
+
       setDeleteStatus({ message: 'Iniciando exclusão...', type: 'deleting' });
 
       // Capturar mapa oldPacienteId → cns ANTES de deletar
@@ -586,6 +628,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
           if (p.id && cnsVal) mapCaptured[p.id] = String(cnsVal);
         }
         oldPatientCnsMapRef.current = mapCaptured;
+        // Salva no localStorage para sobreviver a F5/Refresh
+        localStorage.setItem('amarcap53_old_patient_cns_map', JSON.stringify(mapCaptured));
       } catch(_) { oldPatientCnsMapRef.current = {}; }
 
       // Loop principal — continua até a coleção ficar vazia
@@ -1337,19 +1381,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                             if (page >= pacs.totalPages) break;
                             page++;
                           }
+
                           // 2. Buscar acompanhamentos huérfãos (sem paciente válido)
                           var orphans: any[] = [];
                           page = 1;
                           while (true) {
                             var acomps = await pb.collection('amarcap53_acompanhamentos').getList(page, 500, {
-                              filter: 'cns != ""',
                               fields: 'id,paciente,cns',
                             });
                             for (var a of acomps.items) {
-                              if (!a.paciente || !pacMap[a.cns]) continue;
-                              try {
-                                await pb.collection('amarcap53_pacientes').getFirstListItem('id = "' + a.paciente + '"');
-                              } catch { orphans.push(a); }
+                              var exists = false;
+                              if (a.paciente) {
+                                try {
+                                  await pb.collection('amarcap53_pacientes').getOne(a.paciente, { fields: 'id' });
+                                  exists = true;
+                                } catch {}
+                              }
+                              
+                              if (!exists && a.cns && pacMap[a.cns]) {
+                                orphans.push(a);
+                              }
                             }
                             if (page >= acomps.totalPages) break;
                             page++;

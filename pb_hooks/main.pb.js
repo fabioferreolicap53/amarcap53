@@ -117,11 +117,37 @@ onRecordUpdate(function(e) {
   e.next();
 }, PACIENTES_COLL);
 
+// ─── HOOKS: ACOMPANHAMENTOS (Auto-CNS) ──────────────────
+onRecordCreate(function(e) {
+  try {
+    var rec = e.record;
+    var pacId = rec.get('paciente');
+    var currentCns = rec.get('cns');
+    
+    // Se já tem CNS (enviado pelo frontend), não faz nada
+    if (currentCns && String(currentCns).trim() !== '') {
+      e.next();
+      return;
+    }
+
+    if (pacId) {
+      var pac = $app.findRecordById(PACIENTES_COLL, pacId);
+      if (pac) {
+        var cns = pac.get('cns');
+        if (cns) rec.set('cns', cns);
+      }
+    }
+  } catch (err) {
+    console.error('[acompanhamento_cns] Hook error:', err);
+  }
+  e.next();
+}, ACOMP_COLL);
+
 // ─── ROTAS CUSTOMIZADAS ─────────────────────────────────
 
 // 1. Re-vincular acompanhamentos por CNS (GET)
 routerAdd('GET', '/api/custom/fix-relink-cns', function(c) {
-  var result = { ok: false, before: 0, after: 0, relinked: 0, err: '' };
+  var result = { ok: false, before: 0, after: 0, relinked: 0, details: [], err: '' };
   try {
     var db = $app.db();
     var getCount = function() {
@@ -130,24 +156,41 @@ routerAdd('GET', '/api/custom/fix-relink-cns', function(c) {
     };
     result.before = getCount();
     
+    // 1. Mapear pacientes atuais por CNS (String keys)
     var pacMap = {};
-    var pacRows = db.newQuery("SELECT id, cns FROM " + PACIENTES_COLL + " WHERE cns != ''").all();
+    var pacRows = db.newQuery("SELECT id, cns FROM " + PACIENTES_COLL + " WHERE cns IS NOT NULL AND cns != ''").all();
     if (pacRows) {
       for (var i = 0; i < pacRows.length; i++) {
-        pacMap[String(pacRows[i].get('cns'))] = String(pacRows[i].get('id'));
+        var pCns = String(pacRows[i].get('cns') || '').trim();
+        var pId = String(pacRows[i].get('id') || '').trim();
+        if (pCns && pId) pacMap[pCns] = pId;
       }
     }
     
-    var orphRows = db.newQuery("SELECT id, cns FROM " + ACOMP_COLL + " WHERE cns != '' AND ((paciente IS NULL OR paciente = '') OR NOT EXISTS (SELECT 1 FROM " + PACIENTES_COLL + " p WHERE p.id = " + ACOMP_COLL + ".paciente))").all();
+    // 2. Buscar acompanhamentos huérfãos que tenham CNS preenchido
+    var orphRows = db.newQuery(
+      "SELECT id, cns FROM " + ACOMP_COLL + " " +
+      "WHERE cns IS NOT NULL AND cns != '' " +
+      "AND ((paciente IS NULL OR paciente = '') OR NOT EXISTS (SELECT 1 FROM " + PACIENTES_COLL + " p WHERE p.id = " + ACOMP_COLL + ".paciente))"
+    ).all();
+
     if (orphRows) {
       for (var j = 0; j < orphRows.length; j++) {
-        var newId = pacMap[String(orphRows[j].get('cns'))];
-        if (newId) {
-          db.newQuery("UPDATE " + ACOMP_COLL + " SET paciente = '" + newId + "' WHERE id = '" + String(orphRows[j].get('id')) + "'").execute();
-          result.relinked++;
+        var aId = String(orphRows[j].get('id') || '').trim();
+        var aCns = String(orphRows[j].get('cns') || '').trim();
+        
+        var newPacId = pacMap[aCns];
+        if (aId && newPacId) {
+          try {
+            db.newQuery("UPDATE " + ACOMP_COLL + " SET paciente = '" + newPacId + "' WHERE id = '" + aId + "'").execute();
+            result.relinked++;
+          } catch(updErr) {
+            result.details.push('Error updating ' + aId + ': ' + String(updErr));
+          }
         }
       }
     }
+    
     result.after = getCount();
     result.ok = true;
     return c.json(200, result);
@@ -171,6 +214,17 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
     var db = $app.db();
     
     if (mode === 'replace') {
+      // SEGURANÇA: Sincronizar CNS antes de deletar
+      try {
+        db.newQuery(
+          "UPDATE " + ACOMP_COLL + " SET cns = (" +
+          "  SELECT p.cns FROM " + PACIENTES_COLL + " p WHERE p.id = " + ACOMP_COLL + ".paciente" +
+          ") WHERE paciente IS NOT NULL AND paciente != '' AND (cns IS NULL OR cns = '') AND EXISTS (" +
+          "  SELECT 1 FROM " + PACIENTES_COLL + " p WHERE p.id = " + ACOMP_COLL + ".paciente AND p.cns IS NOT NULL AND p.cns != ''" +
+          ")"
+        ).execute();
+      } catch(e) { console.error('[import] Sync CNS error:', e); }
+
       db.newQuery("DELETE FROM " + PACIENTES_COLL).execute();
     }
     
@@ -201,7 +255,23 @@ routerAdd('POST', '/api/custom/delete-all', function(c) {
     var coll = '';
     try { coll = c.parseBody().collection; } catch(e) {}
     if (!coll) return c.json(400, { message: 'Envie collection' });
-    $app.db().newQuery("DELETE FROM " + coll).execute();
+
+    var db = $app.db();
+    
+    // Se for excluir pacientes, sincroniza CNS nos acompanhamentos primeiro
+    if (coll === PACIENTES_COLL) {
+      try {
+        db.newQuery(
+          "UPDATE " + ACOMP_COLL + " SET cns = (" +
+          "  SELECT p.cns FROM " + PACIENTES_COLL + " p WHERE p.id = " + ACOMP_COLL + ".paciente" +
+          ") WHERE paciente IS NOT NULL AND paciente != '' AND (cns IS NULL OR cns = '') AND EXISTS (" +
+          "  SELECT 1 FROM " + PACIENTES_COLL + " p WHERE p.id = " + ACOMP_COLL + ".paciente AND p.cns IS NOT NULL AND p.cns != ''" +
+          ")"
+        ).execute();
+      } catch(e) { console.error('[delete-all] Sync CNS error:', e); }
+    }
+
+    db.newQuery("DELETE FROM " + coll).execute();
     return c.json(200, { success: true });
   } catch(err) {
     return c.json(500, { message: String(err) });
