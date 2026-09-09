@@ -161,10 +161,10 @@ onRecordBeforeDeleteRequest(function(e) {
   e.next();
 }, PACIENTES_COLL);
 
-// ─── ROTAS CUSTOMIZADAS ─────────────────────────────────
+// ─── ROTAS CUSTOMIZADAS AMAR ─────────────────────────────────
 
 // 1. Sincronizar CNS nos acompanhamentos (POST)
-routerAdd('POST', '/api/custom/migrate-acompanhamento-cns', function(c) {
+routerAdd('POST', '/api/amar/migrate-acompanhamento-cns', function(c) {
   try {
     var db = $app.db();
     db.newQuery(
@@ -180,7 +180,7 @@ routerAdd('POST', '/api/custom/migrate-acompanhamento-cns', function(c) {
 });
 
 // 2. Re-vincular acompanhamentos por CNS (POST)
-routerAdd('POST', '/api/custom/fix-relink-cns', function(c) {
+routerAdd('POST', '/api/amar/fix-relink-cns', function(c) {
   var result = { ok: false, relinked: 0, scanned: 0, details: [], err: '' };
   try {
     var db = $app.db();
@@ -236,7 +236,7 @@ routerAdd('POST', '/api/custom/fix-relink-cns', function(c) {
 });
 
 // 3. Importar pacientes (Corrigido com ID e Timestamps)
-routerAdd('POST', '/api/custom/import-pacientes', function(c) {
+routerAdd('POST', '/api/amar/import-pacientes', function(c) {
   try {
     var auth = c.auth;
     if (!auth) return c.json(401, { message: 'Nao autenticado' });
@@ -290,7 +290,7 @@ routerAdd('POST', '/api/custom/import-pacientes', function(c) {
 });
 
 // 3. Delete All
-routerAdd('POST', '/api/custom/delete-all', function(c) {
+routerAdd('POST', '/api/amar/delete-all', function(c) {
   try {
     var coll = '';
     try { coll = c.parseBody().collection; } catch(e) {}

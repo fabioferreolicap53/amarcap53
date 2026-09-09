@@ -398,7 +398,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         var relinkInfo = '';
         try {
           setUploadStatus(prev => ({ ...prev, message: 'Re-vinculando acompanhamentos...' }));
-          const relinkRes = await pb.send('/api/custom/fix-relink-cns', { method: 'POST' });
+          const relinkRes = await pb.send('/api/amar/fix-relink-cns', { method: 'POST' });
           if (relinkRes && relinkRes.relinked > 0) {
             relinkInfo = ` | ${relinkRes.relinked} re-vinculados`;
           }
@@ -558,7 +558,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
       setDeleteStatus({ message: 'Sincronizando CNS nos acompanhamentos...', type: 'deleting' });
       try {
-        await pb.send('/api/custom/migrate-acompanhamento-cns', { method: 'POST' });
+        await pb.send('/api/amar/migrate-acompanhamento-cns', { method: 'POST' });
       } catch (e) {
         console.error('[Delete] CNS Sync error:', e);
       }
@@ -647,7 +647,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     if (!window.confirm('Deseja executar a re-vinculação manual dos acompanhamentos por CNS?')) return;
     try {
       setDeleteStatus({ message: 'Re-vinculando acompanhamentos...', type: 'deleting' });
-      const res = await pb.send('/api/custom/fix-relink-cns', { method: 'POST' });
+      const res = await pb.send('/api/amar/fix-relink-cns', { method: 'POST' });
       alert(`Processo concluído: ${res.relinked} registros re-vinculados.`);
       setDeleteStatus({ message: '', type: 'idle' });
       fetchStats();
