@@ -394,18 +394,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         if (importEtaTimerRef.current) clearInterval(importEtaTimerRef.current);
         var elapsed = Math.round((Date.now() - importStartTimeRef.current) / 1000);
 
-        // Re-vincular acompanhamentos huérfãos por CNS via BACKEND
-        var relinkInfo = '';
+        // Remove chamada ao backend para re-vincular
+        var relinkInfo = ' (use o botão manual para re-vincular CNS)';
         try {
-          setUploadStatus(prev => ({ ...prev, message: 'Re-vinculando acompanhamentos...' }));
-          const relinkRes = await pb.send('/api/amar/fix-relink-cns', { method: 'POST' });
-          if (relinkRes && relinkRes.relinked > 0) {
-            relinkInfo = ` | ${relinkRes.relinked} re-vinculados`;
-          }
           localStorage.removeItem('amarcap53_old_patient_cns_map');
           oldPatientCnsMapRef.current = {};
         } catch (relinkErr: any) {
-          console.error('[Import] Erro re-vincular:', relinkErr);
+          console.error('[Import] Erro limpar storage:', relinkErr);
         }
 
         // Cria registro de log no histórico
@@ -646,12 +641,49 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
   const handleManualRelink = async () => {
     if (!window.confirm('Deseja executar a re-vinculação manual dos acompanhamentos por CNS?')) return;
     try {
-      setDeleteStatus({ message: 'Re-vinculando acompanhamentos...', type: 'deleting' });
-      const res = await pb.send('/api/amar/fix-relink-cns', { method: 'POST' });
-      alert(`Processo concluído: ${res.relinked} registros re-vinculados.`);
+      setDeleteStatus({ message: 'Buscando dados para re-vinculação...', type: 'deleting' });
+      
+      // 1. Busca todos os pacientes com CNS
+      const pacientes = await pb.collection('amarcap53_pacientes').getFullList({
+        filter: 'cns != ""',
+        fields: 'id,cns'
+      });
+      
+      // Mapeia CNS -> ID
+      const cnsMap: Record<string, string> = {};
+      pacientes.forEach(p => {
+        if (p.cns) cnsMap[String(p.cns).trim()] = p.id;
+      });
+      
+      // 2. Busca acompanhamentos com CNS
+      setDeleteStatus({ message: 'Analisando vínculos dos acompanhamentos...', type: 'deleting' });
+      const acompanhamentos = await pb.collection('amarcap53_acompanhamentos').getFullList({
+        filter: 'cns != ""',
+        fields: 'id,cns,paciente'
+      });
+      
+      let count = 0;
+      
+      // 3. Atualiza 1 a 1 via API padrão
+      for (const a of acompanhamentos) {
+        const aCns = String(a.cns || '').trim();
+        const aPac = String(a.paciente || '').trim();
+        const correctPacId = cnsMap[aCns];
+        
+        if (aCns && correctPacId && aPac !== correctPacId) {
+          setDeleteStatus({ message: `Re-vinculando acompanhamento ${count + 1}...`, type: 'deleting' });
+          await pb.collection('amarcap53_acompanhamentos').update(a.id, {
+            paciente: correctPacId
+          });
+          count++;
+        }
+      }
+
+      alert(`Processo concluído: ${count} registros re-vinculados.`);
       setDeleteStatus({ message: '', type: 'idle' });
       fetchStats();
     } catch (err: any) {
+      console.error(err);
       alert('Erro: ' + (err.message || 'Falha na comunicação'));
       setDeleteStatus({ message: '', type: 'idle' });
     }

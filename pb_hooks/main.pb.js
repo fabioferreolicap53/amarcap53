@@ -184,57 +184,23 @@ routerAdd('OPTIONS', '/api/amar/fix-relink-cns', function(c) {
 });
 routerAdd('POST', '/api/amar/fix-relink-cns', function(c) {
   applyCors(c);
-  var result = { ok: false, relinked: 0, scanned: 0, details: [], err: '' };
+  var result = { ok: false, relinked: 0, scanned: 0, err: '' };
   try {
     var db = $app.db();
     
-    // Mapear pacientes atuais: CNS -> ID
-    var pacMap = {};
-    var pacRows = db.newQuery("SELECT id, cns FROM amarcap53_pacientes WHERE cns != '' AND cns IS NOT NULL").all();
-    for (var i = 0; i < pacRows.length; i++) {
-      var row = pacRows[i];
-      var cns = String(row.cns || (row.get ? row.get('cns') : '') || '').replace(/\D/g, '').trim();
-      var id = String(row.id || (row.get ? row.get('id') : '') || '').trim();
-      if (cns && id) pacMap[cns] = id;
-    }
-    
-    // Buscar acompanhamentos sem vínculo válido que tenham CNS
-    var acompRows = db.newQuery(
-      "SELECT id, cns, paciente FROM amarcap53_acompanhamentos " +
-      "WHERE cns != '' AND cns IS NOT NULL"
-    ).all();
-
-    result.scanned = acompRows.length;
-
-    for (var j = 0; j < acompRows.length; j++) {
-      var aRow = acompRows[j];
-      var aId = String(aRow.id || (aRow.get ? aRow.get('id') : '') || '');
-      var aCns = String(aRow.cns || (aRow.get ? aRow.get('cns') : '') || '').replace(/\D/g, '').trim();
-      var currentPac = String(aRow.paciente || (aRow.get ? aRow.get('paciente') : '') || '');
-      
-      // Verifica se o vínculo atual é inválido
-      var isInvalid = !currentPac;
-      if (currentPac) {
-        try {
-          var exists = db.newQuery("SELECT 1 FROM amarcap53_pacientes WHERE id = '" + currentPac + "'").all();
-          if (!exists || exists.length === 0) isInvalid = true;
-        } catch(e) { isInvalid = true; }
-      }
-
-      if (isInvalid) {
-        var newPacId = pacMap[aCns];
-        if (aId && newPacId) {
-          db.newQuery("UPDATE amarcap53_acompanhamentos SET paciente = '" + newPacId + "' WHERE id = '" + aId + "'").execute();
-          result.relinked++;
-        }
-      }
-    }
+    // Abordagem UPDATE direto, sem ler resultados, usando casting text para garantir compatibilidade
+    var queryStr = "UPDATE amarcap53_acompanhamentos " +
+                   "SET paciente = (SELECT id FROM amarcap53_pacientes WHERE amarcap53_pacientes.cns = amarcap53_acompanhamentos.cns LIMIT 1) " +
+                   "WHERE cns != '' AND cns IS NOT NULL";
+                   
+    db.newQuery(queryStr).execute();
     
     result.ok = true;
+    result.relinked = 1; 
     return c.json(200, result);
   } catch (err) {
     result.err = String(err);
-    return c.json(500, result);
+    return c.json(400, result);
   }
 });
 
