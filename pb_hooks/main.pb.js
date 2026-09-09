@@ -149,8 +149,20 @@ onRecordCreate(function(e) {
 
 // ─── ROTAS CUSTOMIZADAS AMAR ─────────────────────────────────
 
+// Middleware manual de CORS para contornar limitações da versão do PocketBase
+function applyCors(c) {
+  c.response.header().set("Access-Control-Allow-Origin", "*");
+  c.response.header().set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  c.response.header().set("Access-Control-Allow-Headers", "*");
+}
+
 // 1. Sincronizar CNS nos acompanhamentos (POST)
+routerAdd('OPTIONS', '/api/amar/migrate-acompanhamento-cns', function(c) {
+  applyCors(c);
+  return c.noContent(204);
+});
 routerAdd('POST', '/api/amar/migrate-acompanhamento-cns', function(c) {
+  applyCors(c);
   try {
     var db = $app.db();
     db.newQuery(
@@ -166,7 +178,12 @@ routerAdd('POST', '/api/amar/migrate-acompanhamento-cns', function(c) {
 });
 
 // 2. Re-vincular acompanhamentos por CNS (POST)
+routerAdd('OPTIONS', '/api/amar/fix-relink-cns', function(c) {
+  applyCors(c);
+  return c.noContent(204);
+});
 routerAdd('POST', '/api/amar/fix-relink-cns', function(c) {
+  applyCors(c);
   var result = { ok: false, relinked: 0, scanned: 0, details: [], err: '' };
   try {
     var db = $app.db();
@@ -215,14 +232,19 @@ routerAdd('POST', '/api/amar/fix-relink-cns', function(c) {
     
     result.ok = true;
     return c.json(200, result);
-  } catch(err) {
+  } catch (err) {
     result.err = String(err);
     return c.json(500, result);
   }
 });
 
 // 3. Importar pacientes (Corrigido com ID e Timestamps)
+routerAdd('OPTIONS', '/api/amar/import-pacientes', function(c) {
+  applyCors(c);
+  return c.noContent(204);
+});
 routerAdd('POST', '/api/amar/import-pacientes', function(c) {
+  applyCors(c);
   try {
     var auth = c.auth;
     if (!auth) return c.json(401, { message: 'Nao autenticado' });
@@ -276,7 +298,12 @@ routerAdd('POST', '/api/amar/import-pacientes', function(c) {
 });
 
 // 3. Delete All
+routerAdd('OPTIONS', '/api/amar/delete-all', function(c) {
+  applyCors(c);
+  return c.noContent(204);
+});
 routerAdd('POST', '/api/amar/delete-all', function(c) {
+  applyCors(c);
   try {
     var coll = '';
     try { coll = c.parseBody().collection; } catch(e) {}
@@ -297,9 +324,9 @@ routerAdd('POST', '/api/amar/delete-all', function(c) {
       } catch(e) { console.error('[delete-all] Sync CNS error:', e); }
     }
 
-    db.newQuery("DELETE FROM " + coll).execute();
-    return c.json(200, { success: true });
-  } catch(err) {
-    return c.json(500, { message: String(err) });
-  }
+  db.newQuery("DELETE FROM " + coll).execute();
+  return c.json(200, { success: true });
+} catch(err) {
+  return c.json(500, { message: String(err) });
+}
 });
