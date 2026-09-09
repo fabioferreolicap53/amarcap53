@@ -641,8 +641,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
   const handleManualRelink = async () => {
     if (!window.confirm('Deseja executar a re-vinculação manual dos acompanhamentos por CNS?')) return;
     try {
-      setDeleteStatus({ message: 'Buscando dados para re-vinculação...', type: 'deleting' });
-      
       // 1. Busca todos os pacientes com CNS
       const pacientes = await pb.collection('amarcap53_pacientes').getFullList({
         filter: 'cns != ""',
@@ -656,7 +654,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       });
       
       // 2. Busca acompanhamentos com CNS
-      setDeleteStatus({ message: 'Analisando vínculos dos acompanhamentos...', type: 'deleting' });
       const acompanhamentos = await pb.collection('amarcap53_acompanhamentos').getFullList({
         filter: 'cns != ""',
         fields: 'id,cns,paciente'
@@ -671,7 +668,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         const correctPacId = cnsMap[aCns];
         
         if (aCns && correctPacId && aPac !== correctPacId) {
-          setDeleteStatus({ message: `Re-vinculando acompanhamento ${count + 1}...`, type: 'deleting' });
           await pb.collection('amarcap53_acompanhamentos').update(a.id, {
             paciente: correctPacId
           });
@@ -680,12 +676,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       }
 
       alert(`Processo concluído: ${count} registros re-vinculados.`);
-      setDeleteStatus({ message: '', type: 'idle' });
       fetchStats();
     } catch (err: any) {
       console.error(err);
       alert('Erro: ' + (err.message || 'Falha na comunicação'));
-      setDeleteStatus({ message: '', type: 'idle' });
     }
   };
 
