@@ -143,23 +143,9 @@ onRecordCreate(function(e) {
   e.next();
 }, ACOMP_COLL);
 
-// Sincronizar CNS antes de qualquer deleção de paciente
-onRecordBeforeDeleteRequest(function(e) {
-  try {
-    var db = $app.db();
-    var pacId = e.record.id;
-    var cns = e.record.get('cns');
-    if (pacId && cns) {
-      db.newQuery(
-        "UPDATE amarcap53_acompanhamentos SET cns = '" + cns + "' " +
-        "WHERE paciente = '" + pacId + "' AND (cns = '' OR cns IS NULL)"
-      ).execute();
-    }
-  } catch(err) {
-    console.error('[paciente_delete] Sync CNS error:', err);
-  }
-  e.next();
-}, PACIENTES_COLL);
+// ─── HOOK: ANTES DE DELETAR PACIENTE (REMOVIDO) ────────────────────────
+// Hook removido para evitar conflitos de versão do PocketBase.
+// A sincronização de CNS agora é feita exclusivamente via rotas da API.
 
 // ─── ROTAS CUSTOMIZADAS AMAR ─────────────────────────────────
 
