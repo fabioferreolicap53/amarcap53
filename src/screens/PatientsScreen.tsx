@@ -595,6 +595,11 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       return;
     }
     
+    if (getSelectLabel(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' && !modalDataAgendamento) {
+      alert('Preencha o campo "Data do Agendamento" quando a situação for "Agendamento após contato direto".');
+      return;
+    }
+    
     if (modalEntravesInformadoPor && (!modalEntraves || modalEntraves.length === 0)) {
       alert('Por favor, selecione ao menos um entrave identificado.');
       return;
@@ -2322,7 +2327,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         <div>
                           <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
                             <Calendar className="h-3 w-3" />
-                            Data do Agendamento
+                            Data do Agendamento <span className="text-red-500">*</span>
                           </label>
                           <DatePickerPTBR value={modalDataAgendamento} isISO={false} onChange={setModalDataAgendamento} />
                         </div>
