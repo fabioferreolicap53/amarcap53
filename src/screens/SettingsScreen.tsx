@@ -92,6 +92,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
   // Estados para exclusão total
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteStatus, setDeleteStatus] = useState<{ message: string; type: 'idle' | 'deleting' | 'completed' | 'error' }>({ message: '', type: 'idle' });
+  const [relinkStatus, setRelinkStatus] = useState<{ active: boolean; phase: string; current: number; total: number; matched: number; updated: number; skipped: number }>({ active: false, phase: '', current: 0, total: 0, matched: 0, updated: 0, skipped: 0 });
 
   // Password confirmation + pause/cancel controls
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -640,8 +641,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
   const handleManualRelink = async () => {
     if (!window.confirm('Deseja executar a re-vinculação manual dos acompanhamentos por CNS?')) return;
+    
+    setRelinkStatus({ active: true, phase: 'carregando pacientes...', current: 0, total: 0, matched: 0, updated: 0, skipped: 0 });
+    
     try {
       // 1. Busca todos os pacientes com CNS
+      setRelinkStatus(prev => ({ ...prev, phase: 'carregando pacientes...' }));
       const pacientes = await pb.collection('amarcap53_pacientes').getFullList({
         filter: 'cns != ""',
         fields: 'id,cns'
@@ -654,15 +659,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       });
       
       // 2. Busca acompanhamentos com CNS
+      setRelinkStatus(prev => ({ ...prev, phase: 'carregando acompanhamentos...', matched: 0 }));
       const acompanhamentos = await pb.collection('amarcap53_acompanhamentos').getFullList({
         filter: 'cns != ""',
         fields: 'id,cns,paciente'
       });
       
-      let count = 0;
+      let updated = 0;
+      let skipped = 0;
+      
+      setRelinkStatus(prev => ({ ...prev, phase: 'processando...', total: acompanhamentos.length }));
       
       // 3. Atualiza 1 a 1 via API padrão
-      for (const a of acompanhamentos) {
+      for (let i = 0; i < acompanhamentos.length; i++) {
+        const a = acompanhamentos[i];
         const aCns = String(a.cns || '').trim();
         const aPac = String(a.paciente || '').trim();
         const correctPacId = cnsMap[aCns];
@@ -671,14 +681,30 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
           await pb.collection('amarcap53_acompanhamentos').update(a.id, {
             paciente: correctPacId
           });
-          count++;
+          updated++;
+        } else {
+          skipped++;
+        }
+        
+        // Atualiza progresso a cada 5 registros para não sobrecarregar React
+        if ((i + 1) % 5 === 0 || i === acompanhamentos.length - 1) {
+          setRelinkStatus(prev => ({
+            ...prev,
+            current: i + 1,
+            matched: updated + skipped,
+            updated,
+            skipped,
+            phase: `processando ${i + 1}/${acompanhamentos.length}...`
+          }));
         }
       }
 
-      alert(`Processo concluído: ${count} registros re-vinculados.`);
+      setRelinkStatus(prev => ({ ...prev, phase: 'concluído!', current: prev.total, active: false }));
+      alert(`Processo concluído: ${updated} registros re-vinculados, ${skipped} já corretos.`);
       fetchStats();
     } catch (err: any) {
       console.error(err);
+      setRelinkStatus({ active: false, phase: '', current: 0, total: 0, matched: 0, updated: 0, skipped: 0 });
       alert('Erro: ' + (err.message || 'Falha na comunicação'));
     }
   };
@@ -1344,21 +1370,70 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                   {/* Re-vincular por CNS */}
                   <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-200/60">
                     <div className="flex items-center gap-4 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
-                        <RefreshCw className="w-5 h-5 text-white" />
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg ${relinkStatus.active ? 'bg-gradient-to-br from-blue-400 to-blue-600 animate-pulse' : 'bg-gradient-to-br from-blue-500 to-blue-700 shadow-blue-200'}`}>
+                        <RefreshCw className={`w-5 h-5 text-white ${relinkStatus.active ? 'animate-spin' : ''}`} />
                       </div>
                       <div>
                         <h3 className="text-sm font-black text-slate-800 uppercase">Re-vincular Acompanhamentos</h3>
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Restaura vínculo paciente por CNS</p>
                       </div>
                     </div>
-                    <p className="text-[10px] text-slate-500 mb-4">Após excluir e reimportar pacientes, clique para restaurar os vínculos dos acompanhamentos usando o campo CNS.</p>
-                    <button
-                      onClick={handleManualRelink}
-                      className="w-full py-3 bg-blue-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 text-xs"
-                    >
-                      Re-vincular por CNS
-                    </button>
+                    
+                    {!relinkStatus.active && relinkStatus.phase !== 'concluído!' && (
+                      <>
+                        <p className="text-[10px] text-slate-500 mb-4">Após excluir e reimportar pacientes, clique para restaurar os vínculos dos acompanhamentos usando o campo CNS.</p>
+                        <button
+                          onClick={handleManualRelink}
+                          className="w-full py-3 bg-blue-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 text-xs"
+                        >
+                          Re-vincular por CNS
+                        </button>
+                      </>
+                    )}
+                    
+                    {relinkStatus.active && (
+                      <div className="space-y-3">
+                        <p className="text-[10px] text-blue-600 font-bold uppercase">{relinkStatus.phase}</p>
+                        {/* Barra de progresso */}
+                        <div className="w-full bg-slate-100 rounded-full h-2.5">
+                          <div
+                            className="bg-gradient-to-r from-blue-500 to-blue-600 h-2.5 rounded-full transition-all duration-300"
+                            style={{ width: `${relinkStatus.total > 0 ? Math.round((relinkStatus.current / relinkStatus.total) * 100) : 0}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[10px] text-slate-400 font-bold">
+                          <span>{relinkStatus.current} / {relinkStatus.total}</span>
+                          <span>{relinkStatus.total > 0 ? Math.round((relinkStatus.current / relinkStatus.total) * 100) : 0}%</span>
+                        </div>
+                        {/* Contadores */}
+                        <div className="flex gap-2">
+                          <div className="flex-1 bg-blue-50 rounded-xl p-2 text-center">
+                            <p className="text-[10px] font-black text-blue-700">{relinkStatus.updated}</p>
+                            <p className="text-[8px] font-bold text-blue-400 uppercase">Re-vinculados</p>
+                          </div>
+                          <div className="flex-1 bg-green-50 rounded-xl p-2 text-center">
+                            <p className="text-[10px] font-black text-green-700">{relinkStatus.skipped}</p>
+                            <p className="text-[8px] font-bold text-green-400 uppercase">Já corretos</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {!relinkStatus.active && relinkStatus.phase === 'concluído!' && (
+                      <div className="text-center space-y-3">
+                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                        </div>
+                        <p className="text-xs font-black text-green-700 uppercase">Re-vinculação concluída!</p>
+                        <p className="text-[10px] text-slate-500">{relinkStatus.updated} registros atualizados, {relinkStatus.skipped} já estavam corretos.</p>
+                        <button
+                          onClick={handleManualRelink}
+                          className="w-full py-3 bg-blue-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 text-xs"
+                        >
+                          Executar Novamente
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Histórico de Operações */}
