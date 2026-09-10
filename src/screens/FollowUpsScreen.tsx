@@ -145,6 +145,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const [createTipoContato, setCreateTipoContato] = useState('');
   const [createSituacao, setCreateSituacao] = useState('');
   const [createDataAgendamento, setCreateDataAgendamento] = useState('');
+  const [createFieldErrors, setCreateFieldErrors] = useState<Record<string, boolean>>({});
   const [createEntraves, setCreateEntraves] = useState<string[]>([]);
   const [createEntravesInformadoPor, setCreateEntravesInformadoPor] = useState('');
   const [createObservacoes, setCreateObservacoes] = useState('');
@@ -558,20 +559,29 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     e.preventDefault();
     if (!createSelectedPaciente || !user) return;
 
-    if (!createDate) {
-      alert('Preencha a Data da Busca.');
-      return;
-    }
-    if (!createTipoBusca || !createTipoContato || !createSituacao) {
-      alert('Preencha todos os campos obrigatórios: Tipo de Busca, Tipo de Contato e Situação Pós Busca.');
-      return;
+    const errors: Record<string, boolean> = {};
+    if (!createDate) errors['data_busca'] = true;
+    if (!createTipoBusca) errors['tipo_busca'] = true;
+    if (!createTipoContato) errors['tipo_contato'] = true;
+    if (!createSituacao) errors['situacao_pos_busca'] = true;
+    if (getSelectLabel(createSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' && !createDataAgendamento) {
+      errors['data_do_agendamento'] = true;
     }
     if (createEntraves.length > 0 && !createEntravesInformadoPor) {
-      alert('Por favor, preencha o campo "Entrave(s) Informado Por" quando houver entrave(s) identificado(s).');
-      return;
+      errors['entraves_informado_por'] = true;
     }
-    if (getSelectLabel(createSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' && !createDataAgendamento) {
-      alert('Por favor, preencha o campo "Data do Agendamento" quando a situação for "Agendamento após contato direto".');
+
+    setCreateFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      const missing: string[] = [];
+      if (errors['data_busca']) missing.push('Data da Busca');
+      if (errors['tipo_busca']) missing.push('Tipo de Busca');
+      if (errors['tipo_contato']) missing.push('Tipo de Contato');
+      if (errors['situacao_pos_busca']) missing.push('Situação Pós Busca');
+      if (errors['data_do_agendamento']) missing.push('Data do Agendamento');
+      if (errors['entraves_informado_por']) missing.push('Entrave(s) Informado Por');
+      alert('Preencha os campos obrigatórios: ' + missing.join(', '));
       return;
     }
 
@@ -1676,19 +1686,20 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                         <p className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-700">Desfecho</p>
                       </div>
                       <div className={`grid gap-x-3 gap-y-2.5 ${getSelectLabel(createSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
-                        <div>
+                        <div className={createFieldErrors['situacao_pos_busca'] ? 'ring-2 ring-red-400 rounded-xl' : ''}>
                           <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
                             Situação Pós Busca Ativa <span className="text-red-500">*</span>
                           </label>
-                          <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={createSituacao} onChange={setCreateSituacao} required showSearch={false} />
+                          <SingleSelect placeholder="Selecione o desfecho" options={SITUACAO_POS_BUSCA_OPTIONS} value={createSituacao} onChange={(v) => { setCreateSituacao(v); if (createFieldErrors['situacao_pos_busca']) setCreateFieldErrors(prev => ({...prev, situacao_pos_busca: false})); if (v !== 'AGENDAMENTO APÓS CONTATO DIRETO') setCreateFieldErrors(prev => ({...prev, data_do_agendamento: false})); }} required showSearch={false} />
                         </div>
                         {getSelectLabel(createSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' && (
-                          <div>
+                          <div className={createFieldErrors['data_do_agendamento'] ? 'ring-2 ring-red-400 rounded-xl' : ''}>
                             <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
                               <Calendar className="h-3 w-3" />
                               Data do Agendamento <span className="text-red-500">*</span>
                             </label>
-                            <DatePickerPTBR value={createDataAgendamento} isISO={false} onChange={setCreateDataAgendamento} />
+                            <DatePickerPTBR value={createDataAgendamento} isISO={false} onChange={(v) => { setCreateDataAgendamento(v); if (createFieldErrors['data_do_agendamento']) setCreateFieldErrors(prev => ({...prev, data_do_agendamento: false})); }} />
+                            {createFieldErrors['data_do_agendamento'] && <p className="text-[9px] text-red-500 font-bold mt-1">Obrigatório para este desfecho</p>}
                           </div>
                         )}
                       </div>
