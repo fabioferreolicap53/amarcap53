@@ -130,7 +130,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       // Buscar acompanhamentos do paciente
       let acompanhamentos: any[] = [];
       try {
-        const fuResult = await pb.collection('amarcap53_followups').getFullList({
+        const fuResult = await pb.collection('amarcap53_acompanhamentos').getFullList({
           filter: `paciente = "${pacienteId}"`,
           sort: '-data_busca',
           requestKey: null,
