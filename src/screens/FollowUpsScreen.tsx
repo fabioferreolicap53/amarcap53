@@ -120,17 +120,29 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
   const [isSaving, setIsSaving] = useState(false);
 
   // Modal de visualização do paciente
-  const [viewPacienteModal, setViewPacienteModal] = useState<{ isOpen: boolean; paciente: any; loading: boolean }>({ isOpen: false, paciente: null, loading: false });
+  const [viewPacienteModal, setViewPacienteModal] = useState<{ isOpen: boolean; paciente: any; loading: boolean; acompanhamentos: any[] }>({ isOpen: false, paciente: null, loading: false, acompanhamentos: [] });
 
   const handleViewPaciente = async (pacienteId?: string) => {
     if (!pacienteId) return;
-    setViewPacienteModal({ isOpen: true, paciente: null, loading: true });
+    setViewPacienteModal({ isOpen: true, paciente: null, loading: true, acompanhamentos: [] });
     try {
       const record = await pb.collection('amarcap53_pacientes').getOne(pacienteId, { expand: '', requestKey: null });
-      setViewPacienteModal({ isOpen: true, paciente: record, loading: false });
+      // Buscar acompanhamentos do paciente
+      let acompanhamentos: any[] = [];
+      try {
+        const fuResult = await pb.collection('amarcap53_followups').getFullList({
+          filter: `paciente = "${pacienteId}"`,
+          sort: '-data_busca',
+          requestKey: null,
+        });
+        acompanhamentos = fuResult;
+      } catch (errFu) {
+        console.error('[VIEW PACIENTE] Erro ao buscar followups:', errFu);
+      }
+      setViewPacienteModal({ isOpen: true, paciente: record, loading: false, acompanhamentos });
     } catch (err) {
       console.error('[VIEW PACIENTE] Erro:', err);
-      setViewPacienteModal({ isOpen: true, paciente: null, loading: false });
+      setViewPacienteModal({ isOpen: true, paciente: null, loading: false, acompanhamentos: [] });
     }
   };
 
@@ -1900,6 +1912,64 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
                     </div>
                   </div>
+
+                  {/* Acompanhamentos */}
+                  {viewPacienteModal.acompanhamentos.length > 0 && (
+                    <div className="rounded-xl border-l-4 border-violet-500 bg-gradient-to-r from-violet-50/80 to-white p-3.5">
+                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-violet-700 mb-3 flex items-center gap-2">
+                        <ClipboardList className="h-3.5 w-3.5" /> Acompanhamentos ({viewPacienteModal.acompanhamentos.length})
+                      </p>
+                      <div className="space-y-2.5 max-h-60 overflow-y-auto">
+                        {viewPacienteModal.acompanhamentos.map((fu: any) => (
+                          <div key={fu.id} className="rounded-lg border border-violet-200 bg-white/70 p-2.5 space-y-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[10px] font-bold text-violet-600 uppercase tracking-wider">
+                                {(() => {
+                                  const d = fu.data_busca || fu.created;
+                                  if (!d) return '--';
+                                  const p = d.substring(0, 10).split('-');
+                                  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d;
+                                })()}
+                              </span>
+                              {fu.situacao_pos_busca && (
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
+                                  {getSelectLabel(fu.situacao_pos_busca, SITUACAO_POS_BUSCA_OPTIONS)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                              <InfoRow label="Tipo de Busca" value={getSelectLabel(fu.tipo_busca, TIPO_BUSCA_OPTIONS)} />
+                              <InfoRow label="Tipo de Contato" value={getSelectLabel(fu.tipo_contato, TIPO_CONTATO_OPTIONS)} />
+                            </div>
+                            {fu.data_do_agendamento && (
+                              <InfoRow label="Data Agendamento" value={fu.data_do_agendamento} />
+                            )}
+                            {fu.entraves_identificados && fu.entraves_identificados.length > 0 && (
+                              <div className="flex flex-col">
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Entraves Identificados</span>
+                                <div className="flex flex-wrap gap-1">
+                                  {(Array.isArray(fu.entraves_identificados)
+                                    ? fu.entraves_identificados
+                                    : fu.entraves_identificados.split('; ')
+                                  ).map((e: string, i: number) => (
+                                    <span key={i} className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                      {getSelectLabel(e, ENTRAVES_IDENTIFICADOS_OPTIONS)}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {fu.observacoes && (
+                              <div className="flex flex-col">
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Observações</span>
+                                <p className="text-[11px] text-slate-600 leading-relaxed whitespace-pre-wrap">{fu.observacoes}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-12 text-slate-400 text-sm font-bold">Paciente não encontrado.</div>
