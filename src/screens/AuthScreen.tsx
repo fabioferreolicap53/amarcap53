@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { pb } from '../lib/pocketbase';
-import { Activity, Mail, Lock, Building, Users, MapPin, ArrowRight, ArrowLeft, Eye, EyeOff, Shield, Heart, BadgeCheck } from 'lucide-react';
+import { Activity, Mail, Lock, Building, Users, MapPin, ArrowRight, ArrowLeft, Eye, EyeOff, Shield, Heart, BadgeCheck, CheckCircle2, Inbox } from 'lucide-react';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 import { EmailActionPage } from '../components/EmailActionPage';
 
-type AuthState = 'login' | 'register' | 'forgot_password' | 'reset_password' | 'confirm_email_change';
+type AuthState = 'login' | 'register' | 'forgot_password' | 'reset_password' | 'confirm_email_change' | 'post_register';
 
 export function AuthScreen() {
   const [authState, setAuthState] = useState<AuthState>('login');
@@ -276,8 +276,7 @@ export function AuthScreen() {
         console.warn('Verificação já enviada ou erro silencioso:', verifyErr);
       }
 
-      setSuccessMsg('Cadastro realizado com sucesso! Verifique sua caixa de entrada e a pasta de SPAM, clique no link de confirmação e depois faça login.');
-      setAuthState('login');
+      setAuthState('post_register');
     } catch (err: any) {
       console.error('Erro completo:', JSON.stringify(err?.data || err));
 
@@ -401,6 +400,188 @@ export function AuthScreen() {
   // Renderiza página de ação de e-mail (verificação / reset / confirmação)
   if (emailAction) {
     return <EmailActionPage action={emailAction.action} token={emailAction.token} />;
+  }
+
+  // ── TELA PÓS-CADASTRO: tela dedicada com orientações claras ──
+  if (authState === 'post_register') {
+    return (
+      <div className="min-h-dvh min-h-[100dvh] flex flex-col font-sans bg-[#f0f2f5]">
+        {/* Brand Panel — Desktop */}
+        <div className="hidden lg:flex lg:w-1/2 fixed inset-0 left-0 w-1/2 z-0 overflow-hidden bg-gradient-to-br from-[#001b3d] via-[#002b5c] to-[#003d7a]">
+          <div className="absolute inset-0">
+            <div className="absolute top-20 -left-20 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl animate-[floatSlow_20s_ease-in-out_infinite]" />
+            <div className="absolute bottom-20 -right-20 w-[30rem] h-[30rem] bg-blue-400/5 rounded-full blur-3xl animate-[floatSlow_25s_ease-in-out_infinite_reverse]" />
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:60px_60px] opacity-60" />
+          </div>
+          <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16 2xl:px-20 py-6 lg:py-8 xl:py-10 w-full">
+            <div className="flex items-center gap-3 lg:gap-4 mb-4 lg:mb-6 xl:mb-8 animate-[fadeSlideIn_0.6s_ease-out_0.2s_both]">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 xl:w-14 xl:h-14 rounded-[0.875rem] lg:rounded-[1rem] bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg shadow-black/10 ring-1 ring-white/10">
+                <Heart className="w-5 h-5 lg:w-6 lg:h-6 xl:w-7 xl:h-7 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl lg:text-2xl xl:text-3xl font-black text-white tracking-tight">{appConfig.name}</h1>
+                <p className="text-blue-200/70 text-[9px] lg:text-[10px] xl:text-[11px] font-bold uppercase tracking-[0.2em] mt-0.5">{appConfig.description}</p>
+              </div>
+            </div>
+            <div className="space-y-2.5 lg:space-y-3 xl:space-y-4 mb-4 lg:mb-6 xl:mb-8 animate-[fadeSlideIn_0.6s_ease-out_0.4s_both]">
+              <h2 className="text-2xl lg:text-2xl xl:text-3xl 2xl:text-4xl font-black text-white leading-[1.05] tracking-tight">
+                Acompanhamento<br />
+                <span className="text-blue-300 bg-gradient-to-r from-blue-300 to-blue-200 bg-clip-text text-transparent">que salva vidas</span>
+              </h2>
+              <p className="text-blue-200/70 text-[13px] lg:text-sm font-medium leading-snug max-w-md">
+                Plataforma integrada para gestão e monitoramento de pacientes no rastreamento do câncer do colo do útero.
+              </p>
+            </div>
+            <div className="mt-auto pt-6 lg:pt-8 xl:pt-12 border-t border-white/[0.07] animate-[fadeSlideIn_0.6s_ease-out_1s_both]">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-px h-3 bg-blue-400/40" />
+                  <p className="text-blue-200/55 text-[9px] font-bold uppercase tracking-[0.15em]">Coordenadoria Geral de Atenção Primária — AP 5.3</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-px h-2.5 bg-blue-400/25" />
+                  <p className="text-blue-300/35 text-[9px] font-semibold tracking-[0.2em]">© 2026 AMAR — Todos os direitos reservados</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Panel — Scrollable */}
+        <div className="relative z-10 w-full lg:w-1/2 lg:ml-auto flex flex-col min-h-dvh min-h-[100dvh] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+          <div
+            className="flex-1 flex items-center justify-center px-4 py-4 sm:px-6 md:px-8 lg:px-10 xl:px-14 2xl:px-16"
+            style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 1rem))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}
+          >
+            <div className="w-full max-w-[440px] lg:max-w-[380px] xl:max-w-[400px] 2xl:max-w-[420px]">
+
+              {/* Mobile logo */}
+              <div className="lg:hidden flex flex-col items-center mb-4 sm:mb-8 animate-[fadeSlideIn_0.5s_ease-out]">
+                <div className="w-14 h-14 sm:w-[4.5rem] sm:h-[4.5rem] rounded-[1rem] sm:rounded-[1.25rem] bg-gradient-to-br from-[#001b3d] to-[#003d7a] flex items-center justify-center shadow-lg shadow-blue-900/20 ring-1 ring-white/10 mb-2.5 sm:mb-4">
+                  <Heart className="w-7 h-7 sm:w-9 sm:h-9 text-white" />
+                </div>
+                <h1 className="text-[1.375rem] sm:text-[1.625rem] font-black text-[#001b3d] tracking-tight leading-tight">{appConfig.name}</h1>
+                <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1 text-center max-w-[260px] sm:max-w-[300px] leading-snug sm:leading-relaxed">{appConfig.description}</p>
+              </div>
+
+              {/* Card — Premium glassmorphism */}
+              <div className="bg-white/80 sm:bg-white backdrop-blur-xl sm:backdrop-blur-none rounded-[1.25rem] sm:rounded-[2rem] shadow-[0_8px_40px_rgba(0,0,0,0.06)] sm:shadow-[0_20px_60px_rgba(0,0,0,0.08)] lg:shadow-[0_25px_80px_rgba(0,0,0,0.12)] border border-white/60 sm:border-slate-200/50 lg:border-slate-200/60 p-4 sm:p-6 md:p-8 lg:p-7 xl:p-8 relative overflow-hidden animate-[fadeSlideIn_0.6s_ease-out_0.1s_both]">
+                {/* Top gradient bar */}
+                <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-400" />
+
+                {/* Header */}
+                <div className="mb-3 sm:mb-5 lg:mb-6">
+                  <h2 className="text-lg sm:text-[1.375rem] md:text-2xl lg:text-[1.5rem] xl:text-[1.625rem] font-black text-[#001b3d] tracking-tight leading-tight">
+                    Cadastro Realizado!
+                  </h2>
+                  <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1 sm:mt-1.5 leading-snug sm:leading-relaxed">
+                    Ative sua conta pelo e-mail
+                  </p>
+                </div>
+
+                {/* Icon centralizado com glow */}
+                <div className="flex flex-col items-center mb-5 sm:mb-6">
+                  <div className="relative mb-4">
+                    <div className="absolute inset-0 rounded-3xl bg-emerald-400 blur-xl opacity-30" />
+                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/25 flex items-center justify-center animate-[scaleIn_0.4s_ease-out]">
+                      <Mail className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mensagem principal */}
+                <p className="text-[13px] sm:text-sm text-slate-600 font-medium leading-relaxed text-center mb-5 sm:mb-6">
+                  Enviamos um link de confirmação para seu e-mail. Clique no link para ativar sua conta.
+                </p>
+
+                {/* Checklist visual com passos */}
+                <div className="space-y-2.5 mb-5 sm:mb-6">
+                  <div className="flex items-center gap-3 p-3 bg-emerald-50/80 border border-emerald-100 rounded-xl animate-[fadeSlideIn_0.4s_ease-out_0.15s_both]">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center shrink-0 shadow-sm shadow-emerald-500/30">
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                    </div>
+                    <p className="text-[11px] sm:text-xs font-bold text-emerald-700">Conta criada com sucesso</p>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 bg-blue-50/80 border border-blue-100 rounded-xl animate-[fadeSlideIn_0.4s_ease-out_0.3s_both]">
+                    <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/30">
+                      <Inbox className="w-4 h-4 text-white" />
+                    </div>
+                    <p className="text-[11px] sm:text-xs font-bold text-blue-700">Verifique sua caixa de entrada</p>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 bg-amber-50/80 border border-amber-100 rounded-xl animate-[fadeSlideIn_0.4s_ease-out_0.45s_both]">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center shrink-0 shadow-sm shadow-amber-500/30">
+                      <span className="text-white text-[11px] font-black">!</span>
+                    </div>
+                    <p className="text-[11px] sm:text-xs font-bold text-amber-700">Confira também a pasta de SPAM</p>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 bg-slate-50/80 border border-slate-100 rounded-xl animate-[fadeSlideIn_0.4s_ease-out_0.6s_both]">
+                    <div className="w-7 h-7 rounded-lg bg-slate-500 flex items-center justify-center shrink-0 shadow-sm shadow-slate-500/30">
+                      <ArrowRight className="w-4 h-4 text-white" />
+                    </div>
+                    <p className="text-[11px] sm:text-xs font-bold text-slate-600">Clique no link e depois faça login</p>
+                  </div>
+                </div>
+
+                {/* Aviso sobre tempo do link */}
+                <div className="w-full p-3 bg-slate-50/80 backdrop-blur-sm border border-slate-100 rounded-xl flex items-start gap-2.5 mb-5 sm:mb-6 animate-[fadeSlideIn_0.4s_ease-out_0.7s_both]">
+                  <span className="text-[13px] mt-0.5">⏱️</span>
+                  <p className="text-[11px] sm:text-xs font-medium text-slate-500 leading-relaxed">
+                    O link de confirmação é válido por <span className="font-black text-slate-700">24 horas</span>. Se expirar, solicite um novo cadastro.
+                  </p>
+                </div>
+
+                {/* Botões */}
+                <div className="space-y-3">
+                  <button
+                    onClick={() => { setAuthState('login'); clearMessages(); }}
+                    className="w-full py-3.5 min-h-[52px] bg-gradient-to-r from-[#001b3d] to-[#002b5c] text-white rounded-xl sm:rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md transition-all duration-300"
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      Acessar o Login <ArrowRight className="w-4 h-4" />
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Mobile Footer */}
+              <div className="flex flex-col items-center gap-3 sm:gap-6 lg:gap-4 mt-4 sm:mt-6 lg:mt-5 animate-[fadeSlideIn_0.6s_ease-out_0.3s_both]">
+                <div className="flex-col gap-1.5 flex lg:hidden">
+                  <div className="flex items-center gap-2 justify-center">
+                    <div className="w-px h-3 bg-slate-300/30" />
+                    <p className="text-slate-400 text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.15em] text-center">Coordenadoria Geral de Atenção Primária — AP 5.3</p>
+                  </div>
+                  <div className="flex items-center gap-2 justify-center">
+                    <div className="w-px h-2.5 bg-slate-300/20" />
+                    <p className="text-slate-400/70 text-[8px] sm:text-[9px] font-semibold tracking-[0.2em]">© 2026 AMAR — Todos os direitos reservados</p>
+                  </div>
+                </div>
+                <p className="text-slate-300 text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.25em] text-center">Desenvolvido por Fabio Ferreira de Oliveira — DAPS/CAP5.3</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Premium Animations */}
+        <style>{`
+          @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+          }
+          @keyframes floatSlow {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(15px, -20px) scale(1.02); }
+            66% { transform: translate(-10px, 10px) scale(0.98); }
+          }
+        `}</style>
+      </div>
+    );
   }
 
   return (
