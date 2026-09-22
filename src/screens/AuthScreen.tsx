@@ -31,6 +31,8 @@ export function AuthScreen() {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [perfil, setPerfil] = useState('');
   const [unidadeSaude, setUnidadeSaude] = useState('');
   const [equipe, setEquipe] = useState('');
@@ -92,15 +94,15 @@ export function AuthScreen() {
     try {
       const authData = await pb.collection('amarcap53_users').authWithPassword(email, password);
 
-      // Verifica se o e-mail foi confirmado (campo verified do PocketBase)
-      if (authData && authData.record && authData.record.verified === false) {
+      // Verifica se o e-mail foi confirmado (PocketBase usa false e 0 para não verificado)
+      if (authData && authData.record && (authData.record.verified === false || authData.record.verified === 0)) {
         pb.authStore.clear();
-        setError('E-mail não confirmado. Verifique sua caixa de entrada (e SPAM) e confirme o link antes de fazer login.');
+        setError('E-mail não confirmado. Verifique sua caixa de entrada e a pasta de SPAM, clique no link de ativação e depois faça login.');
         return;
       }
     } catch (err: any) {
       console.error(err);
-      setError('Credenciais inválidas. Verifique seu e-mail e senha.');
+      setError('Credenciais inválidas. Verifique se o e-mail e a senha estão corretos.');
     } finally {
       submittingRef.current = false;
       setIsLoading(false);
@@ -274,7 +276,7 @@ export function AuthScreen() {
         console.warn('Verificação já enviada ou erro silencioso:', verifyErr);
       }
 
-      setSuccessMsg('Cadastro realizado! Verifique seu e-mail (e a caixa de SPAM) para ativar a conta.');
+      setSuccessMsg('Cadastro realizado com sucesso! Verifique sua caixa de entrada e a pasta de SPAM, clique no link de confirmação e depois faça login.');
       setAuthState('login');
     } catch (err: any) {
       console.error('Erro completo:', JSON.stringify(err?.data || err));
@@ -312,23 +314,43 @@ export function AuthScreen() {
     }
   };
 
+  const startCooldown = () => {
+    setCooldown(30);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) {
+          if (cooldownRef.current) clearInterval(cooldownRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submittingRef.current) return;
+    if (submittingRef.current || cooldown > 0) return;
     submittingRef.current = true;
     setIsLoading(true);
     clearMessages();
     try {
       await pb.collection('amarcap53_users').requestPasswordReset(email);
-      setSuccessMsg('Se o e-mail estiver cadastrado, você receberá um link de recuperação. Verifique também sua caixa de SPAM.');
+      setSuccessMsg('Se o e-mail estiver cadastrado, você receberá um link de redefinição de senha na sua caixa de entrada. Verifique também a pasta de SPAM.');
+      startCooldown();
     } catch (err: any) {
       console.error(err);
-      setError('Erro ao solicitar recuperação. Tente novamente mais tarde.');
+      setError('Erro ao solicitar recuperação. Aguarde alguns minutos e tente novamente.');
     } finally {
       submittingRef.current = false;
       setIsLoading(false);
     }
   };
+
+  // Cleanup cooldown on unmount
+  useEffect(() => {
+    return () => { if (cooldownRef.current) clearInterval(cooldownRef.current); };
+  }, []);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -358,7 +380,7 @@ export function AuthScreen() {
     try {
       await pb.collection('amarcap53_users').confirmPasswordReset(token, password, passwordConfirm);
       delete (window as any).__resetToken;
-      setSuccessMsg('Senha redefinida com sucesso! Agora você pode fazer login.');
+      setSuccessMsg('Senha redefinida com sucesso! Agora você pode acessar o sistema com sua nova senha.');
       setAuthState('login');
       setEmail('');
     } catch (err: any) {
@@ -827,13 +849,17 @@ export function AuthScreen() {
 
                   <button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isLoading || cooldown > 0}
                     className="w-full py-3.5 min-h-[52px] bg-gradient-to-r from-[#001b3d] to-[#002b5c] text-white rounded-xl sm:rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                   >
                     {isLoading ? (
                       <span className="flex items-center justify-center gap-2">
                         <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         Enviando...
+                      </span>
+                    ) : cooldown > 0 ? (
+                      <span className="flex items-center justify-center gap-2">
+                        Aguarde {cooldown}s para reenviar
                       </span>
                     ) : 'Enviar Link'}
                   </button>

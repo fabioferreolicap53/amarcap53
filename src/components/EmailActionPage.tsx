@@ -17,34 +17,34 @@ const ACTION_CONFIG = {
     title: 'Verificação de E-mail',
     subtitle: 'Ativando sua conta',
     loadingText: 'Verificando seu e-mail...',
-    loadingDesc: 'Aguarde enquanto confirmamos seu endereço de e-mail.',
+    loadingDesc: 'Aguarde enquanto confirmamos seu endereço de e-mail. Isso pode levar alguns instantes.',
     icon: Mail,
-    successTitle: 'E-mail Verificado!',
-    successDesc: 'Sua conta foi ativada com sucesso. Agora você pode acessar o sistema.',
+    successTitle: 'E-mail Confirmado!',
+    successDesc: 'Sua conta foi ativada com sucesso. Agora você pode acessar o sistema usando seu e-mail e senha.',
     errorTitle: 'Não foi possível verificar',
-    errorDesc: 'O link de verificação pode ter expirado ou já ter sido utilizado.',
+    errorDesc: 'O link de verificação pode ter expirado ou já ter sido utilizado. Solicite um novo cadastro ou entre em contato com o administrador.',
   },
   reset_password: {
-    title: 'Redefinição de Senha',
-    subtitle: 'Criar nova senha',
+    title: 'Redefinir Senha',
+    subtitle: 'Crie uma nova senha para sua conta',
     loadingText: 'Validando link de recuperação...',
-    loadingDesc: 'Aguarde enquanto verificamos seu pedido.',
+    loadingDesc: 'Aguarde enquanto verificamos a validade do link.',
     icon: Lock,
     successTitle: 'Senha Redefinida!',
-    successDesc: 'Sua senha foi alterada com sucesso. Agora você pode fazer login com a nova senha.',
+    successDesc: 'Sua senha foi alterada com sucesso. Agora você pode acessar o sistema usando a nova senha que acabou de criar.',
     errorTitle: 'Link inválido ou expirado',
-    errorDesc: 'O link de redefinição de senha pode ter expirado. Solicite uma nova recuperação.',
+    errorDesc: 'O link de redefinição pode ter expirado ou já ter sido usado. Solicite uma nova recuperação de senha.',
   },
   confirm_email_change: {
-    title: 'Confirmação de Novo E-mail',
-    subtitle: 'Alterando endereço de e-mail',
+    title: 'Confirmar Novo E-mail',
+    subtitle: 'Para concluir a alteração do seu endereço de e-mail',
     loadingText: 'Confirmando novo endereço...',
     loadingDesc: 'Aguarde enquanto validamos a alteração do seu e-mail.',
     icon: BadgeCheck,
-    successTitle: 'E-mail Alterado!',
-    successDesc: 'Seu endereço de e-mail foi atualizado. Faça login com o novo e-mail.',
-    errorTitle: 'Não foi possível alterar',
-    errorDesc: 'O link de confirmação pode ter expirado. Solicite a alteração novamente.',
+    successTitle: 'E-mail Atualizado!',
+    successDesc: 'Seu endereço de e-mail foi alterado com sucesso. Use o novo e-mail para fazer login no sistema.',
+    errorTitle: 'Não foi possível alterar o e-mail',
+    errorDesc: 'O link de confirmação pode ter expirado. Solicite a alteração de e-mail novamente nas configurações da conta.',
   },
 };
 
@@ -295,7 +295,12 @@ export function EmailActionPage({ action, token, onError, onSuccess }: EmailActi
 
                   <button type="submit" disabled={status === 'loading'}
                     className="w-full py-3.5 min-h-[52px] bg-gradient-to-r from-[#001b3d] to-[#002b5c] text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
-                    Redefinir Senha
+                    {status === 'loading' ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Redefinindo...
+                      </span>
+                    ) : 'Redefinir Senha'}
                   </button>
                 </form>
               )}
@@ -304,7 +309,7 @@ export function EmailActionPage({ action, token, onError, onSuccess }: EmailActi
               {status === 'form' && action === 'confirm_email_change' && (
                 <form className="space-y-4" onSubmit={handleConfirmEmailChange}>
                   <p className="text-[13px] text-slate-500 font-medium leading-relaxed bg-slate-50/80 p-4 rounded-xl border border-slate-100">
-                    Para confirmar a alteração do seu e-mail, digite sua senha atual.
+                    Para confirmar a alteração do seu e-mail, digite sua senha atual. Essa é uma medida de segurança para proteger sua conta.
                   </p>
 
                   {error && (
@@ -340,7 +345,12 @@ export function EmailActionPage({ action, token, onError, onSuccess }: EmailActi
 
                   <button type="submit" disabled={status === 'loading'}
                     className="w-full py-3.5 min-h-[52px] bg-gradient-to-r from-[#001b3d] to-[#002b5c] text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
-                    Confirmar Alteração
+                    {status === 'loading' ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Confirmando...
+                      </span>
+                    ) : 'Confirmar Alteração'}
                   </button>
                 </form>
               )}
