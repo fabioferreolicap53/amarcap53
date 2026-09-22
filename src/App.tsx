@@ -141,7 +141,22 @@ function AppContent() {
     };
   }, [setIsMobile]);
 
-  if (isLoading) {
+  // Loading inicial (antes de qualquer verificação)
+  if (isLoading && !verifyMsg && !verifyProcessing) {
+    return (
+      <div className="min-h-dvh min-h-[100dvh] flex items-center justify-center bg-[#f0f2f5]">
+        <div className="text-center">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#001b3d] to-[#003d7a] shadow-lg shadow-blue-900/20 flex items-center justify-center mx-auto mb-4">
+            <Heart className="w-7 h-7 text-white" />
+          </div>
+          <div className="w-10 h-10 border-3 border-slate-200 border-t-blue-600 rounded-full animate-spin mx-auto" />
+        </div>
+      </div>
+    );
+  }
+
+  // Tela de resultado de verificação de e-mail — PRIORIDADE MÁXIMA
+  if (verifyMsg || verifyProcessing) {
     const isSuccess = verifyMsg && (verifyMsg.includes('sucesso') || verifyMsg.includes('já verificado'));
     const isError = verifyMsg && !isSuccess;
 
