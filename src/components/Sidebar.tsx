@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, Settings, HelpCircle, LogOut, X, Building, MapPin, ClipboardList, Star } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, HelpCircle, LogOut, X, Building, MapPin, ClipboardList, Star, Globe, ArrowUpRight } from 'lucide-react';
 import { useSidebar } from '../contexts/SidebarContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -65,6 +65,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
             </button>
           );
         })}
+
+        {/* Link Externo — Análise Global */}
+        <a
+          href="https://amarcap53global.pages.dev/"
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => { if (window.innerWidth < 1024) closeSidebar(); }}
+          className="group relative w-full flex items-center gap-3 px-4 py-3 rounded-md overflow-hidden border border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 via-fuchsia-500/10 to-amber-400/10 hover:border-cyan-500/60 hover:from-cyan-500/20 hover:via-fuchsia-500/20 hover:to-amber-400/20 transition-all text-left"
+        >
+          <span className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-[1200ms] bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+          <Globe className="w-5 h-5 text-cyan-600 dark:text-cyan-300 shrink-0 group-hover:rotate-12 transition-transform" />
+          <span className="text-sm font-black uppercase tracking-wide text-[#051934] dark:text-white">Análise Global</span>
+          <ArrowUpRight className="w-4 h-4 ml-auto text-slate-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+        </a>
       </nav>
       
       <div className="mt-auto pt-4 space-y-4">

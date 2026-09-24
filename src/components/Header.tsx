@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, Settings, Menu, X, Building, Users, MapPin, LayoutDashboard, LogOut, ClipboardList, Star, BadgeCheck } from 'lucide-react';
+import { Bell, Settings, Menu, X, Building, Users, MapPin, LayoutDashboard, LogOut, ClipboardList, Star, BadgeCheck, Globe, ArrowUpRight } from 'lucide-react';
 import { useSidebar } from '../contexts/SidebarContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -127,6 +127,29 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               );
             })}
+
+            {/* Link Externo — Análise Global */}
+            <a
+              href="https://amarcap53global.pages.dev/"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Análise Global (abre em nova aba)"
+              className="group relative flex items-center gap-2 lg:gap-2.5 px-2 lg:px-3 xl:px-4 py-1.5 lg:py-2 rounded-xl whitespace-nowrap shrink-0 overflow-hidden border border-white/15 bg-gradient-to-r from-cyan-500/10 via-fuchsia-500/10 to-amber-400/10 hover:border-cyan-300/40 hover:from-cyan-500/25 hover:via-fuchsia-500/25 hover:to-amber-400/25 hover:shadow-[0_0_20px_rgba(34,211,238,0.25)] transition-all duration-300"
+            >
+              {/* Brilho que atravessa no hover */}
+              <span className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-[1200ms] bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+
+              <Globe className="w-4 h-4 text-cyan-300 shrink-0 group-hover:rotate-12 group-hover:scale-110 transition-transform duration-300" />
+
+              <span className="text-[10px] lg:text-xs xl:text-sm font-black uppercase tracking-wide text-white whitespace-nowrap">
+                Análise Global
+              </span>
+
+              <ArrowUpRight className="w-3 h-3 text-white/50 shrink-0 group-hover:text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-300" />
+
+              {/* Ponto "ao vivo" */}
+              <span className="absolute -top-px right-1.5 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse" />
+            </a>
           </nav>
 
           {/* Informações do Usuário */}
