@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { pb } from '../lib/pocketbase';
-import { Activity, Mail, Lock, Building, Users, MapPin, ArrowRight, ArrowLeft, Eye, EyeOff, Shield, Heart, BadgeCheck, CheckCircle2, Inbox } from 'lucide-react';
+import { Activity, Mail, Lock, Building, Users, MapPin, ArrowRight, ArrowLeft, Eye, EyeOff, Shield, Heart, BadgeCheck, CheckCircle2, Inbox, RefreshCw, ExternalLink, AlertTriangle } from 'lucide-react';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 import { EmailActionPage } from '../components/EmailActionPage';
 
@@ -37,10 +37,16 @@ export function AuthScreen() {
   const [unidadeSaude, setUnidadeSaude] = useState('');
   const [equipe, setEquipe] = useState('');
   const [microarea, setMicroarea] = useState('');
+  // Reenvio do e-mail de confirmação
+  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
   const clearMessages = () => {
     setError(null);
     setSuccessMsg(null);
+    setUnverifiedEmail(null);
+    setResendState('idle');
     setPassword('');
     setPasswordConfirm('');
     setShowPassword(false);
@@ -97,6 +103,7 @@ export function AuthScreen() {
       // Verifica se o e-mail foi confirmado (PocketBase usa false e 0 para não verificado)
       if (authData && authData.record && (authData.record.verified === false || authData.record.verified === 0)) {
         pb.authStore.clear();
+        setUnverifiedEmail(email);
         setError('E-mail não confirmado. Verifique sua caixa de entrada e a pasta de SPAM, clique no link de ativação e depois faça login.');
         return;
       }
@@ -276,6 +283,7 @@ export function AuthScreen() {
         console.warn('Verificação já enviada ou erro silencioso:', verifyErr);
       }
 
+      setRegisteredEmail(email);
       setAuthState('post_register');
     } catch (err: any) {
       console.error('Erro completo:', JSON.stringify(err?.data || err));
@@ -325,6 +333,22 @@ export function AuthScreen() {
         return prev - 1;
       });
     }, 1000);
+  };
+
+  // Reenvia o e-mail de confirmação (pós-cadastro e login não confirmado)
+  const handleResendVerification = async (targetEmail: string) => {
+    if (!targetEmail || resendState === 'sending' || cooldown > 0) return;
+    setResendState('sending');
+    try {
+      await pb.collection('amarcap53_users').requestVerification(targetEmail);
+      setResendState('sent');
+      startCooldown();
+      setTimeout(() => setResendState('idle'), 6000);
+    } catch (err) {
+      console.error(err);
+      setResendState('error');
+      setTimeout(() => setResendState('idle'), 6000);
+    }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -490,9 +514,17 @@ export function AuthScreen() {
                 </div>
 
                 {/* Mensagem principal */}
-                <p className="text-[13px] sm:text-sm text-slate-600 font-medium leading-relaxed text-center mb-5 sm:mb-6">
-                  Enviamos um link de confirmação para seu e-mail. Clique no link para ativar sua conta.
+                <p className="text-[13px] sm:text-sm text-slate-600 font-medium leading-relaxed text-center mb-3 sm:mb-4">
+                  Enviamos um link de confirmação para o seu e-mail. <span className="font-black text-[#001b3d]">Este passo é obrigatório:</span> sua conta só é ativada quando você clica no link.
                 </p>
+
+                {/* E-mail de destino em destaque */}
+                <div className="flex items-center justify-center gap-2 mb-5 sm:mb-6">
+                  <div className="max-w-full flex items-center gap-2 px-3 py-2 bg-blue-50/80 border border-blue-100 rounded-xl">
+                    <Mail className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span className="text-[11px] sm:text-xs font-black text-blue-700 truncate">{registeredEmail || email}</span>
+                  </div>
+                </div>
 
                 {/* Checklist visual com passos */}
                 <div className="space-y-2.5 mb-5 sm:mb-6">
@@ -521,7 +553,7 @@ export function AuthScreen() {
                     <div className="w-7 h-7 rounded-lg bg-slate-500 flex items-center justify-center shrink-0 shadow-sm shadow-slate-500/30">
                       <ArrowRight className="w-4 h-4 text-white" />
                     </div>
-                    <p className="text-[11px] sm:text-xs font-bold text-slate-600">Clique no link e depois faça login</p>
+                    <p className="text-[11px] sm:text-xs font-bold text-slate-600">Abra o e-mail e clique no link (obrigatório)</p>
                   </div>
                 </div>
 
@@ -532,6 +564,66 @@ export function AuthScreen() {
                     O link de confirmação é válido por <span className="font-black text-slate-700">24 horas</span>. Se expirar, solicite um novo cadastro.
                   </p>
                 </div>
+
+                {/* Atalhos diretos para o webmail */}
+                <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center mb-2.5">
+                  Abrir meu e-mail agora
+                </p>
+                <div className="grid grid-cols-2 gap-2.5 mb-3">
+                  {[
+                    { label: 'Gmail', url: 'https://mail.google.com/' },
+                    { label: 'Outlook', url: 'https://outlook.live.com/mail/0/' },
+                    { label: 'Yahoo', url: 'https://mail.yahoo.com/' },
+                    { label: 'Proton', url: 'https://mail.proton.me/' },
+                  ].map((provider) => (
+                    <a
+                      key={provider.label}
+                      href={provider.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1.5 py-2.5 min-h-[44px] bg-white border-2 border-slate-100 hover:border-blue-500/30 hover:bg-blue-50/50 active:bg-blue-50 rounded-xl text-[10px] sm:text-[11px] font-black text-slate-600 hover:text-blue-700 uppercase tracking-wide transition-all duration-200"
+                    >
+                      {provider.label} <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ))}
+                </div>
+
+                {/* Reenviar e-mail de confirmação */}
+                <button
+                  type="button"
+                  onClick={() => handleResendVerification(registeredEmail || email)}
+                  disabled={resendState === 'sending' || cooldown > 0}
+                  className={`w-full py-3 min-h-[48px] mb-3 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-black uppercase tracking-widest border-2 transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                    resendState === 'sent'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                      : resendState === 'error'
+                      ? 'bg-rose-50 border-rose-200 text-rose-700'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500/40 hover:text-blue-700'
+                  }`}
+                >
+                  {resendState === 'sending' && (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                      Reenviando...
+                    </>
+                  )}
+                  {resendState === 'sent' && (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" /> E-mail reenviado!
+                    </>
+                  )}
+                  {resendState === 'error' && (
+                    <>
+                      <AlertTriangle className="w-4 h-4" /> Falha no reenvio — tente novamente
+                    </>
+                  )}
+                  {resendState === 'idle' && (
+                    <>
+                      <RefreshCw className="w-4 h-4" />
+                      {cooldown > 0 ? `Reenviar em ${cooldown}s` : 'Não recebeu? Reenviar e-mail'}
+                    </>
+                  )}
+                </button>
 
                 {/* Botões */}
                 <div className="space-y-3">
@@ -691,7 +783,7 @@ export function AuthScreen() {
                 </h2>
                 <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1 sm:mt-1.5 leading-snug sm:leading-relaxed">
                   {authState === 'login' && 'Acesse sua conta'}
-                  {authState === 'register' && 'Preencha os dados para criar sua conta'}
+                  {authState === 'register' && 'Preencha os dados — a ativação é feita por e-mail'}
                   {authState === 'forgot_password' && 'Enviaremos um link de recuperação'}
                   {authState === 'reset_password' && 'Digite sua nova senha'}
                   {authState === 'confirm_email_change' && 'Aguarde...'}
@@ -705,6 +797,65 @@ export function AuthScreen() {
                     <span className="text-white text-[10px] sm:text-[11px] font-black">!</span>
                   </div>
                   <p className="text-[11px] sm:text-xs font-bold text-rose-700 leading-snug sm:leading-relaxed">{error}</p>
+                </div>
+              )}
+
+              {/* Ação de reenvio quando o e-mail não está confirmado */}
+              {unverifiedEmail && (
+                <div className="mb-2.5 sm:mb-4 lg:mb-5 space-y-2.5 animate-[fadeSlideIn_0.4s_ease-out]">
+                  <button
+                    type="button"
+                    onClick={() => handleResendVerification(unverifiedEmail)}
+                    disabled={resendState === 'sending' || cooldown > 0}
+                    className={`w-full py-3 min-h-[48px] rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-black uppercase tracking-widest border-2 transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                      resendState === 'sent'
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        : resendState === 'error'
+                        ? 'bg-rose-50 border-rose-200 text-rose-700'
+                        : 'bg-white border-blue-200 text-blue-700 hover:border-blue-400 hover:bg-blue-50/60'
+                    }`}
+                  >
+                    {resendState === 'sending' && (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+                        Reenviando...
+                      </>
+                    )}
+                    {resendState === 'sent' && (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" /> Link reenviado! Verifique sua caixa de entrada
+                      </>
+                    )}
+                    {resendState === 'error' && (
+                      <>
+                        <AlertTriangle className="w-4 h-4" /> Não foi possível reenviar. Tente novamente
+                      </>
+                    )}
+                    {resendState === 'idle' && (
+                      <>
+                        <RefreshCw className="w-4 h-4" />
+                        {cooldown > 0 ? `Reenviar em ${cooldown}s` : 'Reenviar link de confirmação'}
+                      </>
+                    )}
+                  </button>
+
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    {[
+                      { label: 'Gmail', url: 'https://mail.google.com/' },
+                      { label: 'Outlook', url: 'https://outlook.live.com/mail/0/' },
+                      { label: 'Yahoo', url: 'https://mail.yahoo.com/' },
+                    ].map((provider) => (
+                      <a
+                        key={provider.label}
+                        href={provider.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 px-3 py-2 min-h-[40px] bg-slate-50 border border-slate-100 hover:border-blue-500/30 hover:text-blue-700 rounded-lg text-[10px] font-black text-slate-500 uppercase tracking-wide transition-all duration-200"
+                      >
+                        {provider.label} <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -985,6 +1136,16 @@ export function AuthScreen() {
                         </button>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Aviso: ativação por e-mail é obrigatória */}
+                  <div className="flex items-start gap-2.5 p-3 bg-amber-50/80 border border-amber-100 rounded-xl">
+                    <div className="w-6 h-6 rounded-lg bg-amber-500 flex items-center justify-center shrink-0 shadow-sm shadow-amber-500/30">
+                      <Mail className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-amber-700 leading-snug">
+                      Depois de solicitar o acesso, abra o e-mail que você informou e <span className="font-black">clique no link de confirmação</span>. Sem esse clique a conta não é ativada e o login não funciona. Confira também a pasta de SPAM.
+                    </p>
                   </div>
 
                   <button
