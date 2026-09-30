@@ -2,6 +2,7 @@
 @import "tailwindcss";
 
 @theme {
+  --breakpoint-hd: 1920px;
   --color-inverse-on-surface: #eff1f3;
   --color-on-secondary-fixed: #151c27;
   --color-primary-fixed-dim: #b5c7ea;
@@ -295,12 +296,6 @@ body {
 /* Container principal para mobile */
 .main-container {
   min-height: 100vh;
-}
-
-.main-container.sidebar-open {
-}
-
-.main-container.sidebar-closed {
 }
 
 /* Sidebar mobile */

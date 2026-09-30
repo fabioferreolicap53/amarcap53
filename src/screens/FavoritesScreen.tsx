@@ -11,6 +11,7 @@ import { DatePickerPTBR } from '../components/DatePickerPTBR';
 import { MultiSelect } from '../components/MultiSelect';
 import { SingleSelect } from '../components/SingleSelect';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
+import { buildEquipeMatchClause, isSameEquipe } from '../lib/equipeAliases';
 import {
   TIPO_BUSCA_OPTIONS,
   TIPO_CONTATO_OPTIONS,
@@ -492,9 +493,9 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
         if (user.role === 'unidade') {
           regionFilters.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
         } else if (user.role === 'equipe') {
-          regionFilters.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%'), e: normalizeText(user.equipe).replace(/\s+/g, '%') }));
+          regionFilters.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
         } else if (user.role === 'microarea') {
-          regionFilters.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%'), e: normalizeText(user.equipe).replace(/\s+/g, '%') }));
+          regionFilters.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
           regionFilters.push(`microarea = ${Number(user.microarea)}`);
         }
       }
@@ -610,7 +611,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     
     // Regional filters (client-side for display filtering)
     const matchesUnidade = filterUnidade.length === 0 || filterUnidade.some(u => normalizeText(u) === normalizeText(p.unidade));
-    const matchesEquipe = filterEquipe.length === 0 || filterEquipe.some(e => normalizeText(e) === normalizeText(p.equipe));
+    const matchesEquipe = filterEquipe.length === 0 || filterEquipe.some(e => isSameEquipe(e, p.equipe));
     const matchesMicroarea = filterMicroarea.length === 0 || filterMicroarea.includes(String(p.microarea));
 
     // Filtros de acompanhamento (baseados no último registro)

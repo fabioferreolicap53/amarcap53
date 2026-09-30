@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { pb } from '../lib/pocketbase';
 import { Activity, Mail, Lock, Building, Users, MapPin, ArrowRight, ArrowLeft, Eye, EyeOff, Shield, Heart, BadgeCheck, CheckCircle2, Inbox, RefreshCw, ExternalLink, AlertTriangle } from 'lucide-react';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
+import { buildEquipeEqualityClause, isSameEquipe } from '../lib/equipeAliases';
 import { EmailActionPage } from '../components/EmailActionPage';
 
 type AuthState = 'login' | 'register' | 'forgot_password' | 'reset_password' | 'confirm_email_change' | 'post_register';
@@ -172,10 +173,10 @@ export function AuthScreen() {
         } else if (role === 'unidade') {
           pbFilter = `role="unidade" && unidade_saude="${esc(unidade)}"`;
         } else if (role === 'equipe') {
-          pbFilter = `role="equipe" && unidade_saude="${esc(unidade)}" && equipe="${esc(equipe)}"`;
+          pbFilter = `role="equipe" && unidade_saude="${esc(unidade)}" && ` + buildEquipeEqualityClause(equipe);
         } else if (role === 'microarea') {
           const mVal = microarea.trim();
-          pbFilter = `role="microarea" && unidade_saude="${esc(unidade)}" && equipe="${esc(equipe)}" && (microarea="${esc(mVal)}" || microarea=${parseInt(mVal, 10)})`;
+          pbFilter = `role="microarea" && unidade_saude="${esc(unidade)}" && ` + buildEquipeEqualityClause(equipe) + ` && (microarea="${esc(mVal)}" || microarea=${parseInt(mVal, 10)})`;
         }
 
         if (pbFilter) {
@@ -207,7 +208,7 @@ export function AuthScreen() {
           const dup = all.find((r: any) => {
             if (norm(r.unidade_saude) !== norm(unidade)) return false;
             if (role === 'cap') return true;
-            if (norm(r.equipe) !== norm(equipe)) return false;
+            if (!isSameEquipe(r.equipe, equipe)) return false;
             if (role === 'unidade') return true;
             if (role === 'microarea') {
               const dbMicro = norm(r.microarea);

@@ -11,6 +11,7 @@ import { MultiSelect } from '../components/MultiSelect';
 import { SingleSelect } from '../components/SingleSelect';
 import Papa from 'papaparse';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
+import { buildEquipeMatchClause, buildEquipeFilterClause } from '../lib/equipeAliases';
 import {
   TIPO_BUSCA_OPTIONS,
   TIPO_CONTATO_OPTIONS,
@@ -331,9 +332,9 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           if (user.role === 'unidade' && !hasUnidadeFilter) {
             patientRegionFilterParts.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
           } else if (user.role === 'equipe' && !hasUnidadeFilter && !hasEquipeFilter) {
-            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%'), e: normalizeText(user.equipe).replace(/\s+/g, '%') }));
+            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
           } else if (user.role === 'microarea' && !hasUnidadeFilter && !hasEquipeFilter && !hasMicroareaFilter) {
-            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && equipe ~ {:e}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%'), e: normalizeText(user.equipe).replace(/\s+/g, '%') }));
+            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
             patientRegionFilterParts.push(`microarea = ${Number(user.microarea)}`);
           }
         }
@@ -347,12 +348,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           patientRegionFilterParts.push(pb.filter(uClauses.join(' || '), uParams));
         }
         if (filterEquipe.length > 0) {
-          const eParams: Record<string, string> = {};
-          const eClauses = filterEquipe.map((e, i) => {
-            eParams[`e${i}`] = normalizeText(e).replace(/\s+/g, '%');
-            return `equipe ~ {:e${i}}`;
-          });
-          patientRegionFilterParts.push(pb.filter(eClauses.join(' || '), eParams));
+          patientRegionFilterParts.push(buildEquipeFilterClause(filterEquipe));
         }
         if (filterMicroarea.length > 0) {
           patientRegionFilterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);

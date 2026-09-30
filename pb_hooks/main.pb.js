@@ -21,6 +21,46 @@ function escSql(v) {
   return "'" + s + "'";
 }
 
+// Aliases de equipe: perfis usam nome "bonito" e o banco guarda forma
+// abreviada/sem acento. Ex: perfil "PARQUE SÃO PAULO" = banco "SAO PAULO".
+var EQUIPE_ALIASES = {
+  'PARQUE SAO PAULO': ['SAO PAULO']
+};
+
+function normalizeEquipeKey(v) {
+  return String(v || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
+// Todos os nomes equivalentes da equipe (nome original + aliases)
+function getEquipeAliases(equipe) {
+  var key = normalizeEquipeKey(equipe);
+  if (!key) return [];
+  var aliases = EQUIPE_ALIASES[key] || [];
+  var all = [String(equipe || ''), key].concat(aliases);
+  var seen = {};
+  var out = [];
+  for (var i = 0; i < all.length; i++) {
+    var t = normalizeEquipeKey(all[i]);
+    if (!t || seen[t]) continue;
+    seen[t] = true;
+    out.push(all[i]);
+  }
+  return out;
+}
+
+// Cláusula de igualdade com aliases: (equipe = "A" || equipe = "B" || ...)
+function buildEquipeEqualityClause(equipe) {
+  var aliases = getEquipeAliases(equipe);
+  if (aliases.length === 0) return 'equipe = ""';
+  var parts = [];
+  for (var i = 0; i < aliases.length; i++) {
+    parts.push('equipe = "' + String(aliases[i]).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"');
+  }
+  return '(' + parts.join(' || ') + ')';
+}
+
 // ─── HOOKS: USUÁRIOS ÚNICOS ─────────────────────────────
 onRecordCreate(function(e) {
   try {
@@ -35,11 +75,11 @@ onRecordCreate(function(e) {
     
     if (role === 'cap') filter = 'role = "cap"';
     else if (role === 'unidade') filter = 'role = "unidade" && unidade_saude = "' + esc(unidade) + '"';
-    else if (role === 'equipe') filter = 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '"';
+    else if (role === 'equipe') filter = 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && ' + buildEquipeEqualityClause(equipe);
     else if (role === 'microarea') {
       var m = microarea.trim();
-      if (m && m !== '0' && m !== 'N/A') filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "' + esc(m) + '" || microarea = ' + parseInt(m, 10) + ')';
-      else filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "" || microarea = null || microarea = "N/A")';
+      if (m && m !== '0' && m !== 'N/A') filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && ' + buildEquipeEqualityClause(equipe) + ' && (microarea = "' + esc(m) + '" || microarea = ' + parseInt(m, 10) + ')';
+      else filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && ' + buildEquipeEqualityClause(equipe) + ' && (microarea = "" || microarea = null || microarea = "N/A")';
     }
     
     if (filter) {
@@ -66,11 +106,11 @@ onRecordUpdate(function(e) {
     
     if (role === 'cap') filter = 'role = "cap"';
     else if (role === 'unidade') filter = 'role = "unidade" && unidade_saude = "' + esc(unidade) + '"';
-    else if (role === 'equipe') filter = 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '"';
+    else if (role === 'equipe') filter = 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && ' + buildEquipeEqualityClause(equipe);
     else if (role === 'microarea') {
       var m = microarea.trim();
-      if (m && m !== '0' && m !== 'N/A') filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "' + esc(m) + '" || microarea = ' + parseInt(m, 10) + ')';
-      else filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && equipe = "' + esc(equipe) + '" && (microarea = "" || microarea = null || microarea = "N/A")';
+      if (m && m !== '0' && m !== 'N/A') filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && ' + buildEquipeEqualityClause(equipe) + ' && (microarea = "' + esc(m) + '" || microarea = ' + parseInt(m, 10) + ')';
+      else filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && ' + buildEquipeEqualityClause(equipe) + ' && (microarea = "" || microarea = null || microarea = "N/A")';
     }
     
     if (filter) {
