@@ -28,6 +28,14 @@ import { getCanonicalValue } from '../constants/followUpOptions';
 const normalizeText = (str: string) =>
   str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim().replace(/\s+/g, ' ');
 
+// Mensagens que alternam no aviso de carregamento do resumo
+const LOADING_MESSAGES = [
+  'Conectando à central de dados…',
+  'Cruzando cito e DNA-HPV…',
+  'Somando grupos prioritários…',
+  'Organizando o resumo…',
+];
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -999,7 +1007,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
       
       <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 no-scrollbar relative">
         <div className="max-w-[1600px] mx-auto space-y-8 md:space-y-10">
-          
+
           {loadError && !isLoading && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 md:p-5 shadow-sm">
               <div className="flex items-center gap-3 text-center sm:text-left">
@@ -1869,7 +1877,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         </div>
       </div>
 
-      <LoadingOverlay visible={isLoading} message="Carregando resumo..." />
+      {/* Aviso elegante: aguarde o carregamento dos dados */}
+      <LoadingOverlay visible={isLoading} variant="banner" messages={LOADING_MESSAGES} />
       <LoadingOverlay visible={isFilterLoading && !isLoading} variant="card" title="Carregando Dados" message="Aplicando filtros avançados, aguarde um momento..." />
     </div>
   );

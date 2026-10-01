@@ -3,12 +3,14 @@ import React, { useEffect, useState } from 'react';
 interface LoadingOverlayProps {
   visible: boolean;
   message?: string;
-  /** Variante "card" = card dark centralizado (imagem 2). Default = rodapé. */
-  variant?: 'default' | 'card';
+  /** Variante "card" = card dark centralizado (imagem 2). "banner" = faixa flutuante no topo. Default = rodapé. */
+  variant?: 'default' | 'card' | 'banner';
   /** Título principal exibido no variant card */
   title?: string;
   /** Subtítulo exibido no variant card */
   subtitle?: string;
+  /** Mensagens que alternam enquanto carrega (variant banner) */
+  messages?: string[];
 }
 
 export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
@@ -17,14 +19,83 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   variant = 'default',
   title,
   subtitle,
+  messages,
 }) => {
   const [mounted, setMounted] = useState(false);
+  const [msgIdx, setMsgIdx] = useState(0);
+
+  const rotating = messages && messages.length > 0 ? messages : null;
+
   useEffect(() => {
     if (visible) requestAnimationFrame(() => setMounted(true));
     else setMounted(false);
   }, [visible]);
 
+  useEffect(() => {
+    if (!rotating || rotating.length <= 1) return;
+    if (!visible) return;
+    const timer = setInterval(() => setMsgIdx(i => (i + 1) % rotating.length), 2600);
+    return () => clearInterval(timer);
+  }, [visible, rotating]);
+
+  useEffect(() => {
+    if (!visible) setMsgIdx(0);
+  }, [visible]);
+
   if (!visible && !mounted) return null;
+
+  if (variant === 'banner') {
+    const textos = rotating ?? (message ? [message] : []);
+    const texto = textos.length > 0 ? textos[msgIdx % textos.length] : '';
+    return (
+      <div
+        className="fixed bottom-0 left-0 right-0 z-[150] flex justify-center pointer-events-none pb-5 sm:pb-6 px-4"
+        style={{
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? 'translateY(0)' : 'translateY(24px)',
+          transition: 'opacity .5s ease, transform .55s cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+      >
+        <div className="relative overflow-hidden flex items-center gap-3.5 pl-2.5 pr-6 py-2.5 rounded-full bg-white/80 backdrop-blur-xl border border-primary/10 ring-1 ring-white/60 shadow-[0_12px_40px_-14px_rgba(5,25,52,0.5)]">
+          {/* Halo suave */}
+          <span className="absolute -inset-px rounded-full bg-gradient-to-r from-primary/0 via-primary/[0.04] to-primary/0" aria-hidden />
+
+          {/* Spinner duplo */}
+          <span className="relative flex items-center justify-center w-8 h-8 flex-shrink-0">
+            <span className="absolute inset-0 rounded-full bg-primary/5" />
+            <svg className="w-8 h-8" viewBox="0 0 32 32" fill="none">
+              <circle cx="16" cy="16" r="13" stroke="rgba(5,25,52,0.10)" strokeWidth="2.5" />
+              <path
+                d="M16 3a13 13 0 0 1 13 13"
+                stroke="#051934"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                className="animate-spin"
+                style={{ transformOrigin: 'center', animationDuration: '0.85s' }}
+              />
+            </svg>
+            <span className="absolute w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          </span>
+
+          {/* Texto */}
+          <div className="relative flex flex-col justify-center leading-none min-w-[190px]">
+            <span className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Carregando resumo</span>
+            <span key={msgIdx} className="mt-1 text-[11px] font-semibold text-slate-500 animate-fade-in-up whitespace-nowrap">
+              {texto}
+            </span>
+          </div>
+
+          {/* Barra de varredura */}
+          <span className="absolute bottom-0 left-0 h-[2.5px] w-full overflow-hidden rounded-full">
+            <span
+              className="block h-full w-1/2 bg-gradient-to-r from-primary/0 via-primary/70 to-primary/0"
+              style={{ animation: 'loadingScan 1.7s ease-in-out infinite' }}
+            />
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   if (variant === 'card') {
     return (

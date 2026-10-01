@@ -137,6 +137,12 @@
   animation: fadeIn 0.35s ease-out forwards;
 }
 
+/* Barra de varredura do aviso de carregamento */
+@keyframes loadingScan {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(210%); }
+}
+
 body {
   font-family: 'Inter', sans-serif;
   background-color: var(--color-surface);
