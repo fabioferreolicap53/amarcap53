@@ -36,6 +36,36 @@ const LOADING_MESSAGES = [
   'Organizando o resumo…',
 ];
 
+// Descobre os nomes reais do campo `grupo`.
+// Usa groupBy (PocketBase v0.26+, 1 request) em vez de depender de uma amostra
+// de 500 registros — a amostra podia não conter os grupos prioritários e zerar
+// os 4 cartões do Resumo em cargas "azaradas".
+const discoverGroupNames = async (filter?: string): Promise<string[]> => {
+  const names = new Set<string>();
+  const collect = (items: any[]) => items.forEach((r: any) => { if (r.grupo && r.grupo !== '--') names.add(r.grupo); });
+
+  try {
+    const opts: any = { groupBy: 'grupo', fields: 'grupo', skipTotal: true, requestKey: null };
+    if (filter) opts.filter = filter;
+    const res = await pb.collection('amarcap53_pacientes').getList(1, 200, opts);
+    collect(res.items);
+  } catch { /* groupBy indisponível → fallback abaixo */ }
+
+  if (names.size === 0) {
+    // Fallback: amostra multi-página (até 3000 registros)
+    for (let page = 1; page <= 15; page++) {
+      try {
+        const opts: any = { fields: 'grupo', skipTotal: true, requestKey: null };
+        if (filter) opts.filter = filter;
+        const res = await pb.collection('amarcap53_pacientes').getList(page, 200, opts);
+        collect(res.items);
+        if (res.items.length < 200) break;
+      } catch { break; }
+    }
+  }
+  return [...names];
+};
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -394,16 +424,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
     (async () => {
       try {
-        // 1 query leve: descobre nomes reais dos grupos (500 registros, campo reduzido)
-        const groupNames = new Set<string>();
-        try {
-          const sample = await pb.collection('amarcap53_pacientes').getList(1, 500, {
-            filter: bf || undefined, fields: 'grupo', requestKey: null,
-          });
-          sample.items.forEach((r: any) => { if (r.grupo) groupNames.add(r.grupo); });
-        } catch (err: any) {
-          console.warn('[prio] amostra de grupos falhou:', err?.message || err);
-        }
+        // 1 query leve: descobre os nomes REAIS dos grupos (groupBy, sem amostra)
+        const groupNames = new Set<string>(await discoverGroupNames(bf || undefined));
         if (cancelled) return;
 
         // Para cada grupo prioritário, conta filtrado (em paralelo) usando nome REAL
@@ -653,26 +675,23 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           ]);
           if (cancelled) return;
 
-          const groups: Record<string, number> = {};
+          let groups: Record<string, number> = {};
           try {
-            const sample = await pb.collection('amarcap53_pacientes').getList(1, 500, {
-              fields: 'grupo',
-              requestKey: null,
-              filter: baseFilter || undefined,
-            });
-            if (!cancelled) {
-              const uniqueGrupos = [...new Set(sample.items.map((r: any) => r.grupo).filter(Boolean))];
-              const countPromises = uniqueGrupos.map(async (g) => {
-                if (g === '--' || g === 'NÃO INFORMADO') return;
-                const cnt = await safeCount(pb.filter('grupo = {:g}', { g }), `grupo_${g}`);
-                if (cnt > 0 && !cancelled) groups[g] = cnt;
-              });
-              await Promise.all(countPromises);
-              // filteredGroupCounts já setado pela query leve — não sobrescrever
-            }
+            const uniqueGrupos = await discoverGroupNames(baseFilter || undefined);
+            if (cancelled) return;
+            await Promise.all(uniqueGrupos.map(async (g) => {
+              if (g === '--' || g === 'NÃO INFORMADO') return;
+              const cnt = await safeCount(pb.filter('grupo = {:g}', { g }), `grupo_${g}`);
+              if (cnt > 0) groups[g] = cnt;
+            }));
           } catch (err) {
             console.warn('[grupo] discover error:', err);
           }
+          if (cancelled) return;
+          // Descoberta vazia (falha sob carga) não pode zerar os cartões:
+          // mantém o último breakdown válido conhecido.
+          if (Object.keys(groups).length === 0) groups = grupoBreakdownRef.current;
+          // filteredGroupCounts já setado pela query leve — não sobrescrever
 
           const withExam = pepMol + coltMol + pepCito + coltCito;
           const atrasadas = Math.max(totalPacientes - withExam, 0);
@@ -1277,7 +1296,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     const pct = totalPct(item.count);
                     const isSelected = selectedPrioIdx === item.prioIdx;
                     const isEmpty = item.gruposDB.length === 0;
-                    const loading = isLoading || isLoadingPrioCounts;
+                    // Breakdown vazio com totais já carregados = grupos ainda não
+                    // resolvidos: mantém o skeleton em vez de exibir zeros falsos.
+                    const breakdownPending = Object.keys(gb).length === 0 && stats.totalPacientes > 0 && !loadError;
+                    const loading = isLoading || isLoadingPrioCounts || breakdownPending;
                     return (
                       <div
                         key={item.prioIdx}
