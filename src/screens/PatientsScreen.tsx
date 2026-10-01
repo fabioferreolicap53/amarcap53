@@ -296,6 +296,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     : null;
 
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [filterVersion, setFilterVersion] = useState(0); // força refetch ao aplicar filtros
   const [currentPage, setCurrentPage] = useState(1);
@@ -452,7 +453,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       
       // Sincroniza com o retorno real do servidor e propaga para AuthContext
       pb.authStore.save(pb.authStore.token, updatedUser);
-      await pb.collection(collectionName).authRefresh();
     } catch (error) {
       console.error("Erro ao sincronizar favoritos:", error);
       
@@ -1072,9 +1072,11 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         if (cancelled) return; // fetch antigo — ignora dados
         setPacientes(pacientesFormatados);
         setTotalItems(resultList.totalItems);
+        setLoadError(false);
         setPatCache({ pacientes: pacientesFormatados, totalItems: resultList.totalItems });
       } catch (error) {
         console.error("Erro ao buscar pacientes:", error);
+        if (!cancelled && fetchVersionRef.current === version) setLoadError(true);
       } finally {
         setIsFilterLoading(false);
         setSortLoading(false);
@@ -1979,10 +1981,30 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                   {pacientes.length === 0 ? (
                     <tr>
                       <td colSpan={isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea' ? 10 : 9} className="px-6 py-20 text-center">
-                        <div className="flex flex-col items-center opacity-30">
-                          <SearchX className="w-16 h-16 mb-4" />
-                          <p className="text-sm font-black uppercase tracking-widest">Nenhum registro encontrado</p>
-                        </div>
+                        {isLoading ? (
+                          <div className="flex flex-col items-center gap-4">
+                            <div className="w-10 h-10 border-3 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
+                            <p className="text-sm font-black uppercase tracking-widest text-slate-500">Carregando pacientes...</p>
+                            <p className="text-xs font-medium text-slate-400 -mt-2">Buscando os registros, aguarde um momento.</p>
+                          </div>
+                        ) : loadError ? (
+                          <div className="flex flex-col items-center gap-3">
+                            <AlertTriangle className="w-14 h-14 text-amber-400" />
+                            <p className="text-sm font-black uppercase tracking-widest text-slate-600">Não foi possível carregar os dados</p>
+                            <p className="text-xs font-medium text-slate-400">Verifique sua conexão e tente novamente.</p>
+                            <button
+                              onClick={() => setFilterVersion(v => v + 1)}
+                              className="mt-1 px-5 py-2.5 rounded-xl bg-[#001b3d] text-white text-[11px] font-black uppercase tracking-widest hover:bg-[#002b5c] transition-all"
+                            >
+                              Tentar novamente
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center opacity-30">
+                            <SearchX className="w-16 h-16 mb-4" />
+                            <p className="text-sm font-black uppercase tracking-widest">Nenhum registro encontrado</p>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ) : (

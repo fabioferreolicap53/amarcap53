@@ -37,34 +37,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let disposed = false;
     let safetyTimer: ReturnType<typeof setTimeout>;
 
+    const finishLoading = () => {
+      if (!disposed) setIsLoading(false);
+    };
+
+    let unsubscribe: (() => void) | undefined;
+
     try {
-      const unsubscribe = pb.authStore.onChange((token, model) => {
+      unsubscribe = pb.authStore.onChange((token, model) => {
         if (disposed) return;
         const userModel = model as UserRecord;
         setUser(userModel);
         setIsAdmin(userModel?.role === 'admin' || userModel?.role === 'cap');
       });
-
-      setIsLoading(false);
-
-      return () => {
-        disposed = true;
-        clearTimeout(safetyTimer);
-        unsubscribe();
-      };
     } catch (err) {
       console.error('[Auth] Erro ao inicializar authStore:', err);
-      setIsLoading(false);
+      finishLoading();
     }
 
-    // Safety: força isLoading=false após 4s mesmo se algo falhar
-    safetyTimer = setTimeout(() => {
-      if (!disposed) setIsLoading(false);
-    }, 4000);
+    // Valida a sessão guardada ANTES de liberar as telas. Um token expirado
+    // fazia as telas montarem e exibirem dados vazios ("sistema zerado").
+    const bootstrap = async () => {
+      try {
+        if (!pb.authStore.token) return;
+
+        if (!pb.authStore.isValid) {
+          // Token expirado no cliente — força novo login
+          pb.authStore.clear();
+          return;
+        }
+
+        // Token válido: renova em background (também valida no servidor)
+        const collectionName =
+          (pb.authStore.model as UserRecord & { collectionName?: string })?.collectionName ||
+          'amarcap53_users';
+        await pb.collection(collectionName).authRefresh({ requestKey: null });
+      } catch (err: any) {
+        const status = err?.status;
+        // 400/401/403 = sessão recusada pelo servidor → derruba o login.
+        // Erro de rede: mantém a sessão em cache e deixa os fetches tentarem de novo.
+        if (status === 400 || status === 401 || status === 403) {
+          pb.authStore.clear();
+        }
+      } finally {
+        finishLoading();
+      }
+    };
+
+    bootstrap();
+
+    // Rede de segurança: nunca deixa o app preso no spinner
+    safetyTimer = setTimeout(finishLoading, 10000);
 
     return () => {
       disposed = true;
       clearTimeout(safetyTimer);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

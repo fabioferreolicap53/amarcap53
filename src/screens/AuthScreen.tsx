@@ -109,8 +109,11 @@ export function AuthScreen() {
         return;
       }
     } catch (err: any) {
-      console.error(err);
-      setError('Credenciais inválidas. Verifique se o e-mail e a senha estão corretos.');
+      // O PocketBase responde 400 genérico ("Failed to authenticate.") tanto para
+      // credenciais erradas quanto para e-mail ainda não confirmado (o hook
+      // onRecordAuthRequest no servidor bloqueia o login nesse caso).
+      console.warn('[login] Falha na autenticação:', err?.status, err?.message || err);
+      setError('Não foi possível entrar. Verifique o e-mail e a senha. Se você acabou de se cadastrar, confirme o e-mail pelo link enviado antes de fazer login.');
     } finally {
       submittingRef.current = false;
       setIsLoading(false);

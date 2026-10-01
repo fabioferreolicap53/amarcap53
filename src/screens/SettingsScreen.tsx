@@ -188,9 +188,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         name: userName
       });
       
-      // Atualiza o estado global do AuthContext forçando um refresh da sessão
-      await pb.collection('amarcap53_users').authRefresh();
-      
+      // Propaga localmente para o AuthContext (dispara o onChange do authStore).
+      // Evita authRefresh(), que falha com 400 para contas não verificadas.
+      pb.authStore.save(pb.authStore.token, updatedRecord);
+
       // O useEffect do SettingsScreen sincronizará o userName automaticamente
       setIsEditingName(false);
       alert('Nome atualizado com sucesso!');

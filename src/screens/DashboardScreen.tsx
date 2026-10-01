@@ -135,6 +135,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   const [filteredGroupCounts, setFilteredGroupCounts] = useState<Record<string, number>>({});
   const [filteredGroupCountsIndep, setFilteredGroupCountsIndep] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [acompStats, setAcompStats] = useState(_acOld?.acompStats ?? {
     total: 0,
@@ -279,8 +281,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         const pacIdsComBusca = [...pacIdsNoPeriodo];
 
         // 4. Buscar esses pacientes em batch para verificar grupo + cito
+        // batchSize baixo: filtro OR de ids longos estoura o limite da URL (400)
         const pacMap = new Map<string, any>();
-        const batchSize = 200;
+        const batchSize = 50;
         for (let i = 0; i < pacIdsComBusca.length && !cancelled; i += batchSize) {
           const chunk = pacIdsComBusca.slice(i, i + batchSize);
           const idFilter = `(${chunk.map(id => `id = "${id}"`).join(' || ')})`;
@@ -338,6 +341,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
+    setIsLoadingPrioCounts(true);
 
     // Filtro base por role (mesmo lógico do fetchStats)
     const fp: string[] = [];
@@ -346,9 +350,31 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
       else if (user.role === 'equipe') fp.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
       else if (user.role === 'microarea') {
         fp.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-        fp.push(`microarea = ${Number(user.microarea)}`);
+        const ma = Number(user.microarea);
+        if (Number.isFinite(ma)) fp.push(`microarea = ${ma}`);
       }
     }
+
+    // Filtros de UI aplicados (respeita as filtragens existentes)
+    if (debouncedFilterUnidade.length > 0) {
+      const uParams: Record<string, string> = {};
+      const uClauses = debouncedFilterUnidade.map((u, i) => {
+        uParams[`u${i}`] = normalizeText(u).replace(/\s+/g, '%');
+        return `unidade ~ {:u${i}}`;
+      });
+      fp.push(pb.filter(uClauses.join(' || '), uParams));
+    }
+    if (debouncedFilterEquipe.length > 0) {
+      fp.push(buildEquipeFilterClause(debouncedFilterEquipe));
+    }
+    if (debouncedFilterMicroarea.length > 0) {
+      const maClauses = debouncedFilterMicroarea
+        .map(m => Number(m))
+        .filter(n => Number.isFinite(n))
+        .map(n => `microarea = ${n}`);
+      if (maClauses.length > 0) fp.push(`(${maClauses.join(' || ')})`);
+    }
+
     const bf = fp.length > 0 ? fp.join(' && ') : '';
 
     const prio = [
@@ -359,45 +385,53 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     ];
 
     (async () => {
-      // 1 query leve: descobre nomes reais dos grupos (500 registros, campo reduzido)
-      const groupNames = new Set<string>();
       try {
-        const sample = await pb.collection('amarcap53_pacientes').getList(1, 500, {
-          filter: bf || undefined, fields: 'grupo', requestKey: null,
-        });
-        sample.items.forEach((r: any) => { if (r.grupo) groupNames.add(r.grupo); });
-      } catch { return; }
-      if (cancelled) return;
+        // 1 query leve: descobre nomes reais dos grupos (500 registros, campo reduzido)
+        const groupNames = new Set<string>();
+        try {
+          const sample = await pb.collection('amarcap53_pacientes').getList(1, 500, {
+            filter: bf || undefined, fields: 'grupo', requestKey: null,
+          });
+          sample.items.forEach((r: any) => { if (r.grupo) groupNames.add(r.grupo); });
+        } catch (err: any) {
+          console.warn('[prio] amostra de grupos falhou:', err?.message || err);
+        }
+        if (cancelled) return;
 
-      // Para cada grupo prioritário, conta filtrado (em paralelo) usando nome REAL
-      const counts: Record<string, number> = {};
-      const countsIndep: Record<string, number> = {};
-      await Promise.all([...groupNames].map(async (g) => {
-        const matchedPrio = prio.find(p => new RegExp(p.g.replace('-', '.*'), 'i').test(g));
-        if (!matchedPrio) return;
-        try {
-          const fF = bf ? `${bf} && grupo = "${g}" && ${matchedPrio.cf}` : `grupo = "${g}" && ${matchedPrio.cf}`;
-          const rF = await pb.collection('amarcap53_pacientes').getList(1, 1, { filter: fF, fields: 'id', requestKey: null });
-          counts[g] = rF.totalItems;
-        } catch { /* ignora */ }
-        // 3º card: "independente" — DNA não feito (sem DNA mas com cito registrado)
-        try {
-          const fI = bf
-            ? `${bf} && grupo = "${g}" && dna_hpv_pep = '' && dna_hpv_gal = ''`
-            : `grupo = "${g}" && dna_hpv_pep = '' && dna_hpv_gal = ''`;
-          const rI = await pb.collection('amarcap53_pacientes').getList(1, 1, { filter: fI, fields: 'id', requestKey: null });
-          countsIndep[g] = rI.totalItems;
-        } catch { /* ignora */ }
-      }));
-      if (!cancelled) {
-        if (Object.keys(counts).length > 0) setFilteredGroupCounts(counts);
-        if (Object.keys(countsIndep).length > 0) setFilteredGroupCountsIndep(countsIndep);
-        setIsLoadingPrioCounts(false);
+        // Para cada grupo prioritário, conta filtrado (em paralelo) usando nome REAL
+        const counts: Record<string, number> = {};
+        const countsIndep: Record<string, number> = {};
+        await Promise.all([...groupNames].map(async (g) => {
+          const matchedPrio = prio.find(p => new RegExp(p.g.replace('-', '.*'), 'i').test(g));
+          if (!matchedPrio) return;
+          try {
+            const fF = (bf ? `${bf} && ` : '') + pb.filter('grupo = {:g} && ' + matchedPrio.cf, { g });
+            const rF = await pb.collection('amarcap53_pacientes').getList(1, 1, { filter: fF, fields: 'id', requestKey: null });
+            counts[g] = rF.totalItems;
+          } catch (err: any) {
+            console.warn('[prio] contagem falhou:', g, err?.message || err);
+          }
+          // 3º card: "independente" — DNA não feito (sem DNA mas com cito registrado)
+          try {
+            const fI = (bf ? `${bf} && ` : '') + pb.filter("grupo = {:g} && dna_hpv_pep = '' && dna_hpv_gal = ''", { g });
+            const rI = await pb.collection('amarcap53_pacientes').getList(1, 1, { filter: fI, fields: 'id', requestKey: null });
+            countsIndep[g] = rI.totalItems;
+          } catch (err: any) {
+            console.warn('[prio] contagem independente falhou:', g, err?.message || err);
+          }
+        }));
+        if (!cancelled) {
+          if (Object.keys(counts).length > 0) setFilteredGroupCounts(counts);
+          if (Object.keys(countsIndep).length > 0) setFilteredGroupCountsIndep(countsIndep);
+        }
+      } finally {
+        // Nunca deixar o skeleton travado: sempre libera o estado de carregamento
+        if (!cancelled) setIsLoadingPrioCounts(false);
       }
     })();
 
     return () => { cancelled = true; };
-  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin]);
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, debouncedFilterUnidade, debouncedFilterEquipe, debouncedFilterMicroarea]);
 
   const toValidDate = (value: any) => {
     if (!hasValue(value)) return null;
@@ -429,6 +463,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     const fetchStats = async () => {
       if (!user) return;
       try {
+        setLoadError(false);
         const patientFilterParts: string[] = [];
 
         // Base filters from user role (normalize accents: DB stores unaccented)
@@ -439,7 +474,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             patientFilterParts.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
           } else if (user.role === 'microarea') {
             patientFilterParts.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-            patientFilterParts.push(`microarea = ${Number(user.microarea)}`);
+            const ma = Number(user.microarea);
+            if (Number.isFinite(ma)) patientFilterParts.push(`microarea = ${ma}`);
           }
         }
 
@@ -456,7 +492,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           patientFilterParts.push(buildEquipeFilterClause(filterEquipe));
         }
         if (filterMicroarea.length > 0) {
-          patientFilterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
+          const maClauses = filterMicroarea
+            .map(m => Number(m))
+            .filter(n => Number.isFinite(n))
+            .map(n => `microarea = ${n}`);
+          if (maClauses.length > 0) patientFilterParts.push(`(${maClauses.join(' || ')})`);
         }
 
         // Build filter strings
@@ -613,7 +653,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               const uniqueGrupos = [...new Set(sample.items.map((r: any) => r.grupo).filter(Boolean))];
               const countPromises = uniqueGrupos.map(async (g) => {
                 if (g === '--' || g === 'NÃO INFORMADO') return;
-                const cnt = await safeCount(`grupo = "${g}"`, `grupo_${g}`);
+                const cnt = await safeCount(pb.filter('grupo = {:g}', { g }), `grupo_${g}`);
                 if (cnt > 0 && !cancelled) groups[g] = cnt;
               });
               await Promise.all(countPromises);
@@ -709,7 +749,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               const comBuscaAlerts: Record<string, number> = {};
               const filteredComBusca: Record<string, number> = {};
               const filteredComBuscaIndep: Record<string, number> = {};
-              const batchSize = 200;
+              // batchSize baixo: filtro OR de ids longos estoura o limite da URL (400)
+              const batchSize = 50;
               for (let i = 0; i < comBuscaPacIds.length && !cancelled; i += batchSize) {
                 const chunkIds = comBuscaPacIds.slice(i, i + batchSize);
                 const idFilter = `(${chunkIds.map(id => `id = "${id}"`).join(' || ')})`;
@@ -934,6 +975,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
       } catch (error: any) {
         if (error?.isAbort) return;
         console.error('Erro ao buscar estatísticas:', error);
+        if (!cancelled) setLoadError(true);
       } finally {
         setIsFilterLoading(false);
         if (!cancelled) {
@@ -944,7 +986,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
 
     fetchStats();
     return () => { cancelled = true; };
-  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, debouncedFilterDataInicio, debouncedFilterDataFim, debouncedFilterUnidade, debouncedFilterEquipe, debouncedFilterMicroarea]);
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, debouncedFilterDataInicio, debouncedFilterDataFim, debouncedFilterUnidade, debouncedFilterEquipe, debouncedFilterMicroarea, reloadKey]);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-surface">
@@ -958,6 +1000,24 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
       <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 no-scrollbar relative">
         <div className="max-w-[1600px] mx-auto space-y-8 md:space-y-10">
           
+          {loadError && !isLoading && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 md:p-5 shadow-sm">
+              <div className="flex items-center gap-3 text-center sm:text-left">
+                <AlertTriangle className="w-6 h-6 text-amber-500 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-black text-amber-800 uppercase tracking-wide">Não foi possível carregar os dados</p>
+                  <p className="text-xs font-medium text-amber-700">Verifique sua conexão e tente novamente. Os números abaixo podem estar incompletos.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setLoadError(false); setIsLoading(true); setReloadKey(k => k + 1); }}
+                className="flex-shrink-0 px-6 py-3 bg-amber-500 text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600 transition-all shadow-md"
+              >
+                Tentar novamente
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-col gap-6 mb-8 items-center lg:items-stretch justify-center">
             {/* Card Principal de Boas-vindas */}
             <div className="w-full bg-gradient-to-br from-[#001b3d] to-[#002b5c] p-4 md:p-10 rounded-2xl md:rounded-[2.5rem] text-white relative overflow-hidden group shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 md:gap-10 text-center md:text-left">
@@ -1132,8 +1192,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             ];
             const gb = Object.keys(grupoBreakdownRef.current).length > 0 ? grupoBreakdownRef.current : stats.grupoBreakdown;
             if (!gb || Object.keys(gb).length === 0) {
-              if (!isLoading) return null;
-              // Loading: mostra 4 cartões reais com skeleton apenas nos números
+              // Nunca esconde a seção: mostra sempre os 4 cartões prioritários
+              // (skeleton enquanto carrega, zeros se a filtragem não retornar grupos)
               return (
                 <div className="mb-8 md:mb-12">
                   <div className="text-center mb-8">
@@ -1157,8 +1217,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                               </div>
                             </div>
                             <div className="text-right">
-                              <span className="skeleton-scan inline-block h-6 w-16 shadow-sm" />
-                              <span className="skeleton-scan inline-block h-2.5 w-8 mt-0.5 shadow-xs" />
+                              {isLoading || isLoadingPrioCounts ? (
+                                <>
+                                  <span className="skeleton-scan inline-block h-6 w-16 shadow-sm" />
+                                  <span className="skeleton-scan inline-block h-2.5 w-8 mt-0.5 shadow-xs" />
+                                </>
+                              ) : (
+                                <>
+                                  <span className={`block text-lg md:text-xl font-black ${c.text} leading-none tabular-nums animate-fade-in`}>0</span>
+                                  <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5 animate-fade-in">0%</span>
+                                </>
+                              )}
                             </div>
                           </div>
                           <h3 className={`text-sm md:text-base font-black ${c.text} uppercase tracking-wide leading-snug`}>{c.titulo}</h3>

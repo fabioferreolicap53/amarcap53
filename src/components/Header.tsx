@@ -161,7 +161,7 @@ export const Header: React.FC<HeaderProps> = ({
               <Globe className="w-4 h-4 text-cyan-300 shrink-0 group-hover:rotate-12 group-hover:scale-110 transition-transform duration-300" />
 
               <span className="text-[10px] lg:text-xs xl:text-sm font-black uppercase tracking-wide text-white whitespace-nowrap">
-                <span className="hd:hidden">Análise Glob.</span>
+                <span className="hd:hidden">Global</span>
                 <span className="hidden hd:inline">Análise Global</span>
               </span>
 

@@ -270,6 +270,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
   const _favInit = getFavCache();
   const [pacientes, setPacientes] = useState<Paciente[]>(_favInit ?? []);
   const [isLoading, setIsLoading] = useState(!_favInit);
+  const [loadError, setLoadError] = useState(false);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [sortField, setSortField] = useState<string>('nome');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -353,7 +354,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
 
   useEffect(() => {
     fetchFavorites(true);
-  }, [favorites]);
+  }, [favorites, user?.id]);
 
   useEffect(() => {
     const handleCitoUpdate = (event: Event) => {
@@ -407,7 +408,6 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       
       // Sincroniza e propaga para AuthContext
       pb.authStore.save(pb.authStore.token, updatedUser);
-      await pb.collection(collectionName).authRefresh();
     } catch (error) {
       console.error("Erro ao sincronizar favoritos:", error);
       
@@ -480,8 +480,13 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
   };
 
   const fetchFavorites = async (silent = false) => {
-    if (!user || favorites.length === 0) {
+    // Sessão ainda não pronta: mantém o loading (nunca zera a tela). O efeito
+    // volta a rodar quando o usuário do AuthContext chegar.
+    if (!user?.id) return;
+
+    if (favorites.length === 0) {
       setPacientes([]);
+      setLoadError(false);
       setIsLoading(false);
       return;
     }
@@ -591,6 +596,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
 
       setPacientes(formatados);
       setFavCache(formatados);
+      setLoadError(false);
       
       // Coleta grupos únicos dos favoritos
       const groups = Array.from(new Set(formatados.map(p => p.grupo))).filter(g => g && g !== '--');
@@ -598,6 +604,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
 
     } catch (error) {
       console.error("Erro ao buscar favoritos:", error);
+      setLoadError(true);
     } finally {
       setIsLoading(false);
       setIsFilterLoading(false);
@@ -1193,7 +1200,23 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
           </div>
 
           {isLoading ? (
-            <div className="relative bg-surface-container-lowest rounded-2xl overflow-hidden shadow-[0px_20px_50px_rgba(0,0,0,0.06)] border border-outline-variant/15 min-h-[200px]">
+            <div className="relative bg-surface-container-lowest rounded-2xl overflow-hidden shadow-[0px_20px_50px_rgba(0,0,0,0.06)] border border-outline-variant/15 min-h-[200px] flex flex-col items-center justify-center gap-3">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              <p className="text-sm font-bold text-on-surface-variant uppercase tracking-widest">Carregando favoritos...</p>
+            </div>
+          ) : loadError ? (
+            <div className="bg-white rounded-[2rem] p-20 text-center shadow-xl border border-primary/5">
+              <AlertTriangle className="w-20 h-20 text-amber-400 mx-auto mb-6" />
+              <h3 className="text-xl font-black text-primary uppercase mb-2">Não foi possível carregar os dados</h3>
+              <p className="text-on-surface-variant font-medium max-w-md mx-auto">
+                Houve uma falha ao buscar seus favoritos. Verifique sua conexão e tente novamente.
+              </p>
+              <button
+                onClick={() => { setLoadError(false); setIsLoading(true); fetchFavorites(false); }}
+                className="mt-8 px-8 py-4 bg-primary text-white font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-primary/20"
+              >
+                Tentar novamente
+              </button>
             </div>
           ) : filteredPacientes.length === 0 ? (
             <div className="bg-white rounded-[2rem] p-20 text-center shadow-xl border border-primary/5">
