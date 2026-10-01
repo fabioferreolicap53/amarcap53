@@ -472,6 +472,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
       if (!user) return;
       try {
         setLoadError(false);
+        // Marca carregamento a cada (re)carga (inclusive troca de filtros) para
+        // não exibir cartões com dados parciais/zerados no meio da atualização
+        setIsLoading(true);
         const patientFilterParts: string[] = [];
 
         // Base filters from user role (normalize accents: DB stores unaccented)
@@ -1199,57 +1202,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
               { num: '4º', titulo: 'Mulheres de 25 a 29 anos', desc: 'que nunca fizeram o rastreamento com o exame citopatológico e, também, ainda não realizaram o teste de DNA-HPV', pattern: /25.*29|29.*25/i, color: 'brown', gradient: 'from-[#92400e] to-[#b45309]', bg: 'bg-[#faf7f2]', border: 'border-[#e9e0d2]', text: 'text-[#78350f]', ring: 'ring-[#92400e]/30', glow: 'shadow-[#92400e]/25', hoverGlow: 'hover:shadow-[#92400e]/40', hoverBorder: 'hover:border-[#92400e]', numBg: 'bg-[#92400e]', numText: 'text-white', iconColor: 'text-[#92400e]' },
             ];
             const gb = Object.keys(grupoBreakdownRef.current).length > 0 ? grupoBreakdownRef.current : stats.grupoBreakdown;
-            if (!gb || Object.keys(gb).length === 0) {
-              // Nunca esconde a seção: mostra sempre os 4 cartões prioritários
-              // (skeleton enquanto carrega, zeros se a filtragem não retornar grupos)
-              return (
-                <div className="mb-8 md:mb-12">
-                  <div className="text-center mb-8">
-                    <h2 className="text-xs md:text-sm font-black text-primary/40 uppercase tracking-[0.25em]">Selecione o Grupo Prioritário</h2>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-                    {PRIORITY_GROUPS.slice(0, 4).map((c, i) => (
-                      <div key={i} className={`group relative bg-white rounded-2xl border-2 ${c.border} shadow-lg ${c.glow}`}>
-                        <div className={`h-1 w-full bg-gradient-to-r ${c.gradient} opacity-70`} />
-                        <div className="p-5 md:p-6 flex flex-col gap-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="flex flex-col items-center gap-0.5">
-                                <span className={`inline-flex items-center justify-center w-9 h-9 rounded-xl ${c.numBg} ${c.numText} text-xs font-black shadow-md ring-2 ${c.ring}`}>
-                                  {c.num}
-                                </span>
-                                <span className={`text-[7px] font-black ${c.text} uppercase tracking-widest leading-none opacity-60`}>Grupo</span>
-                              </div>
-                              <div className={`w-7 h-7 rounded-lg ${c.bg} flex items-center justify-center ring-1 ${c.ring}`}>
-                                <Users className={`w-4 h-4 ${c.iconColor}`} />
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              {isLoading || isLoadingPrioCounts ? (
-                                <>
-                                  <span className="skeleton-scan inline-block h-6 w-16 shadow-sm" />
-                                  <span className="skeleton-scan inline-block h-2.5 w-8 mt-0.5 shadow-xs" />
-                                </>
-                              ) : (
-                                <>
-                                  <span className={`block text-lg md:text-xl font-black ${c.text} leading-none tabular-nums animate-fade-in`}>0</span>
-                                  <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5 animate-fade-in">0%</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <h3 className={`text-sm md:text-base font-black ${c.text} uppercase tracking-wide leading-snug`}>{c.titulo}</h3>
-                          <p className="text-[10px] md:text-[11px] font-medium text-slate-500 leading-relaxed">{c.desc}</p>
-                          <div className="mt-1 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                            <div className={`h-full bg-gradient-to-r ${c.gradient} rounded-full w-0 transition-all duration-700`} />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
+            // Fonte dos grupos: ref (mais recente) ou estado. Nunca sai antes de
+            // renderizar: os 4 cartões prioritários são sempre exibidos abaixo.
             const EXTRA_COLORS = ['indigo', 'slate', 'cyan', 'amber', 'teal', 'pink', 'rose', 'orange'];
             const extraColorMap: Record<string, { gradient: string; bg: string; border: string; text: string; ring: string; glow: string; hoverGlow: string; hoverBorder: string; numBg: string; numText: string; iconColor: string }> = {
               indigo: { gradient: 'from-indigo-600 to-indigo-400', bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700', ring: 'ring-indigo-400/30', glow: 'shadow-indigo-500/25', hoverGlow: 'hover:shadow-indigo-500/40', hoverBorder: 'hover:border-indigo-400', numBg: 'bg-indigo-600', numText: 'text-white', iconColor: 'text-indigo-500' },
@@ -1270,32 +1224,31 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
             const matched: { count: number; titulo: string; desc: string; num: string; priority: typeof PRIORITY_GROUPS[0]; prioIdx: number; gruposDB: string[] }[] = [];
             
             PRIORITY_GROUPS.forEach((pg, prioIdx) => {
+              const isIndependente = 'reuseFrom' in pg && typeof (pg as any).reuseFrom === 'number';
               let gruposDB: string[];
-              if ('reuseFrom' in pg && typeof (pg as any).reuseFrom === 'number') {
+              if (isIndependente) {
                 gruposDB = matched[(pg as any).reuseFrom]?.gruposDB ?? [];
               } else {
                 gruposDB = allGroups.filter(g => pg.pattern.test(g.grupo)).map(g => g.grupo);
               }
 
-              if (gruposDB.length > 0) {
-                const isIndependente = 'reuseFrom' in pg && typeof (pg as any).reuseFrom === 'number';
-                const totalCount = gruposDB.reduce((acc, gName) => {
-                  const grpObj = allGroups.find(g => g.grupo === gName);
-                  if (!grpObj) return acc;
-                  const baseCount = filteredGroupCounts?.[gName] ?? grpObj.count;
-                  return acc + (isIndependente ? (filteredGroupCountsIndep?.[gName] ?? baseCount) : baseCount);
-                }, 0);
+              // Sempre gera o cartão (mesmo sem grupo correspondente) para a seção
+              // nunca oscilar: os 4 prioritários aparecem fixos, com 0 se vazio.
+              const totalCount = gruposDB.reduce((acc, gName) => {
+                const grpObj = allGroups.find(g => g.grupo === gName);
+                const baseCount = filteredGroupCounts?.[gName] ?? grpObj?.count ?? 0;
+                return acc + (isIndependente ? (filteredGroupCountsIndep?.[gName] ?? baseCount) : baseCount);
+              }, 0);
 
-                matched.push({
-                  count: totalCount,
-                  titulo: pg.titulo,
-                  desc: pg.desc,
-                  num: pg.num,
-                  priority: pg,
-                  prioIdx,
-                  gruposDB
-                });
-              }
+              matched.push({
+                count: totalCount,
+                titulo: pg.titulo,
+                desc: pg.desc,
+                num: pg.num,
+                priority: pg,
+                prioIdx,
+                gruposDB
+              });
             });
 
             // Grupos que não bateram em nenhum card de prioridade (exclui grupos de idade acima de 64)
@@ -1323,11 +1276,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                     const c = item.priority;
                     const pct = totalPct(item.count);
                     const isSelected = selectedPrioIdx === item.prioIdx;
+                    const isEmpty = item.gruposDB.length === 0;
+                    const loading = isLoading || isLoadingPrioCounts;
                     return (
                       <div
                         key={item.prioIdx}
-                        onClick={() => handleGrupoClick(item.prioIdx, item.gruposDB, 'reuseFrom' in (item.priority as any) && typeof (item.priority as any).reuseFrom === 'number')}
-                        className={`group relative bg-white rounded-2xl border-2 ${isSelected ? `${c.border} ring-4 ${c.ring} shadow-xl` : `${c.border} ${c.hoverBorder} shadow-lg ${c.glow} ${c.hoverGlow}`} hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 transition-all duration-500 cursor-pointer ${isSelected ? '' : 'overflow-hidden'}`}
+                        onClick={() => { if (!isEmpty) handleGrupoClick(item.prioIdx, item.gruposDB, 'reuseFrom' in (item.priority as any) && typeof (item.priority as any).reuseFrom === 'number'); }}
+                        className={`group relative bg-white rounded-2xl border-2 ${isSelected ? `${c.border} ring-4 ${c.ring} shadow-xl` : `${c.border} shadow-lg ${c.glow}`} transition-all duration-500 ${isEmpty ? 'cursor-default opacity-80' : `cursor-pointer ${c.hoverBorder} ${c.hoverGlow} hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1`} ${isSelected ? '' : 'overflow-hidden'}`}
                       >
                         <div className={`h-1 w-full bg-gradient-to-r ${c.gradient} ${isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'} transition-opacity`} />
                         <div className="p-5 md:p-6 flex flex-col gap-3">
@@ -1344,12 +1299,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                               </div>
                             </div>
                             <div className="text-right">
-                              {isLoadingPrioCounts ? (
+                              {loading ? (
                                 <span className="skeleton-scan inline-block h-6 w-16 shadow-sm" />
                               ) : (
                                 <span className="text-lg md:text-xl font-black text-slate-800 tabular-nums animate-fade-in">{item.count.toLocaleString('pt-BR')}</span>
                               )}
-                              {isLoadingPrioCounts ? (
+                              {loading ? (
                                 <span className="skeleton-scan inline-block h-2.5 w-8 mt-0.5 shadow-xs" />
                               ) : (
                                 <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest animate-fade-in">{pct}%</span>
@@ -1357,8 +1312,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
                             </div>
                           </div>
                           <h3
-                            onClick={(e) => { e.stopPropagation(); handleGrupoClick(item.prioIdx, item.gruposDB, 'reuseFrom' in (item.priority as any) && typeof (item.priority as any).reuseFrom === 'number'); }}
-                            className={`text-sm md:text-base font-black ${c.text} uppercase tracking-wide leading-snug cursor-pointer`}
+                            onClick={(e) => { e.stopPropagation(); if (!isEmpty) handleGrupoClick(item.prioIdx, item.gruposDB, 'reuseFrom' in (item.priority as any) && typeof (item.priority as any).reuseFrom === 'number'); }}
+                            className={`text-sm md:text-base font-black ${c.text} uppercase tracking-wide leading-snug ${isEmpty ? '' : 'cursor-pointer'}`}
                           >{c.titulo}</h3>
                           <p className="text-[10px] md:text-[11px] font-medium text-slate-500 leading-relaxed">{c.desc}</p>
                           <div className="mt-1 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
