@@ -527,42 +527,42 @@ export function AuthScreen() {
                   </div>
                 </div>
 
-                {/* Checklist visual com passos */}
-                <div className="space-y-2.5 mb-5 sm:mb-6">
-                  <div className="flex items-center gap-3 p-3 bg-emerald-50/80 border border-emerald-100 rounded-xl animate-[fadeSlideIn_0.4s_ease-out_0.15s_both]">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center shrink-0 shadow-sm shadow-emerald-500/30">
-                      <CheckCircle2 className="w-4 h-4 text-white" />
+                {/* Checklist visual com passos — grid 2x2 compacto */}
+                <div className="grid grid-cols-2 gap-2 mb-3 sm:mb-4">
+                  <div className="flex items-center gap-2 p-2 bg-emerald-50/80 border border-emerald-100 rounded-lg animate-[fadeSlideIn_0.4s_ease-out_0.15s_both]">
+                    <div className="w-5 h-5 rounded-md bg-emerald-500 flex items-center justify-center shrink-0 shadow-sm shadow-emerald-500/30">
+                      <CheckCircle2 className="w-3 h-3 text-white" />
                     </div>
-                    <p className="text-[11px] sm:text-xs font-bold text-emerald-700">Conta criada com sucesso</p>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-emerald-700 leading-tight">Conta criada</p>
                   </div>
 
-                  <div className="flex items-center gap-3 p-3 bg-blue-50/80 border border-blue-100 rounded-xl animate-[fadeSlideIn_0.4s_ease-out_0.3s_both]">
-                    <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/30">
-                      <Inbox className="w-4 h-4 text-white" />
+                  <div className="flex items-center gap-2 p-2 bg-blue-50/80 border border-blue-100 rounded-lg animate-[fadeSlideIn_0.4s_ease-out_0.3s_both]">
+                    <div className="w-5 h-5 rounded-md bg-blue-500 flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/30">
+                      <Inbox className="w-3 h-3 text-white" />
                     </div>
-                    <p className="text-[11px] sm:text-xs font-bold text-blue-700">Verifique sua caixa de entrada</p>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-blue-700 leading-tight">Verifique sua caixa de entrada</p>
                   </div>
 
-                  <div className="flex items-center gap-3 p-3 bg-amber-50/80 border border-amber-100 rounded-xl animate-[fadeSlideIn_0.4s_ease-out_0.45s_both]">
-                    <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center shrink-0 shadow-sm shadow-amber-500/30">
-                      <span className="text-white text-[11px] font-black">!</span>
+                  <div className="flex items-center gap-2 p-2 bg-amber-50/80 border border-amber-100 rounded-lg animate-[fadeSlideIn_0.4s_ease-out_0.45s_both]">
+                    <div className="w-5 h-5 rounded-md bg-amber-500 flex items-center justify-center shrink-0 shadow-sm shadow-amber-500/30">
+                      <span className="text-white text-[10px] font-black">!</span>
                     </div>
-                    <p className="text-[11px] sm:text-xs font-bold text-amber-700">Confira também a pasta de SPAM</p>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-amber-700 leading-tight">Confira também a pasta de SPAM</p>
                   </div>
 
-                  <div className="flex items-center gap-3 p-3 bg-slate-50/80 border border-slate-100 rounded-xl animate-[fadeSlideIn_0.4s_ease-out_0.6s_both]">
-                    <div className="w-7 h-7 rounded-lg bg-slate-500 flex items-center justify-center shrink-0 shadow-sm shadow-slate-500/30">
-                      <ArrowRight className="w-4 h-4 text-white" />
+                  <div className="flex items-center gap-2 p-2 bg-slate-50/80 border border-slate-100 rounded-lg animate-[fadeSlideIn_0.4s_ease-out_0.6s_both]">
+                    <div className="w-5 h-5 rounded-md bg-slate-500 flex items-center justify-center shrink-0 shadow-sm shadow-slate-500/30">
+                      <ArrowRight className="w-3 h-3 text-white" />
                     </div>
-                    <p className="text-[11px] sm:text-xs font-bold text-slate-600">Abra o e-mail e clique no link (obrigatório)</p>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-slate-600 leading-tight">Abra o e-mail e clique no link (obrigatório)</p>
                   </div>
                 </div>
 
                 {/* Aviso sobre tempo do link */}
-                <div className="w-full p-3 bg-slate-50/80 backdrop-blur-sm border border-slate-100 rounded-xl flex items-start gap-2.5 mb-5 sm:mb-6 animate-[fadeSlideIn_0.4s_ease-out_0.7s_both]">
-                  <span className="text-[13px] mt-0.5">⏱️</span>
-                  <p className="text-[11px] sm:text-xs font-medium text-slate-500 leading-relaxed">
-                    O link de confirmação é válido por <span className="font-black text-slate-700">24 horas</span>. Se expirar, solicite um novo cadastro.
+                <div className="w-full p-2 bg-slate-50/80 backdrop-blur-sm border border-slate-100 rounded-lg flex items-center gap-2 mb-3 sm:mb-4 animate-[fadeSlideIn_0.4s_ease-out_0.7s_both]">
+                  <span className="text-[12px] mt-0">⏱️</span>
+                  <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 leading-snug">
+                    Link válido por <span className="font-black text-slate-700">24 horas</span>. Se expirar, solicite um novo cadastro.
                   </p>
                 </div>
 
