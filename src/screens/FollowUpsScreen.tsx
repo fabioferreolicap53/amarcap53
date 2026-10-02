@@ -354,15 +354,6 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           patientRegionFilterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
         }
 
-        const buildIdFilter = (ids: string[], chunkSize = 200) => {
-          if (ids.length === 0) return null;
-          const chunks: string[][] = [];
-          for (let i = 0; i < ids.length; i += chunkSize) {
-            chunks.push(ids.slice(i, i + chunkSize));
-          }
-          return `(${chunks.map(chunk => `(${chunk.map(id => `paciente = "${id}"`).join(' || ')})`).join(' || ')})`;
-        };
-
         // Parallel: fetch region patient IDs + SIM/NÃO patient IDs (2x faster)
         const regionPromise = (patientRegionFilterParts.length > 0)
           ? pb.collection('amarcap53_pacientes').getFullList({
@@ -401,21 +392,16 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
         const [regionPatientIds, simNaoPatientIds] = await Promise.all([regionPromise, simNaoPromise]);
 
+        // Filtro por região e SIM/NÃO é aplicado no client-side: um OR gigante de
+        // `paciente = "id"` estoura o limite de cláusulas do PocketBase (400).
+        const hasRegionScope = patientRegionFilterParts.length > 0;
+        const regionSet = new Set(regionPatientIds);
+        const simNaoSet = new Set(simNaoPatientIds);
+
         const acompFilters = [];
         // Filtro por paciente específico (vindo do long press)
         if (filterPacienteId) {
           acompFilters.push(`paciente = "${filterPacienteId}"`);
-        }
-        const regionIdFilter = buildIdFilter(regionPatientIds);
-        if (regionIdFilter) acompFilters.push(regionIdFilter);
-
-        if (hasSimNaoFilter) {
-          const simNaoIdFilter = buildIdFilter(simNaoPatientIds);
-          if (simNaoIdFilter) {
-            acompFilters.push(simNaoIdFilter);
-          } else {
-            acompFilters.push('id = "none"');
-          }
         }
 
         // Outros Filtros UI
@@ -450,8 +436,13 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         const filterStr = acompFilters.join(' && ');
         if (filterStr) fetchOpts.filter = filterStr;
         const records = await pb.collection('amarcap53_acompanhamentos').getFullList(fetchOpts);
-        setAcompanhamentos(records);
-        setFUCache(records);
+        const scoped = records.filter((r: any) => {
+          if (hasRegionScope && !regionSet.has(r.paciente)) return false;
+          if (hasSimNaoFilter && !simNaoSet.has(r.paciente)) return false;
+          return true;
+        });
+        setAcompanhamentos(scoped);
+        setFUCache(scoped);
       } catch (error) {
         if (cancelled) return;
         console.error('Erro ao buscar acompanhamentos:', error);
