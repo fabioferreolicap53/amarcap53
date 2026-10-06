@@ -62,7 +62,20 @@ function buildEquipeEqualityClause(equipe) {
 }
 
 // ─── HOOKS: USUÁRIOS ÚNICOS ─────────────────────────────
+// NOTA: a cláusula de equipe é definida INLINE dentro de cada handler.
+// Motivo: hooks JS do PocketBase têm escopo isolado por arquivo; variável
+// global de outro arquivo/arquivo desatualizado gera ReferenceError.
 onRecordCreate(function(e) {
+  // Cláusula inline (hoisted no escopo do handler — sempre disponível)
+  function eqClause(equipe) {
+    var norm = String(equipe || '').trim();
+    if (!norm) return 'equipe = ""';
+    var up = norm.toUpperCase();
+    var normKey = up.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+    var parts = ['equipe = "' + up.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'];
+    if (normKey !== up) parts.push('equipe = "' + normKey.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"');
+    return '(' + parts.join(' || ') + ')';
+  }
   try {
     var rec = e.record;
     var role = String(rec.get('role') || '');
@@ -75,11 +88,11 @@ onRecordCreate(function(e) {
     
     if (role === 'cap') filter = 'role = "cap"';
     else if (role === 'unidade') filter = 'role = "unidade" && unidade_saude = "' + esc(unidade) + '"';
-    else if (role === 'equipe') filter = 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && ' + buildEquipeEqualityClause(equipe);
+    else if (role === 'equipe') filter = 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && ' + eqClause(equipe);
     else if (role === 'microarea') {
       var m = microarea.trim();
-      if (m && m !== '0' && m !== 'N/A') filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && ' + buildEquipeEqualityClause(equipe) + ' && (microarea = "' + esc(m) + '" || microarea = ' + parseInt(m, 10) + ')';
-      else filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && ' + buildEquipeEqualityClause(equipe) + ' && (microarea = "" || microarea = null || microarea = "N/A")';
+      if (m && m !== '0' && m !== 'N/A') filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && ' + eqClause(equipe) + ' && (microarea = "' + esc(m) + '" || microarea = ' + parseInt(m, 10) + ')';
+      else filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && ' + eqClause(equipe) + ' && (microarea = "" || microarea = null || microarea = "N/A")';
     }
     
     if (filter) {
@@ -94,6 +107,16 @@ onRecordCreate(function(e) {
 }, USERS_COLL);
 
 onRecordUpdate(function(e) {
+  // Cláusula inline (idem create — escopo isolado por handler)
+  function eqClause(equipe) {
+    var norm = String(equipe || '').trim();
+    if (!norm) return 'equipe = ""';
+    var up = norm.toUpperCase();
+    var normKey = up.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+    var parts = ['equipe = "' + up.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'];
+    if (normKey !== up) parts.push('equipe = "' + normKey.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"');
+    return '(' + parts.join(' || ') + ')';
+  }
   try {
     var rec = e.record;
     var role = String(rec.get('role') || '');
@@ -106,11 +129,11 @@ onRecordUpdate(function(e) {
     
     if (role === 'cap') filter = 'role = "cap"';
     else if (role === 'unidade') filter = 'role = "unidade" && unidade_saude = "' + esc(unidade) + '"';
-    else if (role === 'equipe') filter = 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && ' + buildEquipeEqualityClause(equipe);
+    else if (role === 'equipe') filter = 'role = "equipe" && unidade_saude = "' + esc(unidade) + '" && ' + eqClause(equipe);
     else if (role === 'microarea') {
       var m = microarea.trim();
-      if (m && m !== '0' && m !== 'N/A') filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && ' + buildEquipeEqualityClause(equipe) + ' && (microarea = "' + esc(m) + '" || microarea = ' + parseInt(m, 10) + ')';
-      else filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && ' + buildEquipeEqualityClause(equipe) + ' && (microarea = "" || microarea = null || microarea = "N/A")';
+      if (m && m !== '0' && m !== 'N/A') filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && ' + eqClause(equipe) + ' && (microarea = "' + esc(m) + '" || microarea = ' + parseInt(m, 10) + ')';
+      else filter = 'role = "microarea" && unidade_saude = "' + esc(unidade) + '" && ' + eqClause(equipe) + ' && (microarea = "" || microarea = null || microarea = "N/A")';
     }
     
     if (filter) {
