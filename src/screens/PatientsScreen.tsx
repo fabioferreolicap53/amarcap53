@@ -13,8 +13,9 @@ import { SingleSelect } from '../components/SingleSelect';
 import { useDebounce } from '../hooks/useDebounce';
 import { useLongPress } from '../hooks/useLongPress';
 import { AcompButton } from '../components/AcompButton';
+import { ScrollIndicator } from '../components/ScrollIndicator';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
-import { buildEquipeMatchClause, buildEquipeFilterClause } from '../lib/equipeAliases';
+import { buildRegionalPatientFilter, getShortUnidade } from '../lib/equipeAliases';
 import {
   TIPO_BUSCA_OPTIONS,
   TIPO_CONTATO_OPTIONS,
@@ -785,6 +786,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const fetchVersionRef = useRef(0);
   const loadedOnceRef = useRef(false);
   const filterStringRef = useRef('');
+  // IDs de pacientes com busca ativa (filtro agora é client-side — impressão/CSV precisam dele)
+  const buscaAtivaSetRef = useRef<Set<string> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -798,59 +801,36 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         
         const filterParts = [];
         if (!isAdmin && user) {
-          if (user.role === 'unidade') {
-            filterParts.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-          } else if (user.role === 'equipe') {
-            filterParts.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-          } else if (user.role === 'microarea') {
-            filterParts.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-            filterParts.push(`microarea = ${Number(user.microarea)}`);
-          }
+          const roleFilter = buildRegionalPatientFilter({
+            unidades: [user.unidade_saude],
+            equipes: user.role === 'unidade' ? [] : [user.equipe],
+            microareas: user.role === 'microarea' ? [user.microarea] : [],
+          });
+          if (roleFilter) filterParts.push(roleFilter);
         }
 
-        // Regional UI Filters
-        if (filterUnidade.length > 0) {
-          const uParams: Record<string, string> = {};
-          const uClauses = filterUnidade.map((u, i) => {
-            uParams[`u${i}`] = normalizeText(u).replace(/\s+/g, '%');
-            return `unidade ~ {:u${i}}`;
-          });
-          filterParts.push(pb.filter(uClauses.join(' || '), uParams));
-        }
-        if (filterEquipe.length > 0) {
-          // Normaliza acentos (DB: "ESPERANCA" / UI: "ESPERANÇA") + aliases de equipe (ex: "PARQUE SÃO PAULO" = "SAO PAULO")
-          filterParts.push(buildEquipeFilterClause(filterEquipe));
-        }
-        if (filterMicroarea.length > 0) {
-          filterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
-        }
+        // Regional UI Filters (igualdade normalizada — usa índice em vez de LIKE)
+        const uiRegionalFilter = buildRegionalPatientFilter({
+          unidades: filterUnidade,
+          equipes: filterEquipe,
+          microareas: filterMicroarea,
+        });
+        if (uiRegionalFilter) filterParts.push(uiRegionalFilter);
 
         // Build patient region filter for scoping acomp queries (reliable direct field filters)
         const patientRegionFilterParts: string[] = [];
-        if (!isAdmin && user) {
-          if (user.role === 'unidade') {
-            patientRegionFilterParts.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-          } else if (user.role === 'equipe') {
-            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-          } else if (user.role === 'microarea') {
-            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-            patientRegionFilterParts.push(`microarea = ${Number(user.microarea)}`);
-          }
-        }
-        if (filterUnidade.length > 0) {
-          const puParams: Record<string, string> = {};
-          const puClauses = filterUnidade.map((u, i) => {
-            puParams[`u${i}`] = normalizeText(u).replace(/\s+/g, '%');
-            return `unidade ~ {:u${i}}`;
-          });
-          patientRegionFilterParts.push(pb.filter(puClauses.join(' || '), puParams));
-        }
-        if (filterEquipe.length > 0) {
-          patientRegionFilterParts.push(buildEquipeFilterClause(filterEquipe));
-        }
-        if (filterMicroarea.length > 0) {
-          patientRegionFilterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
-        }
+        const patientRegionFilter = buildRegionalPatientFilter({
+          unidades: (!isAdmin && user) ? [user.unidade_saude] : [],
+          equipes: (!isAdmin && user && user.role !== 'unidade') ? [user.equipe] : [],
+          microareas: (!isAdmin && user && user.role === 'microarea') ? [user.microarea] : [],
+        });
+        if (patientRegionFilter) patientRegionFilterParts.push(patientRegionFilter);
+        const uiRegionalFilterParts = buildRegionalPatientFilter({
+          unidades: filterUnidade,
+          equipes: filterEquipe,
+          microareas: filterMicroarea,
+        });
+        if (uiRegionalFilterParts) patientRegionFilterParts.push(uiRegionalFilterParts);
 
         // Filtros de Acompanhamento (Requer busca na outra coleção)
         const hasAcompFilter = filterTipoBusca.length > 0 || filterTipoContato.length > 0 || filterSituacao.length > 0 || filterEntraves.length > 0 || filterDataInicio || filterDataFim;
@@ -878,41 +858,42 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             acompFilters.push(`data_busca <= "${filterDataFim} 23:59:59"`);
           }
 
-          // Patient ID-based scoping (replaces unreliable paciente.unidade filter syntax)
-          if (patientRegionFilterParts.length > 0) {
-            const regionFilter = patientRegionFilterParts.join(' && ');
-            const regionPatients = await pb.collection('amarcap53_pacientes').getFullList({
-              filter: regionFilter,
-              fields: 'id',
+          // Busca TODOS os acompanhamentos que casam os filtros de acompanhamento
+          // e cruza client-side com o escopo regional. Evita OR gigante de
+          // `paciente = "id"` (milhares de cláusulas) que estoura o limite
+          // do PocketBase → 400 Bad Request.
+          let patientIds: string[] = [];
+          try {
+            const acompRecords = await pb.collection('amarcap53_acompanhamentos').getFullList({
+              filter: acompFilters.length > 0 ? acompFilters.join(' && ') : undefined,
+              fields: 'paciente',
               batch: 500,
               requestKey: null,
             });
-            const regionIds = regionPatients.map(p => p.id).filter(Boolean);
-            if (regionIds.length > 0) {
-              const chunkSize = 200;
-              const idChunks: string[][] = [];
-              for (let i = 0; i < regionIds.length; i += chunkSize) {
-                idChunks.push(regionIds.slice(i, i + chunkSize));
-              }
-              const idFilterStr = idChunks.map(chunk => `(${chunk.map(id => `paciente = "${id}"`).join(' || ')})`).join(' || ');
-              acompFilters.push(`(${idFilterStr})`);
-            }
-          }
+            let acompPacIds = Array.from(new Set(acompRecords.map(r => r.paciente).filter(Boolean)));
 
-          let patientIds: string[] = [];
-          if (acompFilters.length > 0) {
-            const acompRecords = await pb.collection('amarcap53_acompanhamentos').getFullList({
-              filter: acompFilters.join(' && '),
-              fields: 'paciente',
-              requestKey: null,
-            });
-            patientIds = Array.from(new Set(acompRecords.map(r => r.paciente).filter(Boolean)));
-          }
+            // Cruza com escopo regional (IDs de pacientes da região)
+            if (patientRegionFilterParts.length > 0) {
+              const regionPatients = await pb.collection('amarcap53_pacientes').getFullList({
+                filter: patientRegionFilterParts.join(' && '),
+                fields: 'id',
+                batch: 500,
+                requestKey: null,
+              });
+              const regionSet = new Set(regionPatients.map(p => p.id).filter(Boolean));
+              acompPacIds = acompPacIds.filter(id => regionSet.has(id));
+            }
+
+            patientIds = acompPacIds;
+          } catch { /* ignora — segue sem filtro de acompanhamento */ }
+
           if (patientIds.length > 0) {
-            filterParts.push(`(${patientIds.map(id => `id = "${id}"`).join(' || ')})`);
-          } else {
+            // Máx 150 ids no OR: acima disso estoura o limite de cláusulas do PocketBase (400)
+            const safeIds = patientIds.slice(0, 150);
+            filterParts.push(`(${safeIds.map(id => `id = "${id}"`).join(' || ')})`);
+          } else if (patientIds.length === 0 && acompFilters.length > 0) {
             // Nenhum acompanhamento encontrado com esses filtros, força resultado vazio
-            filterParts.push(`id = "none"`);
+            filterParts.push('id = "none"');
           }
         }
 
@@ -972,6 +953,8 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
         const effectivePage = searchTerm ? 1 : currentPage;
 
         // Filtrar por busca ativa (pacientes COM ou SEM acompanhamento — com filtro de datas se aplicável)
+        // Client-side com Set: OR/AND de centenas de `id = "..."` estoura o limite de cláusulas (400)
+        let buscaAtivaSet: Set<string> | null = null;
         if (filterBuscaAtiva !== null) {
           try {
             const acompOpts: any = { fields: 'paciente,tipo_busca', requestKey: null, batch: 500 };
@@ -982,26 +965,12 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             if (dateParts.length > 0) acompOpts.filter = dateParts.join(' && ');
             
             const allAcomp = await pb.collection('amarcap53_acompanhamentos').getFullList(acompOpts);
-            const acompPacIds = [...new Set(allAcomp.map((a: any) => a.paciente).filter(Boolean))];
-            
-            if (acompPacIds.length > 0) {
-              if (filterBuscaAtiva === true) {
-                // COM acompanhamento
-                const idFilter = acompPacIds.map(id => `id = "${id}"`).join(' || ');
-                filterParts.push(`(${idFilter})`);
-              } else {
-                // SEM acompanhamento — negar ids
-                const idFilter = acompPacIds.map(id => `id != "${id}"`).join(' && ');
-                filterParts.push(`(${idFilter})`);
-              }
-            } else if (filterBuscaAtiva === true) {
-              // Nenhum acompanhamento → resultado vazio
-              filterParts.push('id = "__none__"');
-            }
+            buscaAtivaSet = new Set(allAcomp.map((a: any) => a.paciente).filter(Boolean));
           } catch (err) {
             console.error('[DEBUG PATS] Erro ao buscar acompanhamentos:', err);
           }
         }
+        buscaAtivaSetRef.current = buscaAtivaSet;
 
         // Finaliza construção do filtro
         const finalFilter = filterParts.join(' && ').trim();
@@ -1010,8 +979,44 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           options.filter = finalFilter;
         }
 
+        // Pacientes com busca ativa: fetch-all + filtro/paginação client-side
+        // (não dá pra filtrar por centenas de ids no servidor — limite de cláusulas)
+        let pageRecords: any[] | null = null;
+        let filteredTotal = 0;
+        if (buscaAtivaSet !== null) {
+          const allRecords: any[] = [];
+          let page = 1;
+          let totalPages = 1;
+          do {
+            const res = await pb.collection('amarcap53_pacientes').getList(page, 500, {
+              ...options,
+              perPage: 500,
+              skipTotal: false,
+              requestKey: null,
+              batch: 500,
+            });
+            if (cancelled) return;
+            allRecords.push(...res.items);
+            totalPages = res.totalPages;
+            page++;
+          } while (page <= totalPages);
+
+          // Filtra pelo Set: COM acompanhamento = pertence; SEM = não pertence
+          const filtered = allRecords.filter((r: any) => {
+            const has = buscaAtivaSet!.has(r.id);
+            return filterBuscaAtiva === true ? has : !has;
+          });
+          filteredTotal = filtered.length;
+
+          // Paginação client-side (mesmo pageSize da UI)
+          const start = (searchTerm ? 1 : currentPage - 1) * pageSize;
+          pageRecords = filtered.slice(start, start + pageSize);
+        }
+
         // Parallel queries — pacientes + acompanhamentos ao mesmo tempo
-        const resultList = await pb.collection('amarcap53_pacientes').getList(effectivePage, pageSize, options);
+        const resultList = await (pageRecords !== null
+          ? Promise.resolve({ items: pageRecords, totalItems: filteredTotal })
+          : pb.collection('amarcap53_pacientes').getList(effectivePage, pageSize, options));
         if (cancelled) return;
 
         const allRecords = resultList.items;
@@ -1326,11 +1331,16 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       sort: 'nome',
       filter: filterStringRef.current || undefined,
     }).then(allRecords => {
+      // Aplica filtro de busca ativa (client-side — fora do filtro server)
+      const baSet = buscaAtivaSetRef.current;
+      const records = baSet
+        ? allRecords.filter((r: any) => (filterBuscaAtiva === true ? baSet.has(r.id) : !baSet.has(r.id)))
+        : allRecords;
       const showUnitColumns = isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea';
       const dataAtual = new Date().toLocaleDateString('pt-BR');
-      const hasFilter = !!filterStringRef.current;
+      const hasFilter = !!filterStringRef.current || baSet !== null;
 
-      const rows = allRecords.map(record => {
+      const rows = records.map(record => {
         const p: any = {
           unidade: record.unidade || '--',
           equipe: record.equipe || '--',
@@ -1433,7 +1443,12 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
       sort: 'nome',
       filter: filterStringRef.current || undefined,
     }).then(allRecords => {
-      const data = allRecords.map(record => ({
+      // Aplica filtro de busca ativa (client-side — fora do filtro server)
+      const baSet = buscaAtivaSetRef.current;
+      const records = baSet
+        ? allRecords.filter((r: any) => (filterBuscaAtiva === true ? baSet.has(r.id) : !baSet.has(r.id)))
+        : allRecords;
+      const data = records.map(record => ({
         'Nome': record.nome || '--',
         'CNS': record.cns || '--',
         'Data Nascimento': formatarData(record.data_nascimento),
@@ -1884,43 +1899,44 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
           )}
 
           <div className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-[0px_20px_50px_rgba(0,0,0,0.06)] border border-outline-variant/15 relative">
+            <ScrollIndicator onlyWhenParentVisible />
             <div className="w-full overflow-x-auto custom-scrollbar-horizontal">
-              <table className="w-full text-center border-collapse">
+              <table className="w-full text-center border-collapse min-w-[720px] md:min-w-full">
                 <thead>
                   <tr className="bg-[#001b3d] border-b border-white/10 shadow-sm">
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[240px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'nome') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('nome'); setSortDir('asc'); } }}>
+                    <th className="px-3 sm:px-4 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[170px] md:w-[180px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'nome') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('nome'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Users className="w-4 h-4 text-blue-400/60" />
                         <span>Paciente</span>
                         {sortField === 'nome' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'alertas') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('alertas'); setSortDir('asc'); } }}>
+                    <th className="px-2 sm:px-4 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[130px] md:w-[180px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'alertas') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('alertas'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Info className="w-4 h-4 text-blue-400/60" />
                         <span>Status</span>
                         {sortField === 'alertas' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[110px] border-r border-white/5">
+                    <th className="px-2 sm:px-4 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[100px] md:w-[100px] border-r border-white/5">
                       <div className="flex flex-col items-center gap-1">
                         <RotateCcw className="w-4 h-4 text-blue-400/60" />
                         <span>Ação</span>
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[140px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'dna_hpv_pep') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('dna_hpv_pep'); setSortDir('asc'); } }}>
+                    <th className="px-2 sm:px-4 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[92px] sm:w-[110px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'dna_hpv_pep') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('dna_hpv_pep'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <TestTube className="w-4 h-4 text-blue-400/60" />
                         <div className="flex items-center gap-1.5">
-                          <span>DNA-HPV (PEP)</span>
+                          <span>DNA-HPV<br/>(PEP)</span>
                           <InfoTooltip content="Data de registro do resultado do teste molecular de DNA-HPV no PEP." />
                         </div>
-                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data do registro do resultado</span>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal hidden sm:block">Data do registro do resultado</span>
                         {sortField === 'dna_hpv_pep' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
                       {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
-                        <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[180px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'unidade') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('unidade'); setSortDir('asc'); } }}>
+                        <th className="px-2 sm:px-4 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[110px] sm:w-[150px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'unidade') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('unidade'); setSortDir('asc'); } }}>
                           <div className="flex flex-col items-center gap-1">
                             <Building className="w-4 h-4 text-blue-400/60" />
                             <span>Unidade<br/>Equipe<br/>Microárea</span>
@@ -1928,47 +1944,47 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                           </div>
                         </th>
                       )}
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[94px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'idade') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('idade'); setSortDir('asc'); } }}>
+                    <th className="px-2 sm:px-4 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[64px] sm:w-[80px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'idade') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('idade'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Calendar className="w-4 h-4 text-blue-400/60" />
-                        <span>Idade/Grupo</span>
+                        <span>Idade/<br/>Grupo</span>
                         {sortField === 'idade' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[153px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'cito_lab') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('cito_lab'); setSortDir('asc'); } }}>
+                    <th className="px-2 sm:px-4 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[76px] sm:w-[92px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'cito_lab') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('cito_lab'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Microscope className="w-4 h-4 text-blue-400/60" />
                         <div className="flex items-center gap-1.5">
-                          <span>Cito (Lab)</span>
+                          <span>Cito<br/>(Lab)</span>
                           <InfoTooltip content="Data de cadastro do resultado do exame citopatológico realizado no laboratório." />
                         </div>
-                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data do cadastro</span>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal hidden sm:block">Data do cadastro</span>
                         {sortField === 'cito_lab' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[153px] cursor-pointer select-none" onClick={() => { if (sortField === 'cito_pep') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('cito_pep'); setSortDir('asc'); } }}>
+                    <th className="px-2 sm:px-4 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[76px] sm:w-[92px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'cito_pep') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('cito_pep'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <FileText className="w-4 h-4 text-blue-400/60" />
                         <div className="flex items-center gap-1.5">
-                          <span>Cito (PEP)</span>
+                          <span>Cito<br/>(PEP)</span>
                           <InfoTooltip content="Data de coleta do exame citopatológico registrada no PEP." />
                         </div>
-                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data da coleta dos resultados registrados</span>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal hidden sm:block">Data da coleta dos resultados registrados</span>
                         {sortField === 'cito_pep' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[153px] cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'dna_hpv_gal') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('dna_hpv_gal'); setSortDir('asc'); } }}>
+                    <th className="px-2 sm:px-4 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[76px] sm:w-[92px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'dna_hpv_gal') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('dna_hpv_gal'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <TestTube className="w-4 h-4 text-blue-400/60" />
                         <div className="flex items-center gap-1.5">
-                          <span>DNA-HPV (GAL)</span>
+                          <span>DNA-HPV<br/>(GAL)</span>
                           <InfoTooltip content="Data do resultado do teste molecular de DNA-HPV registrada no GAL." />
                         </div>
-                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal">Data da coleta</span>
+                        <span className="text-[8px] text-blue-200/40 normal-case tracking-normal hidden sm:block">Data da coleta</span>
                         {sortField === 'dna_hpv_gal' && (sortLoading ? <Loader2 className="h-3 w-3 animate-spin text-blue-300" /> : <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>)}
                       </div>
                     </th>
-                    <th className="px-4 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[200px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'last_desfecho') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('last_desfecho'); setSortDir('asc'); } }}>
+                    <th className="px-2 sm:px-4 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center w-[100px] sm:w-[130px] border-r border-white/5 cursor-pointer select-none" onClick={() => { setSortLoading(true); if (sortField === 'last_desfecho') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('last_desfecho'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <ClipboardList className="w-4 h-4 text-blue-400/60" />
                         <span>Últ. Desf.<br/>da Busca</span>
@@ -2055,7 +2071,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         {/* 3. STATUS */}
                         <td className="px-2 py-6 text-center">
                           {paciente.alertas && ALERT_CONFIGS[paciente.alertas] ? (
-                            <div className={`inline-flex flex-col items-center justify-center px-2 py-2 rounded-lg border border-white/10 shadow-lg min-h-[50px] w-full max-w-[140px] mx-auto ${ALERT_CONFIGS[paciente.alertas].bg}`}>
+                            <div
+                              className={`inline-flex flex-col items-center justify-center px-2 py-2 rounded-lg border border-white/10 shadow-lg min-h-[50px] w-full max-w-[160px] mx-auto ${ALERT_CONFIGS[paciente.alertas].bg}`}
+                              title={ALERT_CONFIGS[paciente.alertas].label}
+                            >
                               <span className={`text-[8px] md:text-[10px] font-bold uppercase leading-tight tracking-normal text-center ${ALERT_CONFIGS[paciente.alertas].color}`}>
                                 {ALERT_CONFIGS[paciente.alertas].label}
                               </span>
@@ -2066,15 +2085,15 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         </td>
 
                         {/* 4. AÇÃO */}
-                        <td className="px-2 py-4 text-center">
-                          <div className="flex flex-col items-center justify-center gap-1.5">
+                        <td className="px-2 sm:px-3 py-4 text-center">
+                          <div className="flex flex-col items-center justify-center gap-1.5 w-full">
                             <button 
                               onClick={() => handleOpenDetails(paciente)}
-                              className="h-10 w-24 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 rounded-lg text-[8px] md:text-[9px] font-black uppercase tracking-tight shadow-sm transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 hover:shadow-md"
+                              className="h-9 sm:h-10 w-full max-w-[100px] bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 rounded-lg text-[8px] md:text-[9px] font-black uppercase tracking-tight shadow-sm transition-all duration-300 active:scale-95 flex items-center justify-center gap-1.5 sm:gap-2 hover:shadow-md"
                               title="Ver Detalhes"
                             >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>Detalhes</span>
+                              <Eye className="w-3.5 h-3.5 shrink-0" />
+                              <span className="whitespace-nowrap">Detalhes</span>
                             </button>
 
                             <AcompButton
@@ -2102,10 +2121,11 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
                         {/* UNIDADE/EQUIPE */}
                         {(isAdmin || user?.role === 'cap' || user?.role === 'unidade' || user?.role === 'equipe' || user?.role === 'microarea') && (
-                          <td className="px-3 py-6 text-center">
+                          <td className="px-2 sm:px-3 py-6 text-center">
                             <div className="flex flex-col items-center gap-0.5">
-                              <p className="text-[10px] md:text-[11px] font-black text-primary uppercase leading-tight break-words max-w-full" title={paciente.unidade}>
-                                {paciente.unidade}
+                              <p className="text-[9px] sm:text-[10px] md:text-[11px] font-black text-primary uppercase leading-tight break-words max-w-full" title={paciente.unidade}>
+                                <span className="sm:hidden">{getShortUnidade(paciente.unidade)}</span>
+                                <span className="hidden sm:inline">{paciente.unidade}</span>
                               </p>
                               <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter break-words">
                                 {paciente.equipe}
@@ -2152,18 +2172,20 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         </td>
 
                         {/* 11. ÚLT. DESF. DA BUSCA */}
-                        <td className="px-4 py-6 text-center">
+                        <td className="px-2 sm:px-4 py-6 text-center">
                           { paciente.lastAcomp ? (
                             <div className="flex flex-col items-center gap-1">
                               <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
-                                Busca realizada em {formatarData(paciente.lastAcomp.data_busca)}
+                                <span className="sm:hidden">Busca: {formatarData(paciente.lastAcomp.data_busca)}</span>
+                                <span className="hidden sm:inline">Busca realizada em {formatarData(paciente.lastAcomp.data_busca)}</span>
                               </span>
-                              <span className="inline-block px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-tight shadow-sm bg-emerald-50 text-emerald-700 border border-emerald-100 max-w-[153px] break-words leading-tight">
+                              <span className="inline-block px-2 sm:px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-tight shadow-sm bg-emerald-50 text-emerald-700 border border-emerald-100 w-full max-w-[153px] break-words leading-tight" title={paciente.lastAcomp.situacao_pos_busca || ''}>
                                 {paciente.lastAcomp.situacao_pos_busca || '--'}
                               </span>
                               {normalizeText(paciente.lastAcomp.situacao_pos_busca || '').includes('AGENDAMENTO') && paciente.lastAcomp.data_do_agendamento && (
-                                <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-tighter">
-                                  Agendamento para {formatarData(paciente.lastAcomp.data_do_agendamento)}
+                                <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-tighter break-words">
+                                  <span className="sm:hidden">Agend.: {formatarData(paciente.lastAcomp.data_do_agendamento)}</span>
+                                  <span className="hidden sm:inline">Agendamento para {formatarData(paciente.lastAcomp.data_do_agendamento)}</span>
                                 </span>
                               )}
                             </div>

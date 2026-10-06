@@ -21,7 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { pb } from '../lib/pocketbase';
 import { useDebounce } from '../hooks/useDebounce';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
-import { buildEquipeMatchClause, buildEquipeFilterClause } from '../lib/equipeAliases';
+import { buildRegionalPatientFilter } from '../lib/equipeAliases';
 import { getCanonicalValue } from '../constants/followUpOptions';
 
 // Remove acentos via Unicode NFD decomposition (ex: "ESPERANÇA" → "ESPERANCA")
@@ -381,37 +381,24 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
     let cancelled = false;
     setIsLoadingPrioCounts(true);
 
-    // Filtro base por role (mesmo lógico do fetchStats)
+    // Filtro base por role (mesmo lógico do fetchStats) — igualdade usa índice
     const fp: string[] = [];
     if (!isAdmin) {
-      if (user.role === 'unidade') fp.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-      else if (user.role === 'equipe') fp.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-      else if (user.role === 'microarea') {
-        fp.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-        const ma = Number(user.microarea);
-        if (Number.isFinite(ma)) fp.push(`microarea = ${ma}`);
-      }
+      const roleFilter = buildRegionalPatientFilter({
+        unidades: [user.unidade_saude],
+        equipes: user.role === 'unidade' ? [] : [user.equipe],
+        microareas: user.role === 'microarea' ? [user.microarea] : [],
+      });
+      if (roleFilter) fp.push(roleFilter);
     }
 
-    // Filtros de UI aplicados (respeita as filtragens existentes)
-    if (debouncedFilterUnidade.length > 0) {
-      const uParams: Record<string, string> = {};
-      const uClauses = debouncedFilterUnidade.map((u, i) => {
-        uParams[`u${i}`] = normalizeText(u).replace(/\s+/g, '%');
-        return `unidade ~ {:u${i}}`;
-      });
-      fp.push(pb.filter(uClauses.join(' || '), uParams));
-    }
-    if (debouncedFilterEquipe.length > 0) {
-      fp.push(buildEquipeFilterClause(debouncedFilterEquipe));
-    }
-    if (debouncedFilterMicroarea.length > 0) {
-      const maClauses = debouncedFilterMicroarea
-        .map(m => Number(m))
-        .filter(n => Number.isFinite(n))
-        .map(n => `microarea = ${n}`);
-      if (maClauses.length > 0) fp.push(`(${maClauses.join(' || ')})`);
-    }
+    // Filtros de UI aplicados (respeita as filtragens existentes) — igualdade
+    const uiFilter = buildRegionalPatientFilter({
+      unidades: debouncedFilterUnidade,
+      equipes: debouncedFilterEquipe,
+      microareas: debouncedFilterMicroarea,
+    });
+    if (uiFilter) fp.push(uiFilter);
 
     const bf = fp.length > 0 ? fp.join(' && ') : '';
 
@@ -499,38 +486,23 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         setIsLoading(true);
         const patientFilterParts: string[] = [];
 
-        // Base filters from user role (normalize accents: DB stores unaccented)
+        // Base filters from user role (igualdade normalizada — usa índice em vez de LIKE)
         if (!isAdmin) {
-          if (user.role === 'unidade') {
-            patientFilterParts.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-          } else if (user.role === 'equipe') {
-            patientFilterParts.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-          } else if (user.role === 'microarea') {
-            patientFilterParts.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-            const ma = Number(user.microarea);
-            if (Number.isFinite(ma)) patientFilterParts.push(`microarea = ${ma}`);
-          }
+          const roleFilter = buildRegionalPatientFilter({
+            unidades: [user.unidade_saude],
+            equipes: user.role === 'unidade' ? [] : [user.equipe],
+            microareas: user.role === 'microarea' ? [user.microarea] : [],
+          });
+          if (roleFilter) patientFilterParts.push(roleFilter);
         }
 
-        // Applied UI filters (normalize accents)
-        if (filterUnidade.length > 0) {
-          const uParams: Record<string, string> = {};
-          const uClauses = filterUnidade.map((u, i) => {
-            uParams[`u${i}`] = normalizeText(u).replace(/\s+/g, '%');
-            return `unidade ~ {:u${i}}`;
-          });
-          patientFilterParts.push(pb.filter(uClauses.join(' || '), uParams));
-        }
-        if (filterEquipe.length > 0) {
-          patientFilterParts.push(buildEquipeFilterClause(filterEquipe));
-        }
-        if (filterMicroarea.length > 0) {
-          const maClauses = filterMicroarea
-            .map(m => Number(m))
-            .filter(n => Number.isFinite(n))
-            .map(n => `microarea = ${n}`);
-          if (maClauses.length > 0) patientFilterParts.push(`(${maClauses.join(' || ')})`);
-        }
+        // Applied UI filters (igualdade normalizada — usa índice)
+        const uiFilter = buildRegionalPatientFilter({
+          unidades: filterUnidade,
+          equipes: filterEquipe,
+          microareas: filterMicroarea,
+        });
+        if (uiFilter) patientFilterParts.push(uiFilter);
 
         // Build filter strings
         const patientFilter = patientFilterParts.join(' && ');

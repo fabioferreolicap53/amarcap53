@@ -10,6 +10,9 @@ export const ScrollIndicator: React.FC<ScrollIndicatorProps> = ({ onlyWhenParent
   const [hasScrolled, setHasScrolled] = useState(false);
   const [isParentVisible, setIsParentVisible] = useState(!onlyWhenParentVisible);
   const indicatorRef = useRef<HTMLDivElement>(null);
+  // Ref (não state): evita que ResizeObserver re-mostre o indicador após o
+  // auto-hide — setState dentro do observer causava loop de re-exibição.
+  const dismissedRef = useRef(false);
 
   useEffect(() => {
     const parent = indicatorRef.current?.parentElement;
@@ -18,6 +21,10 @@ export const ScrollIndicator: React.FC<ScrollIndicatorProps> = ({ onlyWhenParent
     if (!parent || !scrollableChild) return;
 
     const checkScroll = () => {
+      if (dismissedRef.current) {
+        setIsVisible(false);
+        return;
+      }
       const canScroll = scrollableChild.scrollWidth > scrollableChild.clientWidth + 10;
       const canShowByViewport = onlyWhenParentVisible ? isParentVisible : true;
       setIsVisible(canScroll && !hasScrolled && canShowByViewport);
@@ -44,6 +51,7 @@ export const ScrollIndicator: React.FC<ScrollIndicatorProps> = ({ onlyWhenParent
 
     const handleScroll = () => {
       if (scrollableChild.scrollLeft > 20) {
+        dismissedRef.current = true;
         setHasScrolled(true);
         setIsVisible(false);
       }
@@ -51,10 +59,11 @@ export const ScrollIndicator: React.FC<ScrollIndicatorProps> = ({ onlyWhenParent
 
     scrollableChild.addEventListener('scroll', handleScroll, { passive: true });
 
-    // Auto-hide após 8 segundos
+    // Auto-hide curto (5s) — indicador é só um lembrete, não um aviso permanente
     const timer = setTimeout(() => {
+      dismissedRef.current = true;
       setIsVisible(false);
-    }, 8000);
+    }, 5000);
 
     return () => {
       resizeObserver.disconnect();
@@ -86,7 +95,7 @@ export const ScrollIndicator: React.FC<ScrollIndicatorProps> = ({ onlyWhenParent
         
         {/* Barra de progresso visual de tempo */}
         <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden backdrop-blur-md border border-white/5">
-          <div className="h-full bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.8)] animate-[shrink_8s_linear_forwards]" />
+          <div className="h-full bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.8)] animate-[shrink_5s_linear_forwards]" />
         </div>
       </div>
     </div>

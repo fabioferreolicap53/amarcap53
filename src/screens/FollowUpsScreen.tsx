@@ -11,7 +11,7 @@ import { MultiSelect } from '../components/MultiSelect';
 import { SingleSelect } from '../components/SingleSelect';
 import Papa from 'papaparse';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
-import { buildEquipeMatchClause, buildEquipeFilterClause } from '../lib/equipeAliases';
+import { buildRegionalPatientFilter, getShortUnidade } from '../lib/equipeAliases';
 import {
   TIPO_BUSCA_OPTIONS,
   TIPO_CONTATO_OPTIONS,
@@ -321,37 +321,45 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     const fetchAcompanhamentos = async () => {
       if (!user) return;
       try {
-        // Build patient region filter (normalize accents: DB stores unaccented)
+        // Escopo regional: igualdade normalizada (usa índice) em vez de
+        // `unidade ~ {:u}` com % entre palavras, que vira LIKE '%X%Y%' e faz
+        // FULL SCAN em ~129K registros (medido: 6-16s ou 400).
         const patientRegionFilterParts: string[] = [];
         const hasUnidadeFilter = filterUnidade.length > 0;
         const hasEquipeFilter = filterEquipe.length > 0;
         const hasMicroareaFilter = filterMicroarea.length > 0;
 
         // Filtro de permissão: só aplica quando NÃO há filtro UI correspondente
+        let roleUnits: string[] = [];
+        let roleEquipes: string[] = [];
+        let roleMicroareas: (string | number)[] = [];
         if (!isAdmin) {
           if (user.role === 'unidade' && !hasUnidadeFilter) {
-            patientRegionFilterParts.push(pb.filter('unidade ~ {:u}', { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
+            roleUnits = [user.unidade_saude];
           } else if (user.role === 'equipe' && !hasUnidadeFilter && !hasEquipeFilter) {
-            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
+            roleUnits = [user.unidade_saude];
+            roleEquipes = [user.equipe];
           } else if (user.role === 'microarea' && !hasUnidadeFilter && !hasEquipeFilter && !hasMicroareaFilter) {
-            patientRegionFilterParts.push(pb.filter('unidade ~ {:u} && ' + buildEquipeMatchClause(user.equipe), { u: normalizeText(user.unidade_saude).replace(/\s+/g, '%') }));
-            patientRegionFilterParts.push(`microarea = ${Number(user.microarea)}`);
+            roleUnits = [user.unidade_saude];
+            roleEquipes = [user.equipe];
+            roleMicroareas = [user.microarea];
           }
         }
+        const roleFilter = buildRegionalPatientFilter({
+          unidades: roleUnits,
+          equipes: roleEquipes,
+          microareas: roleMicroareas,
+        });
+        if (roleFilter) patientRegionFilterParts.push(roleFilter);
+
         // Filtros UI substituem filtro de permissão
-        if (hasUnidadeFilter) {
-          const uParams: Record<string, string> = {};
-          const uClauses = filterUnidade.map((u, i) => {
-            uParams[`u${i}`] = normalizeText(u).replace(/\s+/g, '%');
-            return `unidade ~ {:u${i}}`;
+        if (hasUnidadeFilter || hasEquipeFilter || hasMicroareaFilter) {
+          const uiFilter = buildRegionalPatientFilter({
+            unidades: filterUnidade,
+            equipes: filterEquipe,
+            microareas: filterMicroarea,
           });
-          patientRegionFilterParts.push(pb.filter(uClauses.join(' || '), uParams));
-        }
-        if (filterEquipe.length > 0) {
-          patientRegionFilterParts.push(buildEquipeFilterClause(filterEquipe));
-        }
-        if (filterMicroarea.length > 0) {
-          patientRegionFilterParts.push(`(${filterMicroarea.map(m => `microarea = ${Number(m)}`).join(' || ')})`);
+          if (uiFilter) patientRegionFilterParts.push(uiFilter);
         }
 
         // Parallel: fetch region patient IDs + SIM/NÃO patient IDs (2x faster)
@@ -1220,45 +1228,45 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           <div className="bg-white rounded-[2rem] overflow-hidden shadow-2xl border border-outline-variant/10 relative">
             <ScrollIndicator onlyWhenParentVisible />
             <div className="overflow-x-auto custom-scrollbar-horizontal">
-              <table className="w-full text-center border-collapse min-w-[900px] lg:min-w-full">
+              <table className="w-full text-center border-collapse min-w-[720px] lg:min-w-full">
                 <thead>
                   <tr className="bg-[#001b3d] border-b border-white/10 shadow-sm">
-                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'nome') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('nome'); setSortDir('asc'); } }}>
+                    <th className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center min-w-[150px] sm:min-w-[200px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'nome') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('nome'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Users className="w-4 h-4 text-blue-400/60" />
                         <span>Paciente</span>
                         {sortField === 'nome' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                       </div>
                     </th>
-                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'data_busca') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('data_busca'); setSortDir('asc'); } }}>
+                    <th className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center min-w-[110px] sm:min-w-[140px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'data_busca') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('data_busca'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Calendar className="w-4 h-4 text-blue-400/60" />
-                        <span>Data da Ação</span>
+                        <span>Data<br/>da Ação</span>
                         {sortField === 'data_busca' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                       </div>
                     </th>
-                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'tipo_contato') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('tipo_contato'); setSortDir('asc'); } }}>
+                    <th className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center min-w-[110px] sm:min-w-[140px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'tipo_contato') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('tipo_contato'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <Phone className="w-4 h-4 text-blue-400/60" />
-                        <span>Contato / Entrave</span>
+                        <span>Contato /<br/>Entrave</span>
                         {sortField === 'tipo_contato' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                       </div>
                     </th>
-                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'situacao_pos_busca') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('situacao_pos_busca'); setSortDir('asc'); } }}>
+                    <th className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center min-w-[110px] sm:min-w-[140px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'situacao_pos_busca') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('situacao_pos_busca'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <BadgeCheck className="w-4 h-4 text-blue-400/60" />
-                        <span>Desfecho / Tipo</span>
+                        <span>Desfecho /<br/>Tipo</span>
                         {sortField === 'situacao_pos_busca' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                       </div>
                     </th>
-                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'observacoes') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('observacoes'); setSortDir('asc'); } }}>
+                    <th className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center min-w-[100px] sm:min-w-[140px] border-r border-white/5 cursor-pointer select-none" onClick={() => { if (sortField === 'observacoes') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField('observacoes'); setSortDir('asc'); } }}>
                       <div className="flex flex-col items-center gap-1">
                         <MessageSquare className="w-4 h-4 text-blue-400/60" />
-                        <span>Observações</span>
+                        <span>Observa-<br/>ções</span>
                         {sortField === 'observacoes' && <svg className={'h-2.5 w-2.5 transition-all duration-300 ' + (sortDir === 'desc' ? 'rotate-180' : '')} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>}
                       </div>
                     </th>
-                    <th className="px-6 py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center">
+                    <th className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-blue-200/80 text-center min-w-[92px] sm:min-w-[120px]">
                       <div className="flex flex-col items-center gap-1">
                         <RotateCcw className="w-4 h-4 text-blue-400/60" />
                         <span>Ações</span>
@@ -1304,55 +1312,60 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
                         return (
                           <tr key={acomp.id} className="hover:bg-primary/[0.03] transition-all group">
-                            <td className="px-4 py-4 text-center align-middle">
+                            <td className="px-3 sm:px-4 py-4 text-center align-middle">
                               <div className="flex flex-col items-center gap-1">
                                 <p className="text-[11px] md:text-[12px] font-black text-primary uppercase leading-snug break-words" title={pacienteNome}>{pacienteNome}</p>
                                 <p className="text-[9px] font-bold text-on-surface-variant/60 uppercase tracking-tighter">CNS: {cns}</p>
-                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter leading-tight">{unidade}</p>
+                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter leading-tight break-words max-w-full" title={unidade}>
+                                  <span className="sm:hidden">{getShortUnidade(unidade)}</span>
+                                  <span className="hidden sm:inline">{unidade}</span>
+                                </p>
                                 <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter leading-tight">{equipe}</p>
                                 <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter leading-tight">MA: {microarea}</p>
                               </div>
                             </td>
-                            <td className="px-6 py-6 text-center">
-                              <span className="text-[13px] font-black text-[#001b3d] uppercase whitespace-nowrap bg-surface-container-low px-3 py-1.5 rounded-lg border border-outline-variant/10">
-                                {dataFormatada}
+                            <td className="px-3 sm:px-6 py-4 sm:py-6 text-center">
+                              <span className="inline-block text-[11px] sm:text-[13px] font-black text-[#001b3d] uppercase bg-surface-container-low px-2 sm:px-3 py-1.5 rounded-lg border border-outline-variant/10">
+                                <span className="sm:hidden">{(() => { const p = String(acomp.data_busca || '').substring(0,10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : '--'; })()}</span>
+                                <span className="hidden sm:inline whitespace-nowrap">{dataFormatada}</span>
                               </span>
                             </td>
-                            <td className="px-6 py-6 text-center">
+                            <td className="px-3 sm:px-6 py-4 sm:py-6 text-center">
                               <div className="flex flex-col items-center gap-1.5">
-                                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-tight border border-blue-100 shadow-sm">
-                                  <Phone className="w-3.5 h-3.5" />
+                                <span className="inline-flex items-center gap-2 px-2 sm:px-4 py-2 rounded-xl bg-blue-50 text-blue-700 text-[9px] sm:text-[10px] font-black uppercase tracking-tight border border-blue-100 shadow-sm max-w-full text-center leading-tight break-words">
+                                  <Phone className="w-3.5 h-3.5 shrink-0" />
                                   {acomp.tipo_contato || '--'}
                                 </span>
                                 {acomp.entraves_identificados && acomp.entraves_identificados.length > 0 && (
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-rose-500 uppercase tracking-tighter bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100">
-                                    <AlertTriangle className="w-3 h-3" />
+                                  <span className="inline-flex items-start gap-1 text-[9px] font-bold text-rose-500 uppercase tracking-tighter bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100 max-w-full text-center leading-tight break-words">
+                                    <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
                                     {Array.isArray(acomp.entraves_identificados) ? acomp.entraves_identificados.join('; ') : acomp.entraves_identificados}
                                   </span>
                                 )}
                               </div>
                             </td>
-                            <td className="px-6 py-6 text-center">
+                            <td className="px-3 sm:px-6 py-4 sm:py-6 text-center">
                               <div className="flex flex-col items-center gap-1.5">
-                                <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-tight border shadow-sm ${
+                                <span className={`inline-flex items-center gap-2 px-2 sm:px-4 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-tight border shadow-sm max-w-full text-center leading-tight break-words ${
                                   acomp.situacao_pos_busca?.includes('Sucesso') || acomp.situacao_pos_busca?.includes('Agendamento')
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                                     : 'bg-amber-50 text-amber-700 border-amber-100'
                                 }`}>
                                   {acomp.situacao_pos_busca || '--'}
                                 </span>
-                                <span className="text-[8px] font-bold text-slate-400 uppercase">
+                                <span className="text-[8px] font-bold text-slate-400 uppercase break-words max-w-full">
                                   {acomp.tipo_busca || '--'}
                                 </span>
                                 {getSelectLabel(acomp.situacao_pos_busca || '', SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' && acomp.data_do_agendamento && (
-                                  <span className="text-[8px] font-bold text-cyan-600 uppercase">
-                                    Agendado para {(() => { const p = (acomp.data_do_agendamento || '').substring(0, 10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : acomp.data_do_agendamento; })()}
+                                  <span className="text-[8px] font-bold text-cyan-600 uppercase break-words max-w-full">
+                                    <span className="sm:hidden">Agend.: {(() => { const p = (acomp.data_do_agendamento || '').substring(0, 10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : acomp.data_do_agendamento; })()}</span>
+                                    <span className="hidden sm:inline">Agendado para {(() => { const p = (acomp.data_do_agendamento || '').substring(0, 10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : acomp.data_do_agendamento; })()}</span>
                                   </span>
                                 )}
                               </div>
                             </td>
-                            <td className="px-4 py-4 text-center align-middle">
-                              <div className="max-w-[200px] mx-auto" title={acomp.observacoes || ''}>
+                            <td className="px-3 sm:px-4 py-4 text-center align-middle">
+                              <div className="max-w-[140px] sm:max-w-[200px] mx-auto" title={acomp.observacoes || ''}>
                                 {acomp.observacoes ? (
                                   <p className="text-[10px] md:text-[11px] font-medium italic text-slate-500/80 leading-relaxed text-center line-clamp-2 tracking-wide">
                                     {acomp.observacoes.length > 144 ? `${acomp.observacoes.substring(0, 144)}...` : acomp.observacoes}
@@ -1362,28 +1375,28 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                                 )}
                               </div>
                             </td>
-                            <td className="px-6 py-6 text-center">
-                              <div className="flex items-center justify-center gap-3">
+                            <td className="px-3 sm:px-6 py-4 sm:py-6 text-center">
+                              <div className="flex items-center justify-center gap-2 sm:gap-3">
                                 <button 
                                   onClick={() => handleViewPaciente(acomp.paciente || acomp.expand?.paciente?.id)}
-                                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-cyan-600 hover:border-cyan-200 hover:bg-cyan-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                                  className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-cyan-600 hover:border-cyan-200 hover:bg-cyan-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
                                   title="Ver Paciente"
                                 >
-                                  <Eye className="w-5 h-5" />
+                                  <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
                                 </button>
                                 <button 
                                   onClick={() => handleEdit(acomp.id)}
-                                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                                  className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
                                   title="Editar"
                                 >
-                                  <Edit className="w-5 h-5" />
+                                  <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
                                 </button>
                                 <button 
                                   onClick={() => handleDelete(acomp.id)}
-                                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                                  className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
                                   title="Excluir"
                                 >
-                                  <Trash2 className="w-5 h-5" />
+                                  <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                                 </button>
                               </div>
                             </td>

@@ -16,20 +16,20 @@ export function AcompButton({ paciente, onOpenModal, onLongPress }: {
   const hasAcomp = (paciente.total_acompanhamentos || 0) > 0;
 
   return (
-    <div className="flex flex-col items-center gap-0.5">
+    <div className="flex flex-col items-center gap-0.5 w-full">
       <button
         {...longPressProps}
-        className={`h-10 w-24 rounded-lg text-[8px] md:text-[9px] font-black uppercase tracking-tight shadow-md transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 border relative ${
+        className={`h-9 sm:h-10 w-full max-w-[100px] rounded-lg text-[8px] md:text-[9px] font-black uppercase tracking-tight shadow-md transition-all duration-300 active:scale-95 flex items-center justify-center gap-1.5 sm:gap-2 border relative ${
           hasAcomp
             ? 'bg-[#001b3d] hover:bg-[#002b5c] text-white border-white/10 shadow-blue-900/15 hover:shadow-lg hover:shadow-blue-900/20 hover:-translate-y-0.5'
             : 'bg-slate-100 text-slate-400 border-slate-200 cursor-default'
         }`}
         title={hasAcomp ? 'Clique: novo acompanhamento | Segurar: ver acompanhamentos' : 'Sem acompanhamentos registrados'}
       >
-        <ClipboardList className="w-3.5 h-3.5" />
-        <span>Acomp.</span>
+        <ClipboardList className="w-3.5 h-3.5 shrink-0" />
+        <span className="whitespace-nowrap">Acomp.</span>
         {hasAcomp && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-5 px-1 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-full border-2 border-[#001b3d] shadow-md z-10">
+          <span className="absolute -top-1.5 -right-1.5 min-w-[16px] sm:min-w-[18px] h-4 sm:h-5 px-1 flex items-center justify-center bg-red-500 text-white text-[8px] sm:text-[9px] font-black rounded-full border-2 border-[#001b3d] shadow-md z-10">
             {paciente.total_acompanhamentos}
           </span>
         )}
