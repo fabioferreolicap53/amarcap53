@@ -102,12 +102,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
   const [deleteControl, setDeleteControl] = useState<'idle' | 'running' | 'paused'>('idle');
   const [deleteProgress, setDeleteProgress] = useState({ deleted: 0, total: 0, errors: 0 });
   const [deleteSummary, setDeleteSummary] = useState<{ elapsedSec: number; errors: number; total: number; cancelled: boolean } | null>(null);
-  const [deleteEta, setDeleteEta] = useState<string>('');
-  const deleteFlagsRef = useRef({ paused: false, cancelled: false });
   const deleteStartTimeRef = useRef(0);
-  const deleteEtaTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const deleteSnapRef = useRef({ deleted: 0, total: 0, errors: 0, running: false });
-  const oldPatientCnsMapRef = useRef<Record<string, string>>({});
 
   // Sincroniza o estado do input com o usuário do contexto sempre que ele mudar
   useEffect(() => {
@@ -399,8 +394,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         // Remove chamada ao backend para re-vincular
         var relinkInfo = ' (use o botão manual para re-vincular CNS)';
         try {
+          // Limpa dado legado do mapa de CNS (ref foi removida com a exclusão atômica)
           localStorage.removeItem('amarcap53_old_patient_cns_map');
-          oldPatientCnsMapRef.current = {};
         } catch (relinkErr: any) {
           console.error('[Import] Erro limpar storage:', relinkErr);
         }
@@ -514,106 +509,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
 
     setShowPasswordModal(false);
     setDeleteSummary(null);
-    setDeleteEta('');
     setIsDeleting(true);
     setDeleteControl('running');
-    setDeleteStatus({ message: 'Buscando registros para exclusão...', type: 'deleting' });
-    setDeleteProgress({ deleted: 0, total: 0, errors: 0 });
-    deleteFlagsRef.current = { paused: false, cancelled: false };
+    setDeleteStatus({ message: 'Apagando registros no servidor...', type: 'deleting' });
+    setDeleteProgress({ deleted: 0, total: totalPatients || 0, errors: 0 });
     deleteStartTimeRef.current = Date.now();
 
-    // Snap ref — usado pelo setInterval para evitar stale closure
-    deleteSnapRef.current = { deleted: 0, total: 0, errors: 0, running: true };
-
-    // ETA a cada 2s — lê do ref, nunca fica stale
-    deleteEtaTimerRef.current = setInterval(() => {
-      var s = deleteSnapRef.current;
-      if (s.total > 0 && s.deleted > 0 && s.running) {
-        var elapsed = (Date.now() - deleteStartTimeRef.current) / 1000;
-        var rate = s.deleted / elapsed;
-        var remaining = (s.total - s.deleted) / rate;
-        if (rate > 0 && remaining > 0 && remaining < 3600) {
-          var mins = Math.floor(remaining / 60);
-          var secs = Math.floor(remaining % 60);
-          setDeleteEta(mins + 'm ' + secs + 's');
-        } else if (rate > 0 && remaining >= 3600) {
-          setDeleteEta('> 1h');
-        } else {
-          setDeleteEta('...');
-        }
-      }
-    }, 2000);
-
     try {
-      // Estratégia "sempre página 1": busca 100, deleta, repete até esvaziar
-      // Não precisa carregar todos os IDs — cada fetch é rápido e seguro
-      var BATCH_SIZE = 100;
-      var total = 0;
-      var deleted = 0;
-      var errorsCount = 0;
-      var wasCancelled = false;
+      // Exclusão atômica no backend (DROP + RECREATE da tabela).
+      // Substitui o loop antigo de 100 em 100 (~1.300 requisições para 129k registros).
+      var result = await pb.send('/api/amar/drop-pacientes', { method: 'POST' });
+      var removed = Number(result.removed || 0) || totalPatients || 0;
 
-      setDeleteStatus({ message: 'Sincronizando CNS nos acompanhamentos...', type: 'deleting' });
-      try {
-        await pb.send('/api/amar/migrate-acompanhamento-cns', { method: 'POST' });
-      } catch (e) {
-        console.error('[Delete] CNS Sync error:', e);
-      }
-
-      setDeleteStatus({ message: 'Iniciando exclusão...', type: 'deleting' });
-
-      // Capturar mapa oldPacienteId → cns ANTES de deletar
-      try {
-        var allPacs = await pb.collection('amarcap53_pacientes').getFullList({ fields: 'id,cns' });
-        var mapCaptured: Record<string, string> = {};
-        for (var p of allPacs) {
-          var cnsVal = (p as any).cns || '';
-          if (p.id && cnsVal) mapCaptured[p.id] = String(cnsVal);
-        }
-        oldPatientCnsMapRef.current = mapCaptured;
-        // Salva no localStorage para sobreviver a F5/Refresh
-        localStorage.setItem('amarcap53_old_patient_cns_map', JSON.stringify(mapCaptured));
-      } catch(_) { oldPatientCnsMapRef.current = {}; }
-
-      // Loop principal — continua até a coleção ficar vazia
-      while (true) {
-        if (deleteFlagsRef.current.cancelled) { wasCancelled = true; break; }
-        while (deleteFlagsRef.current.paused && !deleteFlagsRef.current.cancelled) {
-          await new Promise(function(r) { setTimeout(r, 200); });
-        }
-        if (deleteFlagsRef.current.cancelled) { wasCancelled = true; break; }
-
-        // Sempre busca a página 1 — após deletar, os próximos sobem pra página 1
-        var page = await pb.collection('amarcap53_pacientes').getList(1, BATCH_SIZE, { fields: 'id' });
-        if (total === 0) total = page.totalItems;
-        if (page.items.length === 0) break;
-
-        var results = await Promise.allSettled(
-          page.items.map(function(r) { return pb.collection('amarcap53_pacientes').delete(r.id); })
-        );
-        results.forEach(function(r) { r.status === 'fulfilled' ? deleted++ : errorsCount++; });
-        deleteSnapRef.current.deleted = deleted;
-        deleteSnapRef.current.total = total;
-        deleteSnapRef.current.errors = errorsCount;
-        setDeleteProgress({ deleted: deleted, total: total, errors: errorsCount });
-      }
-
-      deleteSnapRef.current.running = false;
-      if (deleteEtaTimerRef.current) clearInterval(deleteEtaTimerRef.current);
       var elapsed = Math.round((Date.now() - deleteStartTimeRef.current) / 1000);
-
-      if (wasCancelled) {
-        setDeleteSummary({ elapsedSec: elapsed, errors: errorsCount, total: deleted, cancelled: true });
-        setDeleteStatus({ message: deleted + ' registros excluídos. Operação interrompida.', type: 'completed' });
-      } else {
-        setDeleteSummary({ elapsedSec: elapsed, errors: errorsCount, total: deleted, cancelled: false });
-        setDeleteStatus({ message: deleted + ' registros excluídos com sucesso!', type: 'completed' });
-      }
+      setDeleteProgress({ deleted: removed, total: removed, errors: 0 });
+      setDeleteSummary({ elapsedSec: elapsed, errors: 0, total: removed, cancelled: false });
+      setDeleteStatus({ message: removed + ' registros excluídos com sucesso!', type: 'completed' });
       setDeleteControl('idle');
       fetchStats();
     } catch (err: any) {
-      deleteSnapRef.current.running = false;
-      if (deleteEtaTimerRef.current) clearInterval(deleteEtaTimerRef.current);
       var elapsedErr = Math.round((Date.now() - deleteStartTimeRef.current) / 1000);
       setDeleteSummary({ elapsedSec: elapsedErr, errors: 0, total: 0, cancelled: false });
       console.error('Erro ao excluir registros:', err);
@@ -622,22 +536,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     } finally {
       setIsDeleting(false);
     }
-  };
-
-  const handlePauseResume = () => {
-    if (deleteFlagsRef.current.paused) {
-      deleteFlagsRef.current.paused = false;
-      setDeleteControl('running');
-    } else {
-      deleteFlagsRef.current.paused = true;
-      setDeleteControl('paused');
-    }
-  };
-
-  const handleCancelDelete = () => {
-    deleteFlagsRef.current.cancelled = true;
-    deleteFlagsRef.current.paused = false;
-    setDeleteControl('idle');
   };
 
   const handleManualRelink = async () => {
@@ -1234,8 +1132,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                             </div>
                           </div>
 
-                          {/* Métricas: tempo + erros + ETA */}
-                          <div className="grid grid-cols-3 gap-2">
+                          {/* Métricas: tempo + erros */}
+                          <div className="grid grid-cols-2 gap-2">
                             <div className="bg-white rounded-xl p-2.5 text-center">
                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">TEMPO</p>
                               <p className="text-[11px] font-black text-slate-700 mt-0.5">
@@ -1245,54 +1143,23 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                               </p>
                             </div>
                             <div className="bg-white rounded-xl p-2.5 text-center">
-                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">ERROS</p>
-                              <p className={`text-[11px] font-black mt-0.5 ${deleteProgress.errors > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                {deleteProgress.errors}
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">REGISTROS</p>
+                              <p className="text-[11px] font-black text-slate-700 mt-0.5">
+                                {deleteProgress.deleted}
                               </p>
-                            </div>
-                            <div className="bg-white rounded-xl p-2.5 text-center">
-                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-tight">
-                                {deleteControl === 'paused' ? 'RESTANTE' : 'ESTIMADO'}
-                              </p>
-                              {deleteControl === 'paused' ? (
-                                <p className="text-[11px] font-black text-amber-600 mt-0.5">
-                                  {deleteEta || '...'}
-                                </p>
-                              ) : (
-                                <p className="text-[11px] font-black text-slate-700 mt-0.5">
-                                  {deleteEta || '...'}
-                                </p>
-                              )}
                             </div>
                           </div>
 
                           {/* Status */}
                           <div className="flex items-center justify-center gap-3">
-                            {deleteControl === 'paused' ? (
-                              <div className="w-3 h-3 bg-amber-400 rounded-full animate-pulse" />
-                            ) : (
-                              <Loader2 className="w-4 h-4 text-rose-500 animate-spin" />
-                            )}
-                            <p className="text-[10px] font-black text-slate-600 uppercase">
-                              {deleteControl === 'paused' ? 'PAUSADO' : 'EXCLUINDO'}
-                            </p>
+                            <Loader2 className="w-4 h-4 text-rose-500 animate-spin" />
+                            <p className="text-[10px] font-black text-slate-600 uppercase">EXCLUINDO</p>
                           </div>
 
-                          {/* Controles: Pause/Resume + Cancelar */}
-                          <div className="flex gap-3">
-                            <button
-                              onClick={handlePauseResume}
-                              className="flex-1 py-4 bg-amber-500 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 text-xs flex items-center justify-center gap-2"
-                            >
-                              {deleteControl === 'paused' ? '▶ Continuar' : '⏸ Pausar'}
-                            </button>
-                            <button
-                              onClick={handleCancelDelete}
-                              className="flex-1 py-4 bg-slate-200 text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-300 transition-all text-xs flex items-center justify-center gap-2"
-                            >
-                              ⏹ Interromper
-                            </button>
-                          </div>
+                          {/* Nota: operação atômica no servidor — sem pausa */}
+                          <p className="text-[9px] font-bold text-slate-400 text-center">
+                            Exclusão atômica no servidor. A operação não pode ser pausada.
+                          </p>
                         </div>
                       )}
 

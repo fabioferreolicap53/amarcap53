@@ -336,3 +336,55 @@ routerAdd('POST', '/api/amar/delete-all', function(c) {
   return c.json(500, { message: String(err) });
 }
 });
+
+// 4. Exclusão atômica de pacientes (SQL direto, sem API de coleção)
+// NOTA: NÃO usar $app.delete(col)/$app.save(col) aqui. Na PocketBase v0.39.4
+// essas chamadas de gestão de coleções derrubam o processo em hooks JS e o
+// servidor inteiro responde 502 (derruba apps de outras coleções também).
+// DELETE FROM + VACUUM no SQLite apaga os dados sem mexer no schema.
+routerAdd('OPTIONS', '/api/amar/drop-pacientes', function(c) {
+  applyCors(c);
+  return c.noContent(204);
+});
+routerAdd('POST', '/api/amar/drop-pacientes', function(c) {
+  applyCors(c);
+  try {
+    var auth = c.auth;
+    if (!auth) return c.json(401, { message: 'Nao autenticado' });
+    var role = String(auth.get('role') || '');
+    if (role !== 'admin' && role !== 'cap') {
+      return c.json(403, { message: 'Somente usuarios admin/cap podem excluir dados.' });
+    }
+
+    var db = $app.db();
+
+    // Contagem antes da exclusão (para o resumo do frontend)
+    var total = 0;
+    try {
+      var countRows = db.newQuery("SELECT COUNT(*) AS total FROM " + PACIENTES_COLL).select();
+      if (countRows && countRows.length > 0) total = parseInt(countRows[0].total, 10) || 0;
+    } catch(e) {}
+
+    // CNS dos acompanhamentos preenchido antes de apagar pacientes.
+    // Importante para o relink por CNS após reimportar.
+    try {
+      db.newQuery(
+        "UPDATE amarcap53_acompanhamentos " +
+        "SET cns = (SELECT cns FROM amarcap53_pacientes WHERE id = amarcap53_acompanhamentos.paciente) " +
+        "WHERE (cns = '' OR cns IS NULL) " +
+        "AND paciente IN (SELECT id FROM amarcap53_pacientes)"
+      ).execute();
+    } catch(e) { console.error('[drop-pacientes] Sync CNS error:', e); }
+
+    // Exclusão em uma única sentença (SQLite otimiza DELETE FROM de tabela cheia
+    // muito mais rápido que 1 delete HTTP por registro).
+    // SQL puro — não toca no schema nem na API de coleções ($app.delete/$app.save
+    // derrubam o PocketBase v0.39.4 e derrubam TODOS os apps do servidor).
+    db.newQuery("DELETE FROM " + PACIENTES_COLL).execute();
+
+    return c.json(200, { success: true, removed: total, method: 'delete_sql' });
+  } catch(err) {
+    console.error('[drop-pacientes] Erro:', err);
+    return c.json(500, { message: String(err) });
+  }
+});
