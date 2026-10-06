@@ -516,17 +516,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     deleteStartTimeRef.current = Date.now();
 
     try {
-      // Exclusão atômica no backend. Substitui o loop antigo de 100 em 100
-      // (~1.300 requisições para 129k registros).
-      var result = null;
-      try {
-        result = await pb.send('/api/amar/drop-pacientes', { method: 'POST', body: {} });
-      } catch (dropErr) {
-        console.warn('[Delete] drop-pacientes falhou, usando delete-all:', dropErr);
-        // Fallback: rota antiga já provada em produção
-        await pb.send('/api/amar/delete-all', { method: 'POST', body: { collection: 'amarcap53_pacientes' } });
-        result = { removed: totalPatients || 0 };
-      }
+      // Exclusão via delete-all (rota já provada em produção): sync CNS +
+      // DELETE FROM em uma única sentença SQL (muito mais rápido que o loop
+      // antigo de 100 em 100 com 1 request HTTP por registro).
+      var result = await pb.send('/api/amar/delete-all', {
+        method: 'POST',
+        body: { collection: 'amarcap53_pacientes' },
+      });
       var removed = Number(result?.removed || 0) || totalPatients || 0;
 
       var elapsed = Math.round((Date.now() - deleteStartTimeRef.current) / 1000);
