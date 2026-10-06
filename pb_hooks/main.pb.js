@@ -327,11 +327,9 @@ routerAdd('POST', '/api/amar/import-pacientes', function(c) {
 });
 
 // 3. Delete All
-routerAdd('OPTIONS', '/api/amar/delete-all', function(c) {
-  applyCors(c);
-  return c.noContent(204);
-});
-routerAdd('POST', '/api/amar/delete-all', function(c) {
+// Handler único compartilhado por delete-all e drop-pacientes (alias de
+// compatibilidade para builds antigos do frontend ainda em produção).
+function amarHandleDeleteAll(c) {
   applyCors(c);
   try {
     var coll = '';
@@ -339,7 +337,7 @@ routerAdd('POST', '/api/amar/delete-all', function(c) {
     if (!coll) return c.json(400, { message: 'Envie collection' });
 
     var db = $app.db();
-    
+
     // Se for excluir pacientes, sincroniza CNS nos acompanhamentos primeiro
     if (coll === PACIENTES_COLL) {
       try {
@@ -353,9 +351,26 @@ routerAdd('POST', '/api/amar/delete-all', function(c) {
       } catch(e) { console.error('[delete-all] Sync CNS error:', e); }
     }
 
-  db.newQuery("DELETE FROM " + coll).execute();
-  return c.json(200, { success: true });
-} catch(err) {
-  return c.json(500, { message: String(err) });
+    db.newQuery("DELETE FROM " + coll).execute();
+    return c.json(200, { success: true });
+  } catch(err) {
+    return c.json(500, { message: String(err) });
+  }
 }
+
+routerAdd('OPTIONS', '/api/amar/delete-all', function(c) {
+  applyCors(c);
+  return c.noContent(204);
+});
+routerAdd('POST', '/api/amar/delete-all', function(c) {
+  return amarHandleDeleteAll(c);
+});
+
+// Alias: builds antigos do frontend chamam /api/amar/drop-pacientes
+routerAdd('OPTIONS', '/api/amar/drop-pacientes', function(c) {
+  applyCors(c);
+  return c.noContent(204);
+});
+routerAdd('POST', '/api/amar/drop-pacientes', function(c) {
+  return amarHandleDeleteAll(c);
 });
