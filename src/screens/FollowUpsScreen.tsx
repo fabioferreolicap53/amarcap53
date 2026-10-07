@@ -104,9 +104,13 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
   const _fuInit = getFUCache();
   const [acompanhamentos, setAcompanhamentos] = useState<Acompanhamento[]>(_fuInit ?? []);
-  const [isLoading, setIsLoading] = useState(!_fuInit);
+  // Só considera "carregado" se o cache tem registros. Cache vazio não deve
+  // esconder o loading (evita piscar "relação zerada" antes do fetch real).
+  const [isLoading, setIsLoading] = useState(!(_fuInit && _fuInit.length));
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [filterVersion, setFilterVersion] = useState(0);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [sortField, setSortField] = useState<string>('data_busca');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const loadedOnceRef = useRef(false);
@@ -320,6 +324,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     let cancelled = false;
     const fetchAcompanhamentos = async () => {
       if (!user) return;
+      setLoadError(false);
       try {
         // Escopo regional: igualdade normalizada (usa índice) em vez de
         // `unidade ~ {:u}` com % entre palavras, que vira LIKE '%X%Y%' e faz
@@ -349,64 +354,28 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           unidades: roleUnits,
           equipes: roleEquipes,
           microareas: roleMicroareas,
+          prefix: 'paciente.',
         });
         if (roleFilter) patientRegionFilterParts.push(roleFilter);
 
-        // Filtros UI substituem filtro de permissão
+        // Filtros UI somam ao filtro de permissão (mesma semântica do antigo AND)
         if (hasUnidadeFilter || hasEquipeFilter || hasMicroareaFilter) {
           const uiFilter = buildRegionalPatientFilter({
             unidades: filterUnidade,
             equipes: filterEquipe,
             microareas: filterMicroarea,
+            prefix: 'paciente.',
           });
           if (uiFilter) patientRegionFilterParts.push(uiFilter);
         }
 
-        // Parallel: fetch region patient IDs + SIM/NÃO patient IDs (2x faster)
-        const regionPromise = (patientRegionFilterParts.length > 0)
-          ? pb.collection('amarcap53_pacientes').getFullList({
-              filter: patientRegionFilterParts.join(' && '),
-              batch: 500,
-              requestKey: null,
-              fields: 'id'
-            }).then(r => r.map(p => p.id).filter(Boolean))
-          : Promise.resolve([]);
-
-        const simNaoFilter = (field: string, val: string) => {
-          if (!val) return null;
-          if (val === 'SIM') return `${field} != ""`;
-          if (val === 'NÃO') return `${field} = ""`;
-          return null;
-        };
-        const hasSimNaoFilter = filterDnaHpvPep.length > 0 || filterCitoLab.length > 0 || filterCitoPep.length > 0 || filterDnaHpvGal.length > 0;
-        const simNaoPromise = hasSimNaoFilter ? (() => {
-          const patFilters: string[] = [];
-          const f1 = simNaoFilter('dna_hpv_pep', filterDnaHpvPep);
-          if (f1) patFilters.push(f1);
-          const f2 = simNaoFilter('cito_lab', filterCitoLab);
-          if (f2) patFilters.push(f2);
-          const f3 = simNaoFilter('cito_pep', filterCitoPep);
-          if (f3) patFilters.push(f3);
-          const f4 = simNaoFilter('dna_hpv_gal', filterDnaHpvGal);
-          if (f4) patFilters.push(f4);
-          if (patFilters.length === 0) return Promise.resolve([]);
-          return pb.collection('amarcap53_pacientes').getFullList({
-            filter: patFilters.join(' && '),
-            fields: 'id',
-            batch: 500,
-            requestKey: null
-          }).then(r => r.map(p => p.id).filter(Boolean));
-        })() : Promise.resolve([]);
-
-        const [regionPatientIds, simNaoPatientIds] = await Promise.all([regionPromise, simNaoPromise]);
-
-        // Filtro por região e SIM/NÃO é aplicado no client-side: um OR gigante de
-        // `paciente = "id"` estoura o limite de cláusulas do PocketBase (400).
-        const hasRegionScope = patientRegionFilterParts.length > 0;
-        const regionSet = new Set(regionPatientIds);
-        const simNaoSet = new Set(simNaoPatientIds);
-
-        const acompFilters = [];
+        // Filtro regional e SIM/NÃO aplicados NO SERVIDOR, direto na coleção de
+        // acompanhamentos, via relação aninhada `paciente.<campo>`.
+        // O modelo antigo buscava TODOS os IDs de pacientes da região (getFullList
+        // em ~129K) e depois TODOS os acompanhamentos, filtrando no client — isso
+        // sobrecarregava o PocketBase de 1GB (500/timeout). O filtro aninhado usa
+        // índice (unidade/equipe/microarea) e corta o volume já no banco.
+        const acompFilters: string[] = [];
         // Filtro por paciente específico (vindo do long press)
         if (filterPacienteId) {
           acompFilters.push(`paciente = "${filterPacienteId}"`);
@@ -434,6 +403,27 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
           acompFilters.push(`data_busca <= "${filterDataFim} 23:59:59"`);
         }
 
+        // Região (permissão + filtros UI) via relação `paciente.*`
+        if (patientRegionFilterParts.length > 0) {
+          acompFilters.push(`(${patientRegionFilterParts.join(' && ')})`);
+        }
+
+        // SIM/NÃO via relação `paciente.*`
+        const simNaoFilter = (field: string, val: string) => {
+          if (val === 'SIM') return `paciente.${field} != ""`;
+          if (val === 'NÃO') return `paciente.${field} = ""`;
+          return '';
+        };
+        ([
+          ['dna_hpv_pep', filterDnaHpvPep],
+          ['cito_lab', filterCitoLab],
+          ['cito_pep', filterCitoPep],
+          ['dna_hpv_gal', filterDnaHpvGal],
+        ] as [string, string][]).forEach(([field, val]) => {
+          const clause = simNaoFilter(field, val);
+          if (clause) acompFilters.push(clause);
+        });
+
         const fetchOpts: any = {
           sort: '-created',
           expand: 'paciente',
@@ -444,16 +434,13 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
         const filterStr = acompFilters.join(' && ');
         if (filterStr) fetchOpts.filter = filterStr;
         const records = await pb.collection('amarcap53_acompanhamentos').getFullList(fetchOpts);
-        const scoped = records.filter((r: any) => {
-          if (hasRegionScope && !regionSet.has(r.paciente)) return false;
-          if (hasSimNaoFilter && !simNaoSet.has(r.paciente)) return false;
-          return true;
-        });
-        setAcompanhamentos(scoped);
-        setFUCache(scoped);
-      } catch (error) {
+        setAcompanhamentos(records);
+        setFUCache(records);
+      } catch (error: any) {
         if (cancelled) return;
+        if (error?.isAbort) return;
         console.error('Erro ao buscar acompanhamentos:', error);
+        setLoadError(true);
       } finally {
         setIsLoading(false);
         setIsFilterLoading(false);
@@ -463,7 +450,7 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
     fetchAcompanhamentos();
     return () => { cancelled = true; };
-  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, filterUnidade, filterEquipe, filterMicroarea, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal, filterPacienteId, filterVersion]);
+  }, [user?.id, user?.role, user?.unidade_saude, user?.equipe, user?.microarea, isAdmin, filterUnidade, filterEquipe, filterMicroarea, filterTipoBusca, filterTipoContato, filterSituacao, filterEntraves, filterDataInicio, filterDataFim, filterDnaHpvPep, filterCitoLab, filterCitoPep, filterDnaHpvGal, filterPacienteId, filterVersion, reloadKey]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este registro?')) {
@@ -868,6 +855,27 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
       <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 no-scrollbar">
         <LoadingOverlay visible={isLoading} message="Sincronizando registros..." />
         <LoadingOverlay visible={isFilterLoading} variant="card" title="Carregando Acompanhamentos" message="Aplicando filtros, aguarde um momento..." />
+
+        {/* Aviso de falha ao carregar: evita o usuário achar que a lista está zerada */}
+        {loadError && !isLoading && (
+          <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 md:p-5 shadow-md animate-in fade-in duration-300">
+            <div className="flex items-center gap-3 text-center sm:text-left">
+              <AlertTriangle className="w-7 h-7 text-amber-500 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-black text-amber-800 uppercase tracking-wide">Falha ao carregar os acompanhamentos</p>
+                <p className="text-xs font-medium text-amber-700">
+                  A lista abaixo pode estar incompleta ou vazia por erro de conexão/servidor — não significa que não há registros. Verifique sua internet e tente novamente.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => { setLoadError(false); setIsLoading(true); setReloadKey(k => k + 1); }}
+              className="flex-shrink-0 px-6 py-3 bg-amber-500 text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600 transition-all shadow-md cursor-pointer"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
 
         {/* Barra de filtro de paciente específico (vindo do long press) */}
         {filterPacienteId && !isLoading && (
@@ -1278,10 +1286,18 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
                   {filteredRecords.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-20 text-center">
-                        <div className="flex flex-col items-center opacity-30">
-                          <ClipboardList className="w-16 h-16 mb-4" />
-                          <p className="text-sm font-black uppercase tracking-widest">Nenhum registro encontrado</p>
-                        </div>
+                        {loadError ? (
+                          <div className="flex flex-col items-center text-amber-600">
+                            <AlertTriangle className="w-16 h-16 mb-4" />
+                            <p className="text-sm font-black uppercase tracking-widest">Não foi possível carregar os registros</p>
+                            <p className="text-xs font-medium mt-1 normal-case tracking-normal">Use "Tentar novamente" acima para recarregar.</p>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center opacity-30">
+                            <ClipboardList className="w-16 h-16 mb-4" />
+                            <p className="text-sm font-black uppercase tracking-widest">Nenhum registro encontrado</p>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ) : (

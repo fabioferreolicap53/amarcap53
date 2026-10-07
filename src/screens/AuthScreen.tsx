@@ -113,7 +113,15 @@ export function AuthScreen() {
       // credenciais erradas quanto para e-mail ainda não confirmado (o hook
       // onRecordAuthRequest no servidor bloqueia o login nesse caso).
       console.warn('[login] Falha na autenticação:', err?.status, err?.message || err);
-      setError('Não foi possível entrar. Verifique o e-mail e a senha. Se você acabou de se cadastrar, confirme o e-mail pelo link enviado antes de fazer login.');
+      const status = err?.status;
+      const isServerError = !status || status >= 500;
+      if (isServerError) {
+        // Erro de servidor/rede NÃO é senha errada. Avisa o usuário para não
+        // achar que perdeu o acesso e tenta de novo depois.
+        setError('Não foi possível conectar ao servidor no momento. Verifique sua internet e tente novamente em alguns instantes.');
+      } else {
+        setError('Não foi possível entrar. Verifique o e-mail e a senha. Se você acabou de se cadastrar, confirme o e-mail pelo link enviado antes de fazer login.');
+      }
     } finally {
       submittingRef.current = false;
       setIsLoading(false);

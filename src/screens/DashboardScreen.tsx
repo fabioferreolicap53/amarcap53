@@ -504,10 +504,34 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         });
         if (uiFilter) patientFilterParts.push(uiFilter);
 
+        // Mesma região, porém aplicada na coleção de acompanhamentos via relação
+        // `paciente.*` (filtro aninhado do PocketBase). Assim não é preciso baixar
+        // TODOS os acompanhamentos para filtrar no client — alivia o servidor de
+        // 1GB. Mantém exatamente a mesma semântica do patientFilterParts.
+        const acompRegionParts: string[] = [];
+        if (!isAdmin) {
+          const roleFilterA = buildRegionalPatientFilter({
+            unidades: [user.unidade_saude],
+            equipes: user.role === 'unidade' ? [] : [user.equipe],
+            microareas: user.role === 'microarea' ? [user.microarea] : [],
+            prefix: 'paciente.',
+          });
+          if (roleFilterA) acompRegionParts.push(roleFilterA);
+        }
+        const uiFilterA = buildRegionalPatientFilter({
+          unidades: filterUnidade,
+          equipes: filterEquipe,
+          microareas: filterMicroarea,
+          prefix: 'paciente.',
+        });
+        if (uiFilterA) acompRegionParts.push(uiFilterA);
+
         // Build filter strings
         const patientFilter = patientFilterParts.join(' && ');
 
-        // Build acomp filters (only acomp-specific fields, not role/regional — handled via patient IDs below)
+        // Build acomp filters: data + região via relação `paciente.*` (filtro aninhado
+        // do PocketBase). O servidor já devolve apenas os acompanhamentos da região,
+        // evitando baixar TODOS e filtrar no client (alivia o servidor de 1GB).
         const acompFilterParts: string[] = [];
         if (filterDataInicio) {
           acompFilterParts.push(`data_busca >= "${filterDataInicio}"`);
@@ -515,6 +539,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         if (filterDataFim) {
           acompFilterParts.push(`data_busca <= "${filterDataFim} 23:59:59"`);
         }
+        if (acompRegionParts.length > 0) {
+          acompFilterParts.push(`(${acompRegionParts.join(' && ')})`);
+        }
+        const acompFilter = acompFilterParts.join(' && ').trim();
 
         // Parallel queries
         const hasUIFilters = filterUnidade.length > 0 || filterEquipe.length > 0 || filterMicroarea.length > 0 || filterDataInicio || filterDataFim;
@@ -718,14 +746,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
         let acompRecords: any[] = [];
 
         if (scopedPatientIds.length > 0) {
-          // Com escopo: busca todos acompanhamentos paginados e filtra por IDs do scope no client
-          const scopedSet = new Set(scopedPatientIds);
-          const baseFilter = acompFilterParts.join(' && ').trim();
+          // Com escopo: o filtro regional já vai no servidor via `paciente.*`;
+          // aqui só excluímos os registros "SEM BUSCA ATIVA" no client (barato).
           try {
-            const allAcomp = await paginatedFetch('amarcap53_acompanhamentos', 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created,paciente,tipo_busca', baseFilter || undefined);
-            // Filtra no client: só registros de pacientes dentro do scope, excluindo SEM BUSCA ATIVA
+            const allAcomp = await paginatedFetch('amarcap53_acompanhamentos', 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created,paciente,tipo_busca', acompFilter || undefined);
             acompRecords = allAcomp.filter((r: any) => {
-              if (!scopedSet.has(r.paciente)) return false;
               const tb = String(r.tipo_busca || '').toLowerCase();
               return !tb.includes('sem busca ativa');
             });
@@ -734,8 +759,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ activeTab, set
           // Admin sem filtros: busca acompanhamentos → IDs únicos → busca só esses pacientes (eficiente)
           try {
             // 1. Busca todos acompanhamentos (~5K, leve)
-            const baseFilter = acompFilterParts.join(' && ').trim();
-            acompRecords = await paginatedFetch('amarcap53_acompanhamentos', 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created,paciente,tipo_busca', baseFilter || undefined);
+            acompRecords = await paginatedFetch('amarcap53_acompanhamentos', 'situacao_pos_busca,tipo_contato,entraves_identificados,data_busca,created,paciente,tipo_busca', acompFilter || undefined);
             if (cancelled) return;
 
             // 2. Extrai IDs únicos dos pacientes COM BUSCA ATIVA (exclui "SEM BUSCA ATIVA")

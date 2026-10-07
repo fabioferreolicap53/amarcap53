@@ -81,12 +81,14 @@ export const isSameEquipe = (a: unknown, b: unknown): boolean => {
 
 // Igualdade de equipe já normalizada para o formato do DB (sem acento,
 // maiúsculo), cobrindo aliases. Ex: UI "TOPÁZIO" → `equipe = "TOPAZIO"`.
-export const buildEquipeDbEqualityClause = (values: string[]): string => {
+// `prefix` permite filtrar por relação aninhada, ex: prefix "paciente." →
+// `paciente.equipe = "TOPAZIO"` (usado em amarcap53_acompanhamentos).
+export const buildEquipeDbEqualityClause = (values: string[], prefix = ''): string => {
   const clauses = new Set<string>();
   values.forEach((v) => {
     getEquipeAliases(v).forEach((alias) => {
       const norm = normalizeEquipeKey(alias);
-      if (norm) clauses.add(`equipe = "${escapeFilterValue(norm)}"`);
+      if (norm) clauses.add(`${prefix}equipe = "${escapeFilterValue(norm)}"`);
     });
   });
   const parts = [...clauses];
@@ -96,12 +98,12 @@ export const buildEquipeDbEqualityClause = (values: string[]): string => {
 };
 
 // Igualdade de unidade normalizada (usa idx_am53_unidade).
-export const buildUnidadeDbEqualityClause = (values: string[]): string => {
+export const buildUnidadeDbEqualityClause = (values: string[], prefix = ''): string => {
   const parts = [...new Set(
     values
       .map((v) => normalizeEquipeKey(v))
       .filter(Boolean)
-      .map((norm) => `unidade = "${escapeFilterValue(norm)}"`)
+      .map((norm) => `${prefix}unidade = "${escapeFilterValue(norm)}"`)
   )];
   if (parts.length === 0) return '';
   if (parts.length === 1) return parts[0];
@@ -110,25 +112,30 @@ export const buildUnidadeDbEqualityClause = (values: string[]): string => {
 
 // Cláusula regional completa para pacientes: unidade + equipe + microárea,
 // tudo por igualdade (usa índices). Aceita listas (filtros UI) ou unitário (role).
+// `prefix` permite aplicar a mesma cláusula em coleções que referenciam o
+// paciente por relação, ex: prefix "paciente." → filtra acompanhamentos pela
+// região do paciente sem precisar buscar todos os IDs antes.
 export const buildRegionalPatientFilter = (opts: {
   unidades?: string[];
   equipes?: string[];
   microareas?: (string | number)[];
+  prefix?: string;
 }): string => {
+  const prefix = opts.prefix || '';
   const clauses: string[] = [];
   if (opts.unidades && opts.unidades.length > 0) {
-    const c = buildUnidadeDbEqualityClause(opts.unidades);
+    const c = buildUnidadeDbEqualityClause(opts.unidades, prefix);
     if (c) clauses.push(c);
   }
   if (opts.equipes && opts.equipes.length > 0) {
-    const c = buildEquipeDbEqualityClause(opts.equipes);
+    const c = buildEquipeDbEqualityClause(opts.equipes, prefix);
     if (c) clauses.push(c);
   }
   if (opts.microareas && opts.microareas.length > 0) {
     const ma = opts.microareas
       .map((m) => Number(m))
       .filter((n) => Number.isFinite(n))
-      .map((n) => `microarea = ${n}`);
+      .map((n) => `${prefix}microarea = ${n}`);
     if (ma.length > 0) clauses.push(`(${ma.join(' || ')})`);
   }
   return clauses.join(' && ');
