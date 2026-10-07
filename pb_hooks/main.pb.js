@@ -289,19 +289,22 @@ routerAdd('POST', '/api/amar/import-pacientes', function(c) {
       rows.push("(" + escSql(id) + ", " + escSql(now) + ", " + escSql(now) + ", " +
         escSql(r.unidade) + ", " + escSql(r.equipe) + ", " + (parseInt(r.microarea, 10) || 0) + ", " +
         escSql(cns) + ", " + escSql(r.nome) + ", " + escSql(r.data_nascimento) + ", " +
+        escSql(r.dna_hpv_pep) + ", " + escSql(r.cito_lab) + ", " + escSql(r.cito_pep) + ", " +
+        escSql(r.dna_hpv_gal) + ", " + escSql(r.unidade_solicitante) + ", " +
         (parseInt(r.idade, 10) || 0) + ", " + escSql(r.grupo) + ")");
     }
 
     if (rows.length) {
       db.newQuery(
         "INSERT INTO amarcap53_pacientes " +
-        "(id, created, updated, unidade, equipe, microarea, cns, nome, data_nascimento, idade, grupo) VALUES " +
+        "(id, created, updated, unidade, equipe, microarea, cns, nome, data_nascimento, " +
+        "dna_hpv_pep, cito_lab, cito_pep, dna_hpv_gal, unidade_solicitante, idade, grupo) VALUES " +
         rows.join(",")
       ).execute();
       imported = rows.length;
     }
 
-    return c.json(200, { success: true, imported: imported });
+    return c.json(200, { success: true, imported: imported, build: '2026-10-07-import-v3' });
   } catch(err) {
     return c.json(500, { message: String(err) });
   }
