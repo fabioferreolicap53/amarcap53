@@ -364,28 +364,40 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
         setImportProgress({ imported: 0, total: records.length, errors: 0 });
         setUploadStatus({ stage: 'importing', message: 'Importando...', current: 0, total: records.length, fileName: file.name });
 
-        var BATCH = 500;
+        // Importação em massa via backend (1 INSERT multi-linha por lote).
+        // Antes: 1 requisição HTTP por registro (129k requests) travava o servidor.
+        // Agora: ~1 request por lote de 1000 registros + respiro entre lotes,
+        // deixando o PocketBase livre (1GB RAM, compartilhado) para os outros apps.
+        var CHUNK = 1000;      // registros por requisição
+        var PAUSE_MS = 40;     // pausa entre lotes p/ liberar o servidor
         var imported = 0;
         var errors = 0;
         var wasCancelled = false;
 
-        for (var i = 0; i < records.length; i += BATCH) {
+        for (var i = 0; i < records.length; i += CHUNK) {
           if (importFlagsRef.current.cancelled) { wasCancelled = true; break; }
           while (importFlagsRef.current.paused && !importFlagsRef.current.cancelled) {
             await new Promise(function(r2) { setTimeout(r2, 200); });
           }
           if (importFlagsRef.current.cancelled) { wasCancelled = true; break; }
 
-          var batch = records.slice(i, i + BATCH);
-          var results = await Promise.allSettled(
-            batch.map(function(rec) { return pb.collection('amarcap53_pacientes').create(rec, { requestKey: null }); })
-          );
-          results.forEach(function(r) { r.status === 'fulfilled' ? imported++ : errors++; });
+          var chunk = records.slice(i, i + CHUNK);
+          try {
+            var res: any = await pb.send('/api/amar/import-pacientes', {
+              method: 'POST',
+              body: { records: chunk, mode: 'append' },
+            });
+            imported += Number(res?.imported || chunk.length);
+          } catch {
+            errors += chunk.length;
+          }
           setImportProgress({ imported: imported, total: records.length, errors: errors });
           setUploadStatus({
             stage: 'importing', message: imported + ' registros importados...',
             current: imported, total: records.length, fileName: file.name,
           });
+
+          if (PAUSE_MS > 0) await new Promise(function(r2) { setTimeout(r2, PAUSE_MS); });
         }
 
         if (importEtaTimerRef.current) clearInterval(importEtaTimerRef.current);

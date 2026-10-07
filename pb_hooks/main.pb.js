@@ -274,23 +274,31 @@ routerAdd('POST', '/api/amar/import-pacientes', function(c) {
     var imported = 0;
     var now = new Date().toISOString().replace('T', ' ').split('.')[0];
 
+    // INSERT multi-linha: 1 única sentença SQL = 1 transação atômica.
+    // Muito mais rápido que 1 INSERT por registro e libera o lock de escrita
+    // do SQLite quase instantaneamente (não trava os outros apps do servidor).
+    var rows = [];
     for (var i = 0; i < records.length; i++) {
       var r = records[i];
-      try {
-        var cns = padLeft(String(r.cns || '').replace(/\D/g, ''), 15, '0').slice(-15);
-        if (!cns || !r.nome) continue;
+      var cns = padLeft(String(r.cns || '').replace(/\D/g, ''), 15, '0').slice(-15);
+      if (!cns || !r.nome) continue;
 
-        // Gerar ID aleatório de 15 caracteres (padrão PocketBase)
-        var id = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 9);
-        id = id.substring(0, 15);
+      // Gerar ID aleatório de 15 caracteres (padrão PocketBase)
+      var id = (Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 9)).substring(0, 15);
 
-        db.newQuery("INSERT INTO amarcap53_pacientes (id, created, updated, unidade, equipe, microarea, cns, nome, data_nascimento, idade, grupo) VALUES (" +
-          escSql(id) + ", " + escSql(now) + ", " + escSql(now) + ", " +
-          escSql(r.unidade) + ", " + escSql(r.equipe) + ", " + (parseInt(r.microarea, 10) || 0) + ", " +
-          escSql(cns) + ", " + escSql(r.nome) + ", " + escSql(r.data_nascimento) + ", " +
-          (parseInt(r.idade, 10) || 0) + ", " + escSql(r.grupo) + ")").execute();
-        imported++;
-      } catch(e) {}
+      rows.push("(" + escSql(id) + ", " + escSql(now) + ", " + escSql(now) + ", " +
+        escSql(r.unidade) + ", " + escSql(r.equipe) + ", " + (parseInt(r.microarea, 10) || 0) + ", " +
+        escSql(cns) + ", " + escSql(r.nome) + ", " + escSql(r.data_nascimento) + ", " +
+        (parseInt(r.idade, 10) || 0) + ", " + escSql(r.grupo) + ")");
+    }
+
+    if (rows.length) {
+      db.newQuery(
+        "INSERT INTO amarcap53_pacientes " +
+        "(id, created, updated, unidade, equipe, microarea, cns, nome, data_nascimento, idade, grupo) VALUES " +
+        rows.join(",")
+      ).execute();
+      imported = rows.length;
     }
 
     return c.json(200, { success: true, imported: imported });
