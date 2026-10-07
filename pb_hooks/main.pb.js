@@ -242,7 +242,9 @@ routerAdd('POST', '/api/amar/import-pacientes', function(c) {
     return s;
   }
   function escSql(v) {
-    if (v === null || v === undefined || v === '') return 'NULL';
+    // Campos do PocketBase são NOT NULL: vazio deve virar '' (string vazia),
+    // nunca NULL — senão o INSERT falha com "NOT NULL constraint failed".
+    if (v === null || v === undefined) return "''";
     var s = String(v).replace(/'/g, "''");
     return "'" + s + "'";
   }
@@ -304,7 +306,7 @@ routerAdd('POST', '/api/amar/import-pacientes', function(c) {
       imported = rows.length;
     }
 
-    return c.json(200, { success: true, imported: imported, build: '2026-10-07-import-v3' });
+    return c.json(200, { success: true, imported: imported, build: '2026-10-07-import-v4' });
   } catch(err) {
     return c.json(500, { message: String(err) });
   }
