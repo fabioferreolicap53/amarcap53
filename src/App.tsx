@@ -12,6 +12,7 @@ import { FavoritesScreen } from './screens/FavoritesScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { InstallBanner } from './components/InstallBanner';
+import { OutubroRosaCampaign } from './components/OutubroRosaCampaign';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthScreen } from './screens/AuthScreen';
@@ -400,6 +401,7 @@ function AppContent() {
         {activeTab === 'configuracoes' && <SettingsScreen key="configuracoes" activeTab={activeTab} setActiveTab={setActiveTab} />}
       </main>
       <InstallBanner />
+      <OutubroRosaCampaign />
     </div>
   );
 }
