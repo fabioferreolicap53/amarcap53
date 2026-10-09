@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, Settings, HelpCircle, LogOut, X, Building, MapPin, ClipboardList, Star, Globe, ArrowUpRight } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, HelpCircle, LogOut, X, Building, MapPin, ClipboardList, Star, Ribbon, ArrowUpRight } from 'lucide-react';
 import { useSidebar } from '../contexts/SidebarContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -66,18 +66,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           );
         })}
 
-        {/* Link Externo — Análise Global */}
+        {/* Link Externo — Outubro Rosa 2026 (tema Ministério da Saúde) */}
         <a
           href="https://amarcap53global.pages.dev/"
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => { if (window.innerWidth < 1024) closeSidebar(); }}
-          className="group relative w-full flex items-center gap-3 px-4 py-3 rounded-md overflow-hidden border border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 via-fuchsia-500/10 to-amber-400/10 hover:border-cyan-500/60 hover:from-cyan-500/20 hover:via-fuchsia-500/20 hover:to-amber-400/20 transition-all text-left"
+          className="group relative w-full flex items-center gap-3 px-4 py-3 rounded-md overflow-hidden border border-pink-500/40 bg-gradient-to-r from-pink-500/15 via-pink-400/15 to-fuchsia-500/10 hover:border-pink-500/70 hover:from-pink-500/25 hover:via-pink-400/25 hover:to-fuchsia-500/20 hover:shadow-[0_0_20px_rgba(236,0,140,0.35)] transition-all text-left"
         >
           <span className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-[1200ms] bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-          <Globe className="w-5 h-5 text-cyan-600 dark:text-cyan-300 shrink-0 group-hover:rotate-12 transition-transform" />
-          <span className="text-sm font-black uppercase tracking-wide text-[#051934] dark:text-white">Análise Global</span>
-          <ArrowUpRight className="w-4 h-4 ml-auto text-slate-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+          <Ribbon className="w-5 h-5 text-pink-600 dark:text-pink-300 shrink-0 group-hover:rotate-12 transition-transform" />
+          <span className="text-sm font-black uppercase tracking-wide text-pink-700 dark:text-pink-200">Outubro Rosa 2026</span>
+          <ArrowUpRight className="w-4 h-4 ml-auto text-slate-400 group-hover:text-pink-600 dark:group-hover:text-pink-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
         </a>
       </nav>
       

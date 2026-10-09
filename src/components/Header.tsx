@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, Settings, Menu, X, Building, Users, MapPin, LayoutDashboard, LogOut, ClipboardList, Star, BadgeCheck, Globe, ArrowUpRight } from 'lucide-react';
+import { Bell, Settings, Menu, X, Building, Users, MapPin, LayoutDashboard, LogOut, ClipboardList, Star, BadgeCheck, Ribbon, ArrowUpRight } from 'lucide-react';
 import { useSidebar } from '../contexts/SidebarContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -147,29 +147,30 @@ export const Header: React.FC<HeaderProps> = ({
               );
             })}
 
-            {/* Link Externo — Análise Global */}
+            {/* Link Externo — Outubro Rosa 2026 (tema Ministério da Saúde) */}
             <a
               href="https://amarcap53global.pages.dev/"
               target="_blank"
               rel="noopener noreferrer"
-              title="Análise Global (abre em nova aba)"
-              className="group relative flex items-center gap-2 lg:gap-2 px-2 lg:px-2.5 xl:px-3.5 py-1.5 lg:py-2 rounded-xl whitespace-nowrap shrink-0 overflow-hidden border border-white/15 bg-gradient-to-r from-cyan-500/10 via-fuchsia-500/10 to-amber-400/10 hover:border-cyan-300/40 hover:from-cyan-500/25 hover:via-fuchsia-500/25 hover:to-amber-400/25 hover:shadow-[0_0_20px_rgba(34,211,238,0.25)] transition-all duration-300"
+              title="Outubro Rosa 2026 (abre em nova aba)"
+              className="group relative flex items-center gap-2 lg:gap-2 px-2 lg:px-2.5 xl:px-3.5 py-1.5 lg:py-2 rounded-xl whitespace-nowrap shrink-0 overflow-hidden border border-pink-400/40 bg-gradient-to-r from-pink-600/20 via-pink-400/20 to-fuchsia-500/15 hover:border-pink-300/70 hover:from-pink-600/35 hover:via-pink-400/35 hover:to-fuchsia-500/30 hover:shadow-[0_0_20px_rgba(236,0,140,0.45)] transition-all duration-300"
             >
               {/* Brilho que atravessa no hover */}
               <span className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-[1200ms] bg-gradient-to-r from-transparent via-white/25 to-transparent" />
 
-              <Globe className="w-4 h-4 text-cyan-300 shrink-0 group-hover:rotate-12 group-hover:scale-110 transition-transform duration-300" />
+              {/* Laço rosa — símbolo Outubro Rosa */}
+              <Ribbon className="w-4 h-4 text-pink-300 shrink-0 group-hover:rotate-12 group-hover:scale-110 transition-transform duration-300" />
 
               <span className="text-[10px] lg:text-xs xl:text-sm font-black uppercase tracking-wide text-white whitespace-nowrap">
-                <span className="hd:hidden">Global</span>
-                <span className="hidden hd:inline">Análise Global</span>
+                <span className="hd:hidden">Outubro Rosa</span>
+                <span className="hidden hd:inline">Outubro Rosa 2026</span>
               </span>
 
               {/* Seta decorativa — só em telas largas para não cortar */}
-              <ArrowUpRight className="hidden hd:block w-3 h-3 text-white/50 shrink-0 group-hover:text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-300" />
+              <ArrowUpRight className="hidden hd:block w-3 h-3 text-pink-200/70 shrink-0 group-hover:text-pink-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-300" />
 
               {/* Ponto "ao vivo" */}
-              <span className="absolute -top-px right-1.5 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse" />
+              <span className="absolute -top-px right-1.5 w-1.5 h-1.5 rounded-full bg-pink-500 shadow-[0_0_8px_rgba(236,0,140,0.9)] animate-pulse" />
             </a>
           </nav>
 
