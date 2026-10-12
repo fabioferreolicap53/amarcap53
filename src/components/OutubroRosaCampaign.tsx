@@ -91,7 +91,7 @@ export const OutubroRosaCampaign: React.FC = () => {
       `}</style>
 
       <div
-        className="fixed right-4 bottom-4 sm:right-6 sm:bottom-6 z-[9998] w-[min(21rem,calc(100vw-2rem))] pointer-events-auto"
+        className="fixed right-4 bottom-4 sm:right-6 sm:bottom-6 z-[10000] w-[min(21rem,calc(100vw-2rem))] pointer-events-auto"
         style={{
           animation: phase === 'leaving'
             ? 'rosaPopOut 0.45s ease-in forwards'

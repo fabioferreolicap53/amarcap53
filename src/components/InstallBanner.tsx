@@ -49,9 +49,9 @@ export const InstallBanner: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[9999] animate-slide-in-from-bottom">
+    <div className="fixed bottom-0 left-0 right-0 z-[9999] animate-slide-in-from-bottom pointer-events-none">
       <div className="mx-auto max-w-lg px-4 pb-6 pt-2">
-        <div className="bg-gradient-to-br from-[#051934] to-[#0a2540]/95 backdrop-blur-2xl px-5 pb-5 pt-4 rounded-[2rem] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.4)] relative overflow-hidden">
+        <div className="bg-gradient-to-br from-[#051934] to-[#0a2540]/95 backdrop-blur-2xl px-5 pb-5 pt-4 rounded-[2rem] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.4)] relative overflow-hidden pointer-events-auto">
           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16" />
 
           <button
