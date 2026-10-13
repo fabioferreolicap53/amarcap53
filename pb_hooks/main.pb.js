@@ -124,7 +124,18 @@ onBootstrap(function(e) {
     // Helpers inline (o handler não enxerga o escopo global do arquivo)
     var PEP_COLL = 'amarcap53_pep_registros';
     function ensurePepColl() {
-      try { $app.findCollectionByNameOrId(PEP_COLL); } catch (notFound) {
+      // NUNCA chamar $app.findCollectionByNameOrId numa coleção INEXISTENTE:
+      // neste build do PocketBase isso dispara panic de nil-pointer em
+      // CollectionQuery/modelQuery e derruba o serviço em loop no boot.
+      // A existência é checada via SQL cru na tabela de sistema _collections.
+      var exists = false;
+      try {
+        var rows = $app.db().newQuery(
+          "SELECT name FROM _collections WHERE name = 'amarcap53_pep_registros' LIMIT 1"
+        ).all();
+        exists = !!(rows && rows.length > 0);
+      } catch (checkErr) { exists = false; }
+      if (!exists) {
         try {
           var coll = new Collection({
             type: 'base',
@@ -201,7 +212,16 @@ onRecordUpdate(function(e) {
     if (val === '--') val = '';
 
     var PEP_COLL = 'amarcap53_pep_registros';
-    try { $app.findCollectionByNameOrId(PEP_COLL); } catch (notFound) {
+    // Existência via SQL cru: findCollectionByNameOrId em coleção inexistente
+    // causa panic de nil-pointer neste build do PocketBase.
+    var pepExists = false;
+    try {
+      var pepRows = $app.db().newQuery(
+        "SELECT name FROM _collections WHERE name = 'amarcap53_pep_registros' LIMIT 1"
+      ).all();
+      pepExists = !!(pepRows && pepRows.length > 0);
+    } catch (checkErr) { pepExists = false; }
+    if (!pepExists) {
       try {
         $app.save(new Collection({
           type: 'base',
@@ -239,21 +259,24 @@ onRecordUpdate(function(e) {
 onRecordCreate(function(e) {
   try {
     var rec = e.record;
-    var pacId = rec.get('paciente');
-    var currentCns = rec.get('cns');
+    var pacId = String(rec.get('paciente') || '').trim();
+    var currentCns = String(rec.get('cns') || '').trim();
 
     // Se já tem CNS (enviado pelo frontend), não faz nada
-    if (currentCns && String(currentCns).trim() !== '') {
+    if (currentCns !== '') {
       e.next();
       return;
     }
 
     if (pacId) {
-      var pac = $app.findRecordById('amarcap53_pacientes', pacId);
-      if (pac) {
-        var cns = pac.get('cns');
-        if (cns) rec.set('cns', cns);
-      }
+      // SQL cru: $app.findRecordById dispara panic de Go (nil-pointer) neste
+      // build quando o id não existe e derruba o serviço. A query direta
+      // simplesmente retorna vazio.
+      function esc(v) { return "'" + String(v == null ? '' : v).replace(/'/g, "''") + "'"; }
+      var rows = $app.db().newQuery(
+        "SELECT cns FROM amarcap53_pacientes WHERE id = " + esc(pacId) + " LIMIT 1"
+      ).all();
+      if (rows && rows.length > 0 && rows[0].cns) rec.set('cns', rows[0].cns);
     }
   } catch (err) {
     console.error('[acompanhamento_cns] Hook error:', err);
@@ -378,7 +401,15 @@ routerAdd('POST', '/api/amar/import-pacientes', function(c) {
       try {
         var PEP_COLL0 = 'amarcap53_pep_registros';
         var pepReady0 = true;
-        try { $app.findCollectionByNameOrId(PEP_COLL0); } catch (notFound) {
+        // Existência via SQL cru (ver nota no bootstrap sobre findCollectionByNameOrId).
+        var pepExists0 = false;
+        try {
+          var pepRows0 = db.newQuery(
+            "SELECT name FROM _collections WHERE name = 'amarcap53_pep_registros' LIMIT 1"
+          ).all();
+          pepExists0 = !!(pepRows0 && pepRows0.length > 0);
+        } catch (checkErr0) { pepExists0 = false; }
+        if (!pepExists0) {
           try {
             $app.save(new Collection({
               type: 'base', name: PEP_COLL0,
@@ -501,7 +532,15 @@ routerAdd('POST', '/api/amar/delete-all', function(c) {
       try {
         var PEP_COLL = 'amarcap53_pep_registros';
         var pepReady = true;
-        try { $app.findCollectionByNameOrId(PEP_COLL); } catch (notFound) {
+        // Existência via SQL cru (ver nota no bootstrap sobre findCollectionByNameOrId).
+        var pepExists = false;
+        try {
+          var pepRows = db.newQuery(
+            "SELECT name FROM _collections WHERE name = 'amarcap53_pep_registros' LIMIT 1"
+          ).all();
+          pepExists = !!(pepRows && pepRows.length > 0);
+        } catch (checkErr) { pepExists = false; }
+        if (!pepExists) {
           try {
             $app.save(new Collection({
               type: 'base', name: PEP_COLL,
@@ -570,7 +609,15 @@ routerAdd('POST', '/api/amar/drop-pacientes', function(c) {
       try {
         var PEP_COLL = 'amarcap53_pep_registros';
         var pepReady = true;
-        try { $app.findCollectionByNameOrId(PEP_COLL); } catch (notFound) {
+        // Existência via SQL cru (ver nota no bootstrap sobre findCollectionByNameOrId).
+        var pepExists = false;
+        try {
+          var pepRows = db.newQuery(
+            "SELECT name FROM _collections WHERE name = 'amarcap53_pep_registros' LIMIT 1"
+          ).all();
+          pepExists = !!(pepRows && pepRows.length > 0);
+        } catch (checkErr) { pepExists = false; }
+        if (!pepExists) {
           try {
             $app.save(new Collection({
               type: 'base', name: PEP_COLL,
