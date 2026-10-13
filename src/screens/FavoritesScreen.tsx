@@ -13,6 +13,7 @@ import { MultiSelect } from '../components/MultiSelect';
 import { SingleSelect } from '../components/SingleSelect';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 import { buildRegionalPatientFilter, getShortUnidade, isSameEquipe } from '../lib/equipeAliases';
+import { migrateFavoritesToCns } from '../lib/favorites';
 import {
   TIPO_BUSCA_OPTIONS,
   TIPO_CONTATO_OPTIONS,
@@ -349,9 +350,23 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
   const [favorites, setFavorites] = useState<string[]>(user?.favoritos || []);
 
   // Sincroniza estado local com o usuário do AuthContext (que vem do PocketBase)
+  // e migra favoritos legados (guardados por `id`) para CNS (chave natural).
   useEffect(() => {
-    setFavorites(user?.favoritos || []);
-  }, [user?.favoritos]);
+    const raw = user?.favoritos || [];
+    setFavorites(raw);
+    if (!user?.id || raw.length === 0) return;
+
+    let cancelled = false;
+    migrateFavoritesToCns(raw).then(result => {
+      if (cancelled || !result.changed) return;
+      setFavorites(result.favorites);
+      pb.collection('amarcap53_users')
+        .update(user.id, { favoritos: result.favorites })
+        .then(updatedUser => pb.authStore.save(pb.authStore.token, updatedUser))
+        .catch(err => console.error('Erro ao migrar favoritos para CNS:', err));
+    });
+    return () => { cancelled = true; };
+  }, [user?.favoritos, user?.id]);
 
   useEffect(() => {
     fetchFavorites(true);
@@ -385,15 +400,15 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     };
   }, []);
 
-  const toggleFavorite = async (id: string) => {
-    if (!user?.id) return;
+  const toggleFavorite = async (cns: string) => {
+    if (!user?.id || !cns || cns === '--') return;
 
     const collectionName = 'amarcap53_users';
     
-    const isFav = favorites.includes(id);
+    const isFav = favorites.includes(cns);
     const newFavorites = isFav 
-      ? favorites.filter(f => f !== id) 
-      : [...favorites, id];
+      ? favorites.filter(f => f !== cns) 
+      : [...favorites, cns];
     
     // Atualização otimista local e no AuthStore
     setFavorites(newFavorites);
@@ -520,12 +535,12 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       // Build complete server-side filter (region + SIM/NÃO + status)
       // Favoritos: se poucos (< 150), inclui no filtro server-side. Se muitos,
       // busca sem o filtro de favoritos e filtra client-side (evita OR gigante
-      // de `id = "..."` que estoura o limite de cláusulas do PocketBase → 400).
+      // de `cns = "..."` que estoura o limite de cláusulas do PocketBase → 400).
       const serverFilterParts: string[] = [];
       if (regionFilter) serverFilterParts.push(regionFilter);
       const useServerFavFilter = favorites.length > 0 && favorites.length <= 150;
       if (useServerFavFilter) {
-        serverFilterParts.push(`(${favorites.map(id => `id = "${id}"`).join(' || ')})`);
+        serverFilterParts.push(`(${favorites.map(cns => `cns = "${cns}"`).join(' || ')})`);
       }
 
       // Filtros SIM/NÃO de exames (server-side)
@@ -566,8 +581,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
 
       // Filtro de favoritos client-side (quando o filtro server-side não foi possível)
       if (!useServerFavFilter) {
-        const favSet = new Set(favorites);
-        resultList = resultList.filter(r => favSet.has(r.id));
+        const favSet = new Set(favorites.map(f => String(f ?? '').trim()));
+        resultList = resultList.filter(r => favSet.has(String(r.cns ?? '').trim()));
       }
 
       // Busca acompanhamentos em lote (evita N+1). OR de `paciente = "id"` com
@@ -1380,7 +1395,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
                       <tr key={paciente.id} className="hover:bg-primary/[0.03] transition-all group">
                         <td className="px-4 py-6 text-center relative">
                           <button 
-                            onClick={() => toggleFavorite(paciente.id)}
+                            onClick={() => toggleFavorite(paciente.cns)}
                             className="absolute left-2 top-2 p-1.5 rounded-lg text-amber-400 bg-amber-50 shadow-sm border border-amber-100 transition-all"
                           >
                             <Star className="w-3.5 h-3.5 fill-current" />

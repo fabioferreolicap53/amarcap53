@@ -16,6 +16,7 @@ import { AcompButton } from '../components/AcompButton';
 import { ScrollIndicator } from '../components/ScrollIndicator';
 import { UNIDADES_EQUIPES, MICROAREAS } from '../constants/regionalData';
 import { buildRegionalPatientFilter, getShortUnidade } from '../lib/equipeAliases';
+import { migrateFavoritesToCns } from '../lib/favorites';
 import {
   TIPO_BUSCA_OPTIONS,
   TIPO_CONTATO_OPTIONS,
@@ -417,28 +418,42 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [favorites, setFavorites] = useState<string[]>(user?.favoritos || []);
 
   // Sincroniza estado local com o usuário do AuthContext (que vem do PocketBase)
+  // e migra favoritos legados (guardados por `id`) para CNS (chave natural).
   useEffect(() => {
-    setFavorites(user?.favoritos || []);
-  }, [user?.favoritos]);
+    const raw = user?.favoritos || [];
+    setFavorites(raw);
+    if (!user?.id || raw.length === 0) return;
+
+    let cancelled = false;
+    migrateFavoritesToCns(raw).then(result => {
+      if (cancelled || !result.changed) return;
+      setFavorites(result.favorites);
+      pb.collection('amarcap53_users')
+        .update(user.id, { favoritos: result.favorites })
+        .then(updatedUser => pb.authStore.save(pb.authStore.token, updatedUser))
+        .catch(err => console.error('Erro ao migrar favoritos para CNS:', err));
+    });
+    return () => { cancelled = true; };
+  }, [user?.favoritos, user?.id]);
 
   useEffect(() => {
     setPacientes(prev =>
       prev.map(paciente => ({
         ...paciente,
-        isFavorite: favorites.includes(paciente.id),
+        isFavorite: favorites.includes(paciente.cns),
       }))
     );
   }, [favorites]);
 
-  const toggleFavorite = async (id: string) => {
-    if (!user?.id) return;
+  const toggleFavorite = async (cns: string) => {
+    if (!user?.id || !cns || cns === '--') return;
 
     const collectionName = 'amarcap53_users';
     
-    const isFav = favorites.includes(id);
+    const isFav = favorites.includes(cns);
     const newFavorites = isFav 
-      ? favorites.filter(f => f !== id) 
-      : [...favorites, id];
+      ? favorites.filter(f => f !== cns) 
+      : [...favorites, cns];
     
     // Atualização otimista local e no AuthStore
     setFavorites(newFavorites);
@@ -1065,7 +1080,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
             unidade_solicitante: record.unidade_solicitante || '--',
             alertas_rastreamento: record.alertas_rastreamento || '--',
             total_acompanhamentos: count,
-            isFavorite: favorites.includes(record.id),
+            isFavorite: favorites.includes(record.cns),
             lastAcomp: lastAcomp || null,
           };
           
@@ -2045,15 +2060,15 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
                         {/* 1. PACIENTE */}
                         <td className="px-4 py-6 text-center relative">
                           <button 
-                            onClick={() => toggleFavorite(paciente.id)}
+                            onClick={() => toggleFavorite(paciente.cns)}
                             className={`absolute left-2 top-2 p-1.5 rounded-lg transition-all duration-300 ${
-                              favorites.includes(paciente.id) 
+                              favorites.includes(paciente.cns) 
                                 ? 'text-amber-400 bg-amber-50 shadow-sm border border-amber-100' 
                                 : 'text-slate-300 hover:text-amber-300 bg-slate-50 border border-slate-100'
                             }`}
-                            title={favorites.includes(paciente.id) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                            title={favorites.includes(paciente.cns) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
                           >
-                            <Star className={`w-3.5 h-3.5 ${favorites.includes(paciente.id) ? 'fill-current' : ''}`} />
+                            <Star className={`w-3.5 h-3.5 ${favorites.includes(paciente.cns) ? 'fill-current' : ''}`} />
                           </button>
                           <div className="flex flex-col items-center gap-0.5 mt-2">
                             <p className="text-[11px] md:text-[12px] font-black text-primary uppercase leading-tight break-words" title={paciente.nome}>

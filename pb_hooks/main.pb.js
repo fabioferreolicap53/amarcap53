@@ -117,6 +117,56 @@ onBootstrap(function(e) {
     db.newQuery("UPDATE amarcap53_pacientes SET unidade = trim(unidade) WHERE unidade != trim(unidade)").execute();
     db.newQuery("UPDATE amarcap53_pacientes SET unidade = REPLACE(unidade, '  ', ' ') WHERE unidade LIKE '%  %'").execute();
   } catch (err) {}
+
+  // Garante a coleção de backup das datas DNA-HPV (PEP) indexada por CNS e
+  // faz o snapshot inicial. Nunca apaga backup existente (ver helper abaixo).
+  try {
+    // Helpers inline (o handler não enxerga o escopo global do arquivo)
+    var PEP_COLL = 'amarcap53_pep_registros';
+    function ensurePepColl() {
+      try { $app.findCollectionByNameOrId(PEP_COLL); } catch (notFound) {
+        try {
+          var coll = new Collection({
+            type: 'base',
+            name: PEP_COLL,
+            fields: [
+              { name: 'cns', type: 'text' },
+              { name: 'dna_hpv_pep', type: 'text' },
+            ],
+          });
+          $app.save(coll);
+        } catch (createErr) {
+          console.error('[pep_registros] Create collection error:', createErr);
+          return false;
+        }
+      }
+      // Índice único por CNS (idempotente) — habilita INSERT OR REPLACE
+      try {
+        $app.db().newQuery(
+          "CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)"
+        ).execute();
+      } catch (idxErr) {}
+      return true;
+    }
+    if (ensurePepColl()) {
+      var now = new Date().toISOString().replace('T', ' ');
+      // Autoritativo apenas para CNS que existem AGORA em pacientes: se a base
+      // estiver vazia (meio de um ciclo delete/import) nada é removido.
+      $app.db().newQuery(
+        "DELETE FROM amarcap53_pep_registros " +
+        "WHERE cns IN (SELECT cns FROM amarcap53_pacientes WHERE cns != '' AND cns IS NOT NULL)"
+      ).execute();
+      $app.db().newQuery(
+        "INSERT OR REPLACE INTO amarcap53_pep_registros (id, created, updated, cns, dna_hpv_pep) " +
+        "SELECT substr(lower(hex(randomblob(12))), 1, 15), '" + now + "', '" + now + "', cns, dna_hpv_pep " +
+        "FROM amarcap53_pacientes " +
+        "WHERE dna_hpv_pep != '' AND dna_hpv_pep IS NOT NULL AND cns != '' AND cns IS NOT NULL"
+      ).execute();
+    }
+  } catch (err) {
+    console.error('[pep_registros] Bootstrap error:', err);
+  }
+
   e.next();
 });
 
@@ -130,6 +180,59 @@ onRecordUpdate(function(e) {
   var u = e.record.get('unidade');
   if (u && typeof u === 'string') e.record.set('unidade', u.trim().replace(/\s+/g, ' '));
   e.next();
+}, PACIENTES_COLL);
+
+// ─── HOOK: BACKUP DNA-HPV (PEP) POR CNS ─────────────────────────────────
+// Campo interativo editado pelos usuários no app. Sem isso, o DELETE da base
+// durante o ciclo de reimportação apaga a data para sempre. Espelha o valor
+// numa coleção à parte, chaveada pelo CNS (chave natural que sobrevive à
+// reimportação). Nunca bloqueia o update do paciente (tudo em try/catch).
+onRecordUpdate(function(e) {
+  var rec = e.record;
+  var cns = '', val = '', orig = '';
+  try {
+    cns = String(rec.get('cns') || '').trim();
+    val = String(rec.get('dna_hpv_pep') || '').trim();
+    try { orig = String(rec.original().get('dna_hpv_pep') || '').trim(); } catch (o) {}
+  } catch (readErr) {}
+  e.next();
+  try {
+    if (!cns || val === orig) return;
+    if (val === '--') val = '';
+
+    var PEP_COLL = 'amarcap53_pep_registros';
+    try { $app.findCollectionByNameOrId(PEP_COLL); } catch (notFound) {
+      try {
+        $app.save(new Collection({
+          type: 'base',
+          name: PEP_COLL,
+          fields: [
+            { name: 'cns', type: 'text' },
+            { name: 'dna_hpv_pep', type: 'text' },
+          ],
+        }));
+      } catch (createErr) { console.error('[pep_registros] Hook create error:', createErr); return; }
+    }
+    try {
+      $app.db().newQuery(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)"
+      ).execute();
+    } catch (idxErr) {}
+
+    function esc(v) { return "'" + String(v == null ? '' : v).replace(/'/g, "''") + "'"; }
+    var db = $app.db();
+    if (val === '') {
+      db.newQuery("DELETE FROM amarcap53_pep_registros WHERE cns = " + esc(cns)).execute();
+    } else {
+      var now = new Date().toISOString().replace('T', ' ');
+      db.newQuery(
+        "INSERT OR REPLACE INTO amarcap53_pep_registros (id, created, updated, cns, dna_hpv_pep) " +
+        "VALUES (substr(lower(hex(randomblob(12))), 1, 15), " + esc(now) + ", " + esc(now) + ", " + esc(cns) + ", " + esc(val) + ")"
+      ).execute();
+    }
+  } catch (err) {
+    console.error('[pep_registros] Hook error:', err);
+  }
 }, PACIENTES_COLL);
 
 // ─── HOOKS: ACOMPANHAMENTOS (Auto-CNS & Sync) ───────────
@@ -270,6 +373,37 @@ routerAdd('POST', '/api/amar/import-pacientes', function(c) {
           "AND paciente IN (SELECT id FROM amarcap53_pacientes)"
         ).execute();
       } catch(e) {}
+
+      // Snapshot das datas DNA-HPV (PEP) por CNS antes do DELETE (idem delete-all)
+      try {
+        var PEP_COLL0 = 'amarcap53_pep_registros';
+        var pepReady0 = true;
+        try { $app.findCollectionByNameOrId(PEP_COLL0); } catch (notFound) {
+          try {
+            $app.save(new Collection({
+              type: 'base', name: PEP_COLL0,
+              fields: [{ name: 'cns', type: 'text' }, { name: 'dna_hpv_pep', type: 'text' }],
+            }));
+          } catch (createErr) { console.error('[import-pacientes] Create pep collection error:', createErr); pepReady0 = false; }
+        }
+        if (pepReady0) {
+          try {
+            db.newQuery("CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)").execute();
+          } catch (idxErr) {}
+          var nowPep0 = new Date().toISOString().replace('T', ' ');
+          db.newQuery(
+            "DELETE FROM amarcap53_pep_registros " +
+            "WHERE cns IN (SELECT cns FROM amarcap53_pacientes WHERE cns != '' AND cns IS NOT NULL)"
+          ).execute();
+          db.newQuery(
+            "INSERT OR REPLACE INTO amarcap53_pep_registros (id, created, updated, cns, dna_hpv_pep) " +
+            "SELECT substr(lower(hex(randomblob(12))), 1, 15), '" + nowPep0 + "', '" + nowPep0 + "', cns, dna_hpv_pep " +
+            "FROM amarcap53_pacientes " +
+            "WHERE dna_hpv_pep != '' AND dna_hpv_pep IS NOT NULL AND cns != '' AND cns IS NOT NULL"
+          ).execute();
+        }
+      } catch (pepErr0) { console.error('[import-pacientes] Snapshot dna_hpv_pep error:', pepErr0); }
+
       db.newQuery("DELETE FROM amarcap53_pacientes").execute();
     }
 
@@ -306,7 +440,22 @@ routerAdd('POST', '/api/amar/import-pacientes', function(c) {
       imported = rows.length;
     }
 
-    return c.json(200, { success: true, imported: imported, build: '2026-10-07-import-v4' });
+    // Restaura as datas DNA-HPV (PEP) salvas por CNS (coleção de backup).
+    // Só preenche campos vazios — nunca sobrescreve valor vindo do CSV.
+    try {
+      db.newQuery(
+        "UPDATE amarcap53_pacientes SET dna_hpv_pep = (" +
+        "  SELECT p.dna_hpv_pep FROM amarcap53_pep_registros p " +
+        "  WHERE p.cns = amarcap53_pacientes.cns AND p.dna_hpv_pep != '' LIMIT 1" +
+        ") WHERE (dna_hpv_pep = '' OR dna_hpv_pep IS NULL) " +
+        "AND EXISTS (SELECT 1 FROM amarcap53_pep_registros p " +
+        "            WHERE p.cns = amarcap53_pacientes.cns AND p.dna_hpv_pep != '')"
+      ).execute();
+    } catch (pepErr) {
+      console.error('[import-pacientes] Restore dna_hpv_pep error:', pepErr);
+    }
+
+    return c.json(200, { success: true, imported: imported, build: '2026-10-13-pep-backup-v1' });
   } catch(err) {
     return c.json(500, { message: String(err) });
   }
@@ -346,6 +495,39 @@ routerAdd('POST', '/api/amar/delete-all', function(c) {
           "AND paciente IN (SELECT id FROM amarcap53_pacientes)"
         ).execute();
       } catch(e) { console.error('[delete-all] Sync CNS error:', e); }
+
+      // Snapshot das datas DNA-HPV (PEP) por CNS ANTES de apagar a base.
+      // Sem isso as datas editadas pelos usuários somem junto com os registros.
+      try {
+        var PEP_COLL = 'amarcap53_pep_registros';
+        var pepReady = true;
+        try { $app.findCollectionByNameOrId(PEP_COLL); } catch (notFound) {
+          try {
+            $app.save(new Collection({
+              type: 'base', name: PEP_COLL,
+              fields: [{ name: 'cns', type: 'text' }, { name: 'dna_hpv_pep', type: 'text' }],
+            }));
+          } catch (createErr) { console.error('[delete-all] Create pep collection error:', createErr); pepReady = false; }
+        }
+        if (pepReady) {
+          try {
+            db.newQuery("CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)").execute();
+          } catch (idxErr) {}
+          var nowPep = new Date().toISOString().replace('T', ' ');
+          // Remove o backup apenas dos CNS que existem agora (base cheia).
+          // Se a base estiver vazia (meio do ciclo), nada é removido.
+          db.newQuery(
+            "DELETE FROM amarcap53_pep_registros " +
+            "WHERE cns IN (SELECT cns FROM amarcap53_pacientes WHERE cns != '' AND cns IS NOT NULL)"
+          ).execute();
+          db.newQuery(
+            "INSERT OR REPLACE INTO amarcap53_pep_registros (id, created, updated, cns, dna_hpv_pep) " +
+            "SELECT substr(lower(hex(randomblob(12))), 1, 15), '" + nowPep + "', '" + nowPep + "', cns, dna_hpv_pep " +
+            "FROM amarcap53_pacientes " +
+            "WHERE dna_hpv_pep != '' AND dna_hpv_pep IS NOT NULL AND cns != '' AND cns IS NOT NULL"
+          ).execute();
+        }
+      } catch (pepErr) { console.error('[delete-all] Snapshot dna_hpv_pep error:', pepErr); }
     }
 
     db.newQuery("DELETE FROM " + coll).execute();
@@ -383,6 +565,36 @@ routerAdd('POST', '/api/amar/drop-pacientes', function(c) {
           "AND paciente IN (SELECT id FROM amarcap53_pacientes)"
         ).execute();
       } catch(e) { console.error('[drop-pacientes] Sync CNS error:', e); }
+
+      // Snapshot das datas DNA-HPV (PEP) por CNS antes de apagar (idem delete-all)
+      try {
+        var PEP_COLL = 'amarcap53_pep_registros';
+        var pepReady = true;
+        try { $app.findCollectionByNameOrId(PEP_COLL); } catch (notFound) {
+          try {
+            $app.save(new Collection({
+              type: 'base', name: PEP_COLL,
+              fields: [{ name: 'cns', type: 'text' }, { name: 'dna_hpv_pep', type: 'text' }],
+            }));
+          } catch (createErr) { console.error('[drop-pacientes] Create pep collection error:', createErr); pepReady = false; }
+        }
+        if (pepReady) {
+          try {
+            db.newQuery("CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)").execute();
+          } catch (idxErr) {}
+          var nowPep = new Date().toISOString().replace('T', ' ');
+          db.newQuery(
+            "DELETE FROM amarcap53_pep_registros " +
+            "WHERE cns IN (SELECT cns FROM amarcap53_pacientes WHERE cns != '' AND cns IS NOT NULL)"
+          ).execute();
+          db.newQuery(
+            "INSERT OR REPLACE INTO amarcap53_pep_registros (id, created, updated, cns, dna_hpv_pep) " +
+            "SELECT substr(lower(hex(randomblob(12))), 1, 15), '" + nowPep + "', '" + nowPep + "', cns, dna_hpv_pep " +
+            "FROM amarcap53_pacientes " +
+            "WHERE dna_hpv_pep != '' AND dna_hpv_pep IS NOT NULL AND cns != '' AND cns IS NOT NULL"
+          ).execute();
+        }
+      } catch (pepErr) { console.error('[drop-pacientes] Snapshot dna_hpv_pep error:', pepErr); }
     }
 
     db.newQuery("DELETE FROM " + coll).execute();
