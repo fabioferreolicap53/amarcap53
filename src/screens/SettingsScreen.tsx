@@ -238,7 +238,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+    if (file.type !== 'text/csv' && !file.name.toLowerCase().endsWith('.csv')) {
       setUploadStatus({ stage: 'error', message: 'Por favor, envie apenas arquivos .csv', current: 0, total: 0 });
       return;
     }
@@ -281,24 +281,36 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       unidade: ['UNIDADE', 'UNIDADE DE SAUDE', 'ESTABELECIMENTO', 'UBS'],
       equipe: ['EQUIPE', 'EQUIPE DE SAUDE', 'EQ'],
       microarea: ['MICROAREA', 'MICRO AREA', 'MICRO', 'MICROAREA'],
-      cns: ['CNS', 'CARTAO SUS', 'NUMERO CNS'],
+      cns: ['CNS', 'CARTAO SUS', 'NUMERO CNS', 'CARTAO NACIONAL DE SAUDE'],
       nome: ['NOME', 'NOME PACIENTE', 'NOME DO PACIENTE', 'PACIENTE', 'NOME COMPLETO'],
-      data_nascimento: ['NASC', 'DATA DE NASCIMENTO', 'DATA NASCIMENTO', 'NASCIMENTO', 'DATA_NASCIMENTO'],
+      data_nascimento: ['NASC', 'DATA DE NASCIMENTO', 'DATA NASCIMENTO', 'NASCIMENTO', 'DATA_NASCIMENTO', 'DT NASCIMENTO'],
       idade: ['IDADE', 'ANOS'],
       grupo: ['GRUPO', 'FAIXA ETARIA', 'CATEGORIA'],
-      cito_lab: ['CITO LAB', 'CITO LABORATORIO', 'CITO_LAB', 'CITOLAB'],
+      cito_lab: ['CITO LAB', 'CITO LABORATORIO', 'CITO_LAB', 'CITOLAB', 'CITOLOGIA LAB'],
       cito_pep: ['CITO PEP', 'CITO_PEP', 'CITOPEP'],
-      dna_hpv_gal: ['DNA-HPV', 'DNA_HPV_GAL', 'DNA HPV', 'DNA HPV GAL'],
+      dna_hpv_gal: ['DNA HPV GAL', 'DNA-HPV', 'DNA_HPV_GAL', 'DNA HPV', 'HPV GAL'],
+      dna_hpv_pep: ['DNA HPV PEP', 'DNA-HPV PEP', 'DNA_HPV_PEP', 'DNA PEP'],
       unidade_solicitante: ['UNIDADE SOLICITANTE', 'UNIDADE_SOLICITANTE', 'SOLICITANTE', 'UNID SOLICITANTE'],
-      alertas_rastreamento: ['ALERTAS RASTREAMENTO', 'ALERTAS', 'OBSERVACOES'],
+      alertas_rastreamento: ['ALERTAS RASTREAMENTO', 'ALERTAS', 'OBSERVACOES', 'OBSERVACOES GERAIS', 'OBS'],
     };
 
+    // Normaliza header: remove BOM, acentos, underscores/hífens e espaços extras.
+    // Excel/Windows gera headers tipo "CARTÃO_SUS" ou "MICROÁREA" — vira "CARTAO SUS"/"MICROAREA".
     function normalize(h: string): string {
-      return h.trim().toUpperCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      return String(h == null ? '' : h)
+        .replace(/^\uFEFF/, '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/[_\-.]+/g, ' ')
+        .replace(/[^\w\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
     }
 
     function findField(csvHeader: string): string | null {
       var n = normalize(csvHeader);
+      if (!n) return null; // header vazio não pode cair no fuzzy match (mapearia para o 1º campo)
       for (var fld in FIELD_ALIASES) {
         for (var a of FIELD_ALIASES[fld]) { if (normalize(a) === n) return fld; }
       }
@@ -311,28 +323,82 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       return null;
     }
 
-    function convertDate(val: string): string {
-      if (!val || val === '--' || val.trim() === '') return '';
-      if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val;
-      var parts = val.split('/');
-      if (parts.length === 3) {
-        var d = parts[0], m = parts[1], y = parts[2];
-        if (y.length === 2) y = '20' + y;
-        return y + '-' + m.padStart(2, '0') + '-' + d.padStart(2, '0');
+    // Converte dd/mm/yyyy (ou yyyy-mm-dd) para ISO. Descarta lixo em vez de gravar invalido.
+    function convertDate(val: any): string {
+      var s = String(val == null ? '' : val).trim().replace(/^["']+|["']+$/g, '');
+      if (!s || s === '--' || s === '-' || s === 'N/A' || s.toUpperCase() === 'NULL') return '';
+      s = s.split(/[ T]/)[0].trim(); // remove horario ("03/02/2026 00:00:00")
+      if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) {
+        var iso = s.split('-');
+        return iso[0] + '-' + iso[1].padStart(2, '0') + '-' + iso[2].padStart(2, '0');
       }
-      return val;
+      var parts = s.split(/[\/\-.]/);
+      if (parts.length !== 3) return '';
+      var d = parts[0], m = parts[1], y = parts[2];
+      if (!/^\d+$/.test(d) || !/^\d+$/.test(m) || !/^\d+$/.test(y)) return '';
+      if (y.length <= 2) y = (parseInt(y, 10) > 30 ? '19' : '20') + y.padStart(2, '0');
+      var dd = parseInt(d, 10), mm = parseInt(m, 10);
+      if (mm > 12 && dd <= 12) { var tmp = dd; dd = mm; mm = tmp; } // mm/dd invertido
+      if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return '';
+      return y + '-' + String(mm).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
+    }
+
+    // Decodifica arquivo: UTF-8 (Excel moderno) com fallback ANSI/Windows-1252 (Excel pt-BR antigo).
+    function decodeCsv(buf: ArrayBuffer): string {
+      var text = '';
+      try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+      catch (e) { text = new TextDecoder('windows-1252').decode(buf); }
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      if (text.indexOf('\u00EF\u00BB\u00BF') === 0) text = text.slice(3); // BOM mal decodificado
+      return text;
+    }
+
+    // Excel no Windows (pt-BR) salva CSV com ";" — detecta pelo cabecalho.
+    function sniffDelimiter(text: string): string {
+      var m = /^[^\r\n]*/.exec(text);
+      var firstLine = m ? m[0] : '';
+      var cands = [';', ',', '\t', '|'];
+      var best = ',', bestCount = 0;
+      for (var ci = 0; ci < cands.length; ci++) {
+        var cnt = 0, inQuotes = false;
+        for (var k = 0; k < firstLine.length; k++) {
+          var ch = firstLine.charAt(k);
+          if (ch === '"') inQuotes = !inQuotes;
+          else if (!inQuotes && ch === cands[ci]) cnt++;
+        }
+        if (cnt > bestCount) { bestCount = cnt; best = cands[ci]; }
+      }
+      return best;
+    }
+
+    // CNS vindo do Excel pode virar notacao cientifica ("7.09E+14")
+    function sanitizeCns(val: any): string {
+      var cs = String(val == null ? '' : val).trim();
+      if (/^\d+(\.\d+)?[eE][+-]?\d+$/.test(cs)) {
+        var asNum = Number(cs);
+        if (isFinite(asNum)) cs = asNum.toFixed(0);
+      }
+      return cs.replace(/\D/g, '').padStart(15, '0').slice(-15);
     }
 
     var reader = new FileReader();
     reader.onload = async (ev) => {
       try {
-        var csvText = ev.target?.result as string;
+        var buf = ev.target?.result as ArrayBuffer;
+        if (!buf || buf.byteLength === 0) throw new Error('CSV vazio');
+        var csvText = decodeCsv(buf);
         if (!csvText || csvText.trim().length === 0) throw new Error('CSV vazio');
 
-        var parsed = Papa.parse<Record<string, string>>(csvText, { header: true, skipEmptyLines: true });
+        var delimiter = sniffDelimiter(csvText);
+        var parsed = Papa.parse<Record<string, string>>(csvText, {
+          header: true,
+          delimiter: delimiter,
+          skipEmptyLines: 'greedy',
+          transformHeader: function(h) { return h.replace(/\uFEFF/g, '').trim(); },
+        });
         if (parsed.data.length === 0) throw new Error('CSV vazio ou sem dados');
 
-        var rawHeaders = parsed.meta.fields || [];
+        var rawHeaders = (parsed.meta.fields || []).filter(function(h) { return h !== '__parsed_extra'; });
         var headerMap: Record<string, string | null> = {};
         for (var h of rawHeaders) headerMap[h] = findField(h);
 
@@ -351,8 +417,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
               var val: any = r[rawH];
               if (val === undefined || val === null || val === '' || val === '--') continue;
               if (DATE_FIELDS.has(mapped)) { val = convertDate(val); if (!val) continue; }
-              else if (mapped === 'cns') { val = String(val).replace(/\D/g, '').padStart(15, '0').slice(-15); }
-              else if (mapped === 'idade' || mapped === 'microarea') { val = parseInt(val, 10) || 0; }
+              else if (mapped === 'cns') { val = sanitizeCns(val); if (val === '000000000000000') continue; }
+              else if (mapped === 'idade' || mapped === 'microarea') { val = parseInt(String(val).replace(',', '.'), 10) || 0; }
+              else { val = String(val).trim(); if (!val) continue; }
               rec[mapped] = val;
             }
             return rec;
@@ -456,7 +523,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       setImportControl('idle');
       setUploadStatus({ stage: 'error', message: 'Erro ao ler arquivo', current: 0, total: 0 });
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const handlePauseResumeImport = () => {
@@ -843,7 +910,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                       <div className="space-y-1">
                         <h4 className="text-sm font-black text-slate-800 uppercase">Arquivo CSV</h4>
                         <p className="text-xs font-medium text-slate-500 leading-relaxed">
-                          Formatos aceitos: <span className="text-blue-600 font-bold">.CSV</span> com delimitador de vírgula. Cabeçalho na primeira linha.
+                          Formatos aceitos: <span className="text-blue-600 font-bold">.CSV</span> com delimitador <span className="font-bold">vírgula (,)</span> ou <span className="font-bold">ponto e vírgula (;)</span> — padrão do Excel/Windows. Cabeçalho na primeira linha, codificação UTF-8 ou ANSI.
                         </p>
                       </div>
                     </div>
@@ -901,7 +968,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
                       ))}
                     </div>
                     <p className="text-[8px] font-medium text-slate-400 mt-4 leading-relaxed border-t border-slate-200/60 pt-3">
-                      A ordem das colunas no CSV deve seguir esta sequência. O sistema reconhece variações nos nomes dos headers automaticamente.
+                      A ordem das colunas não importa — o sistema casa os headers automaticamente, ignorando acentos, maiúsculas/minúsculas e espaços.
                     </p>
                   </div>
                 </div>
