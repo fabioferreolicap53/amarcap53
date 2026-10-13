@@ -112,73 +112,50 @@ onRecordAuthRequest(function(e) {
 
 // ─── HOOKS: NORMALIZAÇÃO DE UNIDADE ──────────────────────
 onBootstrap(function(e) {
+  // e.next() PRIMEIRO (obrigatório). O one-off do core que inicializa os
+  // bancos (initDataDB/initAuxDB) é o ÚLTIMO handler da cadeia de bootstrap
+  // (ver tools/hook.Target: os oneOff são `append` no fim). Se rodarmos SQL
+  // cru ou $app.save() ANTES do e.next(), o ConcurrentDB ainda é nil e o
+  // PocketBase morre no boot com "invalid memory address or nil pointer
+  // dereference" em core.(*BaseApp).modelQuery. Depois do e.next() o banco e
+  // as coleções já estão carregados.
+  e.next();
+
   try {
     var db = $app.db();
     db.newQuery("UPDATE amarcap53_pacientes SET unidade = trim(unidade) WHERE unidade != trim(unidade)").execute();
     db.newQuery("UPDATE amarcap53_pacientes SET unidade = REPLACE(unidade, '  ', ' ') WHERE unidade LIKE '%  %'").execute();
   } catch (err) {}
 
-  // Garante a coleção de backup das datas DNA-HPV (PEP) indexada por CNS e
-  // faz o snapshot inicial. Nunca apaga backup existente (ver helper abaixo).
+  // Garante a TABELA CRUA de backup das datas DNA-HPV (PEP) indexada por CNS e
+  // faz o snapshot inicial. É tabela SQLite pura (NÃO é coleção do PocketBase):
+  // assim não depende do model/cache de collections, não corre risco de panic
+  // de nil-pointer nem do erro "Collection name must be unique". Idempotente.
   try {
-    // Helpers inline (o handler não enxerga o escopo global do arquivo)
-    var PEP_COLL = 'amarcap53_pep_registros';
-    function ensurePepColl() {
-      // NUNCA chamar $app.findCollectionByNameOrId numa coleção INEXISTENTE:
-      // neste build do PocketBase isso dispara panic de nil-pointer em
-      // CollectionQuery/modelQuery e derruba o serviço em loop no boot.
-      // A existência é checada via SQL cru na tabela de sistema _collections.
-      var exists = false;
-      try {
-        var rows = $app.db().newQuery(
-          "SELECT name FROM _collections WHERE name = 'amarcap53_pep_registros' LIMIT 1"
-        ).all();
-        exists = !!(rows && rows.length > 0);
-      } catch (checkErr) { exists = false; }
-      if (!exists) {
-        try {
-          var coll = new Collection({
-            type: 'base',
-            name: PEP_COLL,
-            fields: [
-              { name: 'cns', type: 'text' },
-              { name: 'dna_hpv_pep', type: 'text' },
-            ],
-          });
-          $app.save(coll);
-        } catch (createErr) {
-          console.error('[pep_registros] Create collection error:', createErr);
-          return false;
-        }
-      }
-      // Índice único por CNS (idempotente) — habilita INSERT OR REPLACE
-      try {
-        $app.db().newQuery(
-          "CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)"
-        ).execute();
-      } catch (idxErr) {}
-      return true;
-    }
-    if (ensurePepColl()) {
-      var now = new Date().toISOString().replace('T', ' ');
-      // Autoritativo apenas para CNS que existem AGORA em pacientes: se a base
-      // estiver vazia (meio de um ciclo delete/import) nada é removido.
-      $app.db().newQuery(
-        "DELETE FROM amarcap53_pep_registros " +
-        "WHERE cns IN (SELECT cns FROM amarcap53_pacientes WHERE cns != '' AND cns IS NOT NULL)"
-      ).execute();
-      $app.db().newQuery(
-        "INSERT OR REPLACE INTO amarcap53_pep_registros (id, created, updated, cns, dna_hpv_pep) " +
-        "SELECT substr(lower(hex(randomblob(12))), 1, 15), '" + now + "', '" + now + "', cns, dna_hpv_pep " +
-        "FROM amarcap53_pacientes " +
-        "WHERE dna_hpv_pep != '' AND dna_hpv_pep IS NOT NULL AND cns != '' AND cns IS NOT NULL"
-      ).execute();
-    }
+    var dbPep = $app.db();
+    dbPep.newQuery(
+      "CREATE TABLE IF NOT EXISTS amarcap53_pep_registros (" +
+      "id TEXT PRIMARY KEY, cns TEXT, dna_hpv_pep TEXT)"
+    ).execute();
+    dbPep.newQuery(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)"
+    ).execute();
+
+    // Autoritativo apenas para CNS que existem AGORA em pacientes: se a base
+    // estiver vazia (meio de um ciclo delete/import) nada é removido.
+    dbPep.newQuery(
+      "DELETE FROM amarcap53_pep_registros " +
+      "WHERE cns IN (SELECT cns FROM amarcap53_pacientes WHERE cns != '' AND cns IS NOT NULL)"
+    ).execute();
+    dbPep.newQuery(
+      "INSERT OR REPLACE INTO amarcap53_pep_registros (id, cns, dna_hpv_pep) " +
+      "SELECT substr(lower(hex(randomblob(12))), 1, 15), cns, dna_hpv_pep " +
+      "FROM amarcap53_pacientes " +
+      "WHERE dna_hpv_pep != '' AND dna_hpv_pep IS NOT NULL AND cns != '' AND cns IS NOT NULL"
+    ).execute();
   } catch (err) {
     console.error('[pep_registros] Bootstrap error:', err);
   }
-
-  e.next();
 });
 
 onRecordCreate(function(e) {
@@ -211,43 +188,25 @@ onRecordUpdate(function(e) {
     if (!cns || val === orig) return;
     if (val === '--') val = '';
 
-    var PEP_COLL = 'amarcap53_pep_registros';
-    // Existência via SQL cru: findCollectionByNameOrId em coleção inexistente
-    // causa panic de nil-pointer neste build do PocketBase.
-    var pepExists = false;
-    try {
-      var pepRows = $app.db().newQuery(
-        "SELECT name FROM _collections WHERE name = 'amarcap53_pep_registros' LIMIT 1"
-      ).all();
-      pepExists = !!(pepRows && pepRows.length > 0);
-    } catch (checkErr) { pepExists = false; }
-    if (!pepExists) {
-      try {
-        $app.save(new Collection({
-          type: 'base',
-          name: PEP_COLL,
-          fields: [
-            { name: 'cns', type: 'text' },
-            { name: 'dna_hpv_pep', type: 'text' },
-          ],
-        }));
-      } catch (createErr) { console.error('[pep_registros] Hook create error:', createErr); return; }
-    }
-    try {
-      $app.db().newQuery(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)"
-      ).execute();
-    } catch (idxErr) {}
+    // Tabela CRUA SQLite (NÃO é coleção do PocketBase). CREATE TABLE IF NOT
+    // EXISTS é idempotente e não depende do model/cache de collections: sem
+    // panic de nil-pointer e sem o erro "Collection name must be unique".
+    var db = $app.db();
+    db.newQuery(
+      "CREATE TABLE IF NOT EXISTS amarcap53_pep_registros (" +
+      "id TEXT PRIMARY KEY, cns TEXT, dna_hpv_pep TEXT)"
+    ).execute();
+    db.newQuery(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)"
+    ).execute();
 
     function esc(v) { return "'" + String(v == null ? '' : v).replace(/'/g, "''") + "'"; }
-    var db = $app.db();
     if (val === '') {
       db.newQuery("DELETE FROM amarcap53_pep_registros WHERE cns = " + esc(cns)).execute();
     } else {
-      var now = new Date().toISOString().replace('T', ' ');
       db.newQuery(
-        "INSERT OR REPLACE INTO amarcap53_pep_registros (id, created, updated, cns, dna_hpv_pep) " +
-        "VALUES (substr(lower(hex(randomblob(12))), 1, 15), " + esc(now) + ", " + esc(now) + ", " + esc(cns) + ", " + esc(val) + ")"
+        "INSERT OR REPLACE INTO amarcap53_pep_registros (id, cns, dna_hpv_pep) " +
+        "VALUES (substr(lower(hex(randomblob(12))), 1, 15), " + esc(cns) + ", " + esc(val) + ")"
       ).execute();
     }
   } catch (err) {
@@ -399,40 +358,23 @@ routerAdd('POST', '/api/amar/import-pacientes', function(c) {
 
       // Snapshot das datas DNA-HPV (PEP) por CNS antes do DELETE (idem delete-all)
       try {
-        var PEP_COLL0 = 'amarcap53_pep_registros';
-        var pepReady0 = true;
-        // Existência via SQL cru (ver nota no bootstrap sobre findCollectionByNameOrId).
-        var pepExists0 = false;
-        try {
-          var pepRows0 = db.newQuery(
-            "SELECT name FROM _collections WHERE name = 'amarcap53_pep_registros' LIMIT 1"
-          ).all();
-          pepExists0 = !!(pepRows0 && pepRows0.length > 0);
-        } catch (checkErr0) { pepExists0 = false; }
-        if (!pepExists0) {
-          try {
-            $app.save(new Collection({
-              type: 'base', name: PEP_COLL0,
-              fields: [{ name: 'cns', type: 'text' }, { name: 'dna_hpv_pep', type: 'text' }],
-            }));
-          } catch (createErr) { console.error('[import-pacientes] Create pep collection error:', createErr); pepReady0 = false; }
-        }
-        if (pepReady0) {
-          try {
-            db.newQuery("CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)").execute();
-          } catch (idxErr) {}
-          var nowPep0 = new Date().toISOString().replace('T', ' ');
-          db.newQuery(
-            "DELETE FROM amarcap53_pep_registros " +
-            "WHERE cns IN (SELECT cns FROM amarcap53_pacientes WHERE cns != '' AND cns IS NOT NULL)"
-          ).execute();
-          db.newQuery(
-            "INSERT OR REPLACE INTO amarcap53_pep_registros (id, created, updated, cns, dna_hpv_pep) " +
-            "SELECT substr(lower(hex(randomblob(12))), 1, 15), '" + nowPep0 + "', '" + nowPep0 + "', cns, dna_hpv_pep " +
-            "FROM amarcap53_pacientes " +
-            "WHERE dna_hpv_pep != '' AND dna_hpv_pep IS NOT NULL AND cns != '' AND cns IS NOT NULL"
-          ).execute();
-        }
+        // Tabela CRUA SQLite (ver nota no bootstrap). Idempotente e sem os
+        // problemas de criar/consultar Collection neste build.
+        db.newQuery(
+          "CREATE TABLE IF NOT EXISTS amarcap53_pep_registros (" +
+          "id TEXT PRIMARY KEY, cns TEXT, dna_hpv_pep TEXT)"
+        ).execute();
+        db.newQuery("CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)").execute();
+        db.newQuery(
+          "DELETE FROM amarcap53_pep_registros " +
+          "WHERE cns IN (SELECT cns FROM amarcap53_pacientes WHERE cns != '' AND cns IS NOT NULL)"
+        ).execute();
+        db.newQuery(
+          "INSERT OR REPLACE INTO amarcap53_pep_registros (id, cns, dna_hpv_pep) " +
+          "SELECT substr(lower(hex(randomblob(12))), 1, 15), cns, dna_hpv_pep " +
+          "FROM amarcap53_pacientes " +
+          "WHERE dna_hpv_pep != '' AND dna_hpv_pep IS NOT NULL AND cns != '' AND cns IS NOT NULL"
+        ).execute();
       } catch (pepErr0) { console.error('[import-pacientes] Snapshot dna_hpv_pep error:', pepErr0); }
 
       db.newQuery("DELETE FROM amarcap53_pacientes").execute();
@@ -530,42 +472,25 @@ routerAdd('POST', '/api/amar/delete-all', function(c) {
       // Snapshot das datas DNA-HPV (PEP) por CNS ANTES de apagar a base.
       // Sem isso as datas editadas pelos usuários somem junto com os registros.
       try {
-        var PEP_COLL = 'amarcap53_pep_registros';
-        var pepReady = true;
-        // Existência via SQL cru (ver nota no bootstrap sobre findCollectionByNameOrId).
-        var pepExists = false;
-        try {
-          var pepRows = db.newQuery(
-            "SELECT name FROM _collections WHERE name = 'amarcap53_pep_registros' LIMIT 1"
-          ).all();
-          pepExists = !!(pepRows && pepRows.length > 0);
-        } catch (checkErr) { pepExists = false; }
-        if (!pepExists) {
-          try {
-            $app.save(new Collection({
-              type: 'base', name: PEP_COLL,
-              fields: [{ name: 'cns', type: 'text' }, { name: 'dna_hpv_pep', type: 'text' }],
-            }));
-          } catch (createErr) { console.error('[delete-all] Create pep collection error:', createErr); pepReady = false; }
-        }
-        if (pepReady) {
-          try {
-            db.newQuery("CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)").execute();
-          } catch (idxErr) {}
-          var nowPep = new Date().toISOString().replace('T', ' ');
-          // Remove o backup apenas dos CNS que existem agora (base cheia).
-          // Se a base estiver vazia (meio do ciclo), nada é removido.
-          db.newQuery(
-            "DELETE FROM amarcap53_pep_registros " +
-            "WHERE cns IN (SELECT cns FROM amarcap53_pacientes WHERE cns != '' AND cns IS NOT NULL)"
-          ).execute();
-          db.newQuery(
-            "INSERT OR REPLACE INTO amarcap53_pep_registros (id, created, updated, cns, dna_hpv_pep) " +
-            "SELECT substr(lower(hex(randomblob(12))), 1, 15), '" + nowPep + "', '" + nowPep + "', cns, dna_hpv_pep " +
-            "FROM amarcap53_pacientes " +
-            "WHERE dna_hpv_pep != '' AND dna_hpv_pep IS NOT NULL AND cns != '' AND cns IS NOT NULL"
-          ).execute();
-        }
+        // Tabela CRUA SQLite (ver nota no bootstrap). Idempotente e sem os
+        // problemas de criar/consultar Collection neste build.
+        db.newQuery(
+          "CREATE TABLE IF NOT EXISTS amarcap53_pep_registros (" +
+          "id TEXT PRIMARY KEY, cns TEXT, dna_hpv_pep TEXT)"
+        ).execute();
+        db.newQuery("CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)").execute();
+        // Remove o backup apenas dos CNS que existem agora (base cheia).
+        // Se a base estiver vazia (meio do ciclo), nada é removido.
+        db.newQuery(
+          "DELETE FROM amarcap53_pep_registros " +
+          "WHERE cns IN (SELECT cns FROM amarcap53_pacientes WHERE cns != '' AND cns IS NOT NULL)"
+        ).execute();
+        db.newQuery(
+          "INSERT OR REPLACE INTO amarcap53_pep_registros (id, cns, dna_hpv_pep) " +
+          "SELECT substr(lower(hex(randomblob(12))), 1, 15), cns, dna_hpv_pep " +
+          "FROM amarcap53_pacientes " +
+          "WHERE dna_hpv_pep != '' AND dna_hpv_pep IS NOT NULL AND cns != '' AND cns IS NOT NULL"
+        ).execute();
       } catch (pepErr) { console.error('[delete-all] Snapshot dna_hpv_pep error:', pepErr); }
     }
 
@@ -607,40 +532,23 @@ routerAdd('POST', '/api/amar/drop-pacientes', function(c) {
 
       // Snapshot das datas DNA-HPV (PEP) por CNS antes de apagar (idem delete-all)
       try {
-        var PEP_COLL = 'amarcap53_pep_registros';
-        var pepReady = true;
-        // Existência via SQL cru (ver nota no bootstrap sobre findCollectionByNameOrId).
-        var pepExists = false;
-        try {
-          var pepRows = db.newQuery(
-            "SELECT name FROM _collections WHERE name = 'amarcap53_pep_registros' LIMIT 1"
-          ).all();
-          pepExists = !!(pepRows && pepRows.length > 0);
-        } catch (checkErr) { pepExists = false; }
-        if (!pepExists) {
-          try {
-            $app.save(new Collection({
-              type: 'base', name: PEP_COLL,
-              fields: [{ name: 'cns', type: 'text' }, { name: 'dna_hpv_pep', type: 'text' }],
-            }));
-          } catch (createErr) { console.error('[drop-pacientes] Create pep collection error:', createErr); pepReady = false; }
-        }
-        if (pepReady) {
-          try {
-            db.newQuery("CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)").execute();
-          } catch (idxErr) {}
-          var nowPep = new Date().toISOString().replace('T', ' ');
-          db.newQuery(
-            "DELETE FROM amarcap53_pep_registros " +
-            "WHERE cns IN (SELECT cns FROM amarcap53_pacientes WHERE cns != '' AND cns IS NOT NULL)"
-          ).execute();
-          db.newQuery(
-            "INSERT OR REPLACE INTO amarcap53_pep_registros (id, created, updated, cns, dna_hpv_pep) " +
-            "SELECT substr(lower(hex(randomblob(12))), 1, 15), '" + nowPep + "', '" + nowPep + "', cns, dna_hpv_pep " +
-            "FROM amarcap53_pacientes " +
-            "WHERE dna_hpv_pep != '' AND dna_hpv_pep IS NOT NULL AND cns != '' AND cns IS NOT NULL"
-          ).execute();
-        }
+        // Tabela CRUA SQLite (ver nota no bootstrap). Idempotente e sem os
+        // problemas de criar/consultar Collection neste build.
+        db.newQuery(
+          "CREATE TABLE IF NOT EXISTS amarcap53_pep_registros (" +
+          "id TEXT PRIMARY KEY, cns TEXT, dna_hpv_pep TEXT)"
+        ).execute();
+        db.newQuery("CREATE UNIQUE INDEX IF NOT EXISTS idx_pep_reg_cns ON amarcap53_pep_registros (cns)").execute();
+        db.newQuery(
+          "DELETE FROM amarcap53_pep_registros " +
+          "WHERE cns IN (SELECT cns FROM amarcap53_pacientes WHERE cns != '' AND cns IS NOT NULL)"
+        ).execute();
+        db.newQuery(
+          "INSERT OR REPLACE INTO amarcap53_pep_registros (id, cns, dna_hpv_pep) " +
+          "SELECT substr(lower(hex(randomblob(12))), 1, 15), cns, dna_hpv_pep " +
+          "FROM amarcap53_pacientes " +
+          "WHERE dna_hpv_pep != '' AND dna_hpv_pep IS NOT NULL AND cns != '' AND cns IS NOT NULL"
+        ).execute();
       } catch (pepErr) { console.error('[drop-pacientes] Snapshot dna_hpv_pep error:', pepErr); }
     }
 
