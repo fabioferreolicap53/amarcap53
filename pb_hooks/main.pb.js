@@ -156,6 +156,29 @@ onBootstrap(function(e) {
   } catch (err) {
     console.error('[pep_registros] Bootstrap error:', err);
   }
+
+  // Garante o campo `favoritos` na coleção de usuários. Sem ele, o PATCH do
+  // frontend (que envia um array de CNS) devolve 400 "Failed to update record."
+  // e o usuário não consegue favoritar. Auto-cura: cria se faltar e recria como
+  // JSON se estiver com tipo errado (array em campo text = 400 também).
+  try {
+    var usersColl = $app.findCollectionByNameOrId('amarcap53_users');
+    if (usersColl) {
+      var favField = usersColl.fields.getByName('favoritos');
+      var needSave = false;
+      if (!favField) {
+        usersColl.fields.add(new JSONField({ name: 'favoritos' }));
+        needSave = true;
+      } else if (String(favField.type) !== 'json') {
+        usersColl.fields.removeByName('favoritos');
+        usersColl.fields.add(new JSONField({ name: 'favoritos' }));
+        needSave = true;
+      }
+      if (needSave) $app.save(usersColl);
+    }
+  } catch (err) {
+    console.error('[favoritos] Bootstrap error:', err);
+  }
 });
 
 onRecordCreate(function(e) {
