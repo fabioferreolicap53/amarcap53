@@ -4,9 +4,12 @@
  * Run: node scripts/fix-unidade-whitespace.js
  */
 
-const PB_URL = 'https://centraldedados.dev.br';
-const ADMIN_EMAIL = 'fabioferreoli@gmail.com';
-const ADMIN_PASSWORD = '@Cap5364125';
+import 'dotenv/config';
+
+// Credenciais lidas do .env local (rodam só no terminal, NUNCA no frontend).
+const PB_URL = process.env.VITE_POCKETBASE_URL || 'https://centraldedados.dev.br';
+const ADMIN_EMAIL = process.env.VITE_POCKETBASE_LOGIN || '';
+const ADMIN_PASSWORD = process.env.VITE_POCKETBASE_PASSWORD || '';
 const COLLECTION = 'amarcap53_pacientes';
 const PAGE_SIZE = 200;
 
@@ -14,8 +17,13 @@ async function main() {
   console.log('=== FIX UNIDADE WHITESPACE ===\n');
 
   // 1. Auth
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+    console.error('Faltam VITE_POCKETBASE_LOGIN/VITE_POCKETBASE_PASSWORD no .env');
+    process.exit(1);
+  }
   process.stdout.write('Auth admin... ');
-  const authRes = await fetch(`${PB_URL}/api/admins/auth-with-password`, {
+  // PocketBase v0.23+ removeu /api/admins — superusuário é /_superusers
+  const authRes = await fetch(`${PB_URL}/api/collections/_superusers/auth-with-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ identity: ADMIN_EMAIL, password: ADMIN_PASSWORD }),

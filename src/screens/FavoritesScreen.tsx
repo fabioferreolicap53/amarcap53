@@ -533,15 +533,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
       });
 
       // Build complete server-side filter (region + SIM/NÃO + status)
-      // Favoritos: se poucos (< 150), inclui no filtro server-side. Se muitos,
-      // busca sem o filtro de favoritos e filtra client-side (evita OR gigante
-      // de `cns = "..."` que estoura o limite de cláusulas do PocketBase → 400).
       const serverFilterParts: string[] = [];
       if (regionFilter) serverFilterParts.push(regionFilter);
-      const useServerFavFilter = favorites.length > 0 && favorites.length <= 150;
-      if (useServerFavFilter) {
-        serverFilterParts.push(`(${favorites.map(cns => `cns = "${cns}"`).join(' || ')})`);
-      }
 
       // Filtros SIM/NÃO de exames (server-side)
       const simNaoFilter = (field: string, val: string) => {
@@ -566,23 +559,29 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
         if (filterStatus.includes('COLETA_MOLECULAR')) statusClauses.push('(dna_hpv_gal != "" && dna_hpv_pep = "")');
         if (filterStatus.includes('PEP_CITO')) statusClauses.push('(cito_pep != "" && dna_hpv_gal = "" && dna_hpv_pep = "")');
         if (filterStatus.includes('COLETA_CITO')) statusClauses.push('(cito_lab != "" && cito_pep = "" && dna_hpv_gal = "" && dna_hpv_pep = "")');
-        if (filterStatus.includes('NAO_IDENTIFICADO')) statusClauses.push('(dna_hpv_pep = "" && dna_hpv_gal = "" && cito_pep = "" && cito_lab = "")');
+        if (filterStatus.includes('NAO_IDENTIFICADO')) statusClauses.push('((dna_hpv_pep = null || dna_hpv_pep = "") && (dna_hpv_gal = null || dna_hpv_gal = "") && (cito_pep = null || cito_pep = "") && (cito_lab = null || cito_lab = ""))');
         if (statusClauses.length > 0) serverFilterParts.push(`(${statusClauses.join(' || ')})`);
       }
 
       const finalServerFilter = serverFilterParts.length > 0 ? serverFilterParts.join(' && ') : '';
-      let resultList = await pb.collection('amarcap53_pacientes').getFullList({
-        filter: finalServerFilter,
-        fields: 'id,nome,cns,unidade,equipe,microarea,idade,grupo,cito_pep,cito_lab,dna_hpv_pep,dna_hpv_gal,unidade_solicitante,alertas_rastreamento',
-        sort: 'nome',
-        batch: 500,
-        requestKey: null,
-      });
-
-      // Filtro de favoritos client-side (quando o filtro server-side não foi possível)
-      if (!useServerFavFilter) {
-        const favSet = new Set(favorites.map(f => String(f ?? '').trim()));
-        resultList = resultList.filter(r => favSet.has(String(r.cns ?? '').trim()));
+      // Favoritos em blocos de 100: OR de `cns = "..."` acima de ~150 cláusulas
+      // estoura o limite do PocketBase (HTTP 400). Blocos também evitam baixar
+      // a coleção inteira (130K) só para filtrar favoritos no client.
+      const FAV_FIELDS = 'id,nome,cns,unidade,equipe,microarea,idade,grupo,cito_pep,cito_lab,dna_hpv_pep,dna_hpv_gal,unidade_solicitante,alertas_rastreamento';
+      let resultList: any[] = [];
+      const favChunks: string[][] = [];
+      for (let i = 0; i < favorites.length; i += 100) favChunks.push(favorites.slice(i, i + 100));
+      for (const chunk of favChunks) {
+        const favPart = `(${chunk.map(cns => `cns = "${String(cns ?? '').replace(/"/g, '\\"')}"`).join(' || ')})`;
+        const filter = finalServerFilter ? `${finalServerFilter} && ${favPart}` : favPart;
+        const part = await pb.collection('amarcap53_pacientes').getFullList({
+          filter,
+          fields: FAV_FIELDS,
+          sort: 'nome',
+          batch: 500,
+          requestKey: null,
+        });
+        resultList = resultList.concat(Array.isArray(part) ? part : (part as any)?.items ?? []);
       }
 
       // Busca acompanhamentos em lote (evita N+1). OR de `paciente = "id"` com

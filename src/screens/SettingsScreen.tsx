@@ -631,7 +631,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       setRelinkStatus(prev => ({ ...prev, phase: 'carregando pacientes...' }));
       const pacientes = await pb.collection('amarcap53_pacientes').getFullList({
         filter: 'cns != ""',
-        fields: 'id,cns'
+        fields: 'id,cns',
+        batch: 500,
+        requestKey: null,
       });
       
       // Mapeia CNS -> ID
@@ -644,7 +646,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       setRelinkStatus(prev => ({ ...prev, phase: 'carregando acompanhamentos...', matched: 0 }));
       const acompanhamentos = await pb.collection('amarcap53_acompanhamentos').getFullList({
         filter: 'cns != ""',
-        fields: 'id,cns,paciente'
+        fields: 'id,cns,paciente',
+        batch: 500,
+        requestKey: null,
       });
       
       let updated = 0;

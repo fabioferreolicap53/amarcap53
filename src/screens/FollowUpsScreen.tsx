@@ -521,14 +521,14 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     const timer = setTimeout(async () => {
       try {
         const search = createPacienteSearch.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-        const patients = await pb.collection('amarcap53_pacientes').getFullList({
+        // getList(1, 10): busca `~` sem limite baixaria TODOS os matches de 130K
+        const patients = await pb.collection('amarcap53_pacientes').getList(1, 10, {
           filter: `nome ~ "${search}" || cns ~ "${search}"`,
           fields: 'id,nome,cns,unidade,equipe,microarea',
           sort: 'nome',
-          limit: 10,
           requestKey: null,
         });
-        setCreatePacienteResults(patients);
+        setCreatePacienteResults(patients.items);
       } catch (e) {
         console.error('[FollowUpsScreen] Erro ao buscar pacientes:', e);
         setCreatePacienteResults([]);

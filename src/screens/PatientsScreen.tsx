@@ -395,7 +395,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvRecords, setCsvRecords] = useState<any[]>([]);
-  const [csvText, setCsvText] = useState('');
   const [csvFileName, setCsvFileName] = useState('');
   const [isCsvUploading, setIsCsvUploading] = useState(false);
   const [csvProgress, setCsvProgress] = useState({ current: 0, total: 0 });
@@ -1139,7 +1138,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      setCsvText(text);
       const result = Papa.parse(text, {
         header: true,
         skipEmptyLines: true,
@@ -1159,34 +1157,35 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     const totalRecords = csvRecords.length;
 
     // ─── MODO SUBSTITUIR: envia CSV inteiro pro backend ─────
-    // Backend faz DELETE + INSERT na mesma transação SQL (atômico)
+    // Backend faz DELETE + INSERT na mesma transação SQL (atômico) e ainda
+    // restaura as datas DNA-HPV (PEP) salvas por CNS.
     if (csvReplaceExisting) {
       setCsvProgress({ current: 1, total: 1 });
 
       try {
-        const baseUrl = pb.baseURL;
-        const token = pb.authStore.token;
-        const res = await fetch(`${baseUrl}/api/custom/import-pacientes`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            csvText: csvText,
-            fileName: csvFileName,
-            mode: 'replace',
-          }),
+        const DATE_FIELDS = new Set(['data_nascimento', 'cito_lab', 'cito_pep', 'dna_hpv_gal', 'dna_hpv_pep']);
+        const records = csvRecords.map((r: any) => {
+          const record: Record<string, any> = {};
+          for (const key in r) {
+            if (r.hasOwnProperty(key) && key) record[key] = r[key];
+          }
+          for (const field of DATE_FIELDS) {
+            if (record[field]) record[field] = convertDateToISO(record[field]);
+          }
+          if (record.cns) record.cns = String(record.cns).replace(/\D/g, '').padStart(15, '0').slice(-15);
+          if (record.idade) record.idade = parseInt(record.idade, 10) || 0;
+          if (record.microarea !== undefined && record.microarea !== '') record.microarea = parseInt(record.microarea, 10) || 0;
+          return record;
         });
 
-        const data = await res.json();
+        const data: any = await pb.send('/api/amar/import-pacientes', {
+          method: 'POST',
+          body: { records: records, mode: 'replace' },
+        });
 
-        if (!res.ok || !data.success) {
-          throw new Error(data.message || `Erro HTTP ${res.status}`);
-        }
-
+        const imported = Number(data?.imported || 0);
         setIsCsvUploading(false);
-        setCsvResult({ success: data.imported, errors: data.errors, total: totalRecords });
+        setCsvResult({ success: imported, errors: totalRecords - imported, total: totalRecords });
       } catch (err: any) {
         console.error('[IMPORT] Erro:', err);
         setIsCsvUploading(false);
@@ -1259,7 +1258,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     setIsCsvModalOpen(false);
     setCsvFile(null);
     setCsvRecords([]);
-    setCsvText('');
     setCsvFileName('');
     setCsvResult(null);
     setCsvPreview([]);
@@ -1342,9 +1340,14 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     printWindow.document.close();
 
     // Agora busca os dados em background
+    // fields enxuto + batch: baixa só as colunas usadas e em blocos de 500
+    // (130K registros com todos os campos trava o servidor de 1GB)
     pb.collection('amarcap53_pacientes').getFullList({
       sort: 'nome',
       filter: filterStringRef.current || undefined,
+      fields: 'id,unidade,equipe,microarea,nome,cns,data_nascimento,idade,grupo,cito_lab,cito_pep,dna_hpv_gal,unidade_solicitante,dna_hpv_pep',
+      batch: 500,
+      requestKey: null,
     }).then(allRecords => {
       // Aplica filtro de busca ativa (client-side — fora do filtro server)
       const baSet = buscaAtivaSetRef.current;
@@ -1454,9 +1457,13 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   };
 
   const handleDownloadCsv = () => {
+    // fields enxuto + batch: mesmas colunas do CSV, em blocos de 500
     pb.collection('amarcap53_pacientes').getFullList({
       sort: 'nome',
       filter: filterStringRef.current || undefined,
+      fields: 'id,nome,cns,data_nascimento,idade,grupo,unidade,equipe,microarea,dna_hpv_pep,dna_hpv_gal,unidade_solicitante,cito_lab,cito_pep',
+      batch: 500,
+      requestKey: null,
     }).then(allRecords => {
       // Aplica filtro de busca ativa (client-side — fora do filtro server)
       const baSet = buscaAtivaSetRef.current;
