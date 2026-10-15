@@ -328,9 +328,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       var s = String(val == null ? '' : val).trim().replace(/^["']+|["']+$/g, '');
       if (!s || s === '--' || s === '-' || s === 'N/A' || s.toUpperCase() === 'NULL') return '';
       s = s.split(/[ T]/)[0].trim(); // remove horario ("03/02/2026 00:00:00")
+      // Âncora 12:00 UTC: PocketBase grava em UTC; meia-noite local viraria 03:00 (+3h) no painel.
       if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) {
         var iso = s.split('-');
-        return iso[0] + '-' + iso[1].padStart(2, '0') + '-' + iso[2].padStart(2, '0');
+        return iso[0] + '-' + iso[1].padStart(2, '0') + '-' + iso[2].padStart(2, '0') + ' 12:00:00.000Z';
       }
       var parts = s.split(/[\/\-.]/);
       if (parts.length !== 3) return '';
@@ -340,7 +341,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ activeTab, setAc
       var dd = parseInt(d, 10), mm = parseInt(m, 10);
       if (mm > 12 && dd <= 12) { var tmp = dd; dd = mm; mm = tmp; } // mm/dd invertido
       if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return '';
-      return y + '-' + String(mm).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
+      return y + '-' + String(mm).padStart(2, '0') + '-' + String(dd).padStart(2, '0') + ' 12:00:00.000Z';
     }
 
     // Decodifica arquivo: UTF-8 (Excel moderno) com fallback ANSI/Windows-1252 (Excel pt-BR antigo).

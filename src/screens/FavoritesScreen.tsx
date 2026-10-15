@@ -222,6 +222,21 @@ const formatarData = (dataStr: string | undefined) => {
   return dateOnly;
 };
 
+// Datas no PocketBase são UTC. Ancorar no meio-dia UTC (12:00:00.000Z)
+// evita o salto de +3h no painel e nunca troca o dia em nenhum fuso.
+const toPbDate = (value?: string): string => {
+  if (!value) return '';
+  const v = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(v)) return `${v.slice(0, 10)} 12:00:00.000Z`;
+  const parts = v.split('/');
+  if (parts.length === 3) {
+    let [d, m, y] = parts;
+    if (y.length === 2) y = '20' + y;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')} 12:00:00.000Z`;
+  }
+  return v;
+};
+
 const calcularIdade = (dataNascimento: string) => {
   if (!dataNascimento) return 0;
   let dataFormatada = dataNascimento;
@@ -483,10 +498,12 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
     if (displayDate === '' || displayDate === '--' || displayDate.length === 10) {
       try {
         let valueToSave = displayDate === '--' ? '' : displayDate;
-        // Converter DD/MM/YYYY → YYYY-MM-DD para PocketBase type=date
+        // Converter para YYYY-MM-DD 12:00:00.000Z (UTC, meio-dia) para PocketBase type=date
         if (/^\d{2}\/\d{2}\/\d{4}$/.test(valueToSave)) {
           const [d, m, y] = valueToSave.split('/');
-          valueToSave = `${y}-${m}-${d}`;
+          valueToSave = `${y}-${m}-${d} 12:00:00.000Z`;
+        } else if (/^\d{4}-\d{2}-\d{2}$/.test(valueToSave)) {
+          valueToSave = `${valueToSave} 12:00:00.000Z`;
         }
         await pb.collection('amarcap53_pacientes').update(patientId, { dna_hpv_pep: valueToSave });
       } catch (err) {
@@ -760,21 +777,15 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({ activeTab, set
 
     setIsSaving(true);
     
-    let dataBuscaIso = '';
-    if (selectedDate && selectedDate.includes('/')) {
-      const [d, m, y] = selectedDate.split('/');
-      dataBuscaIso = `${y}-${m}-${d}`; // Formato YYYY-MM-DD
-    }
-
     const data = {
       paciente: selectedPaciente.id,
       profissional: user.id,
       cns: (selectedPaciente as any).cns || '',
-      data_busca: dataBuscaIso || selectedDate,
+      data_busca: toPbDate(selectedDate),
       tipo_busca: getCanonicalSelectValue(modalTipoBusca, TIPO_BUSCA_OPTIONS),
       tipo_contato: getCanonicalSelectValue(modalTipoContato, TIPO_CONTATO_OPTIONS),
       situacao_pos_busca: getCanonicalSelectValue(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS),
-      data_do_agendamento: getCanonicalSelectValue(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' ? (modalDataAgendamento.includes('/') ? (() => { const [d,m,y] = modalDataAgendamento.split('/'); return `${y}-${m}-${d}`; })() : modalDataAgendamento) : '',
+      data_do_agendamento: getCanonicalSelectValue(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' ? toPbDate(modalDataAgendamento) : '',
       entraves_identificados: JSON.stringify(
         Array.isArray(modalEntraves)
           ? modalEntraves.filter(v => v)

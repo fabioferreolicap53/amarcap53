@@ -29,6 +29,21 @@ import {
 const normalizeText = (str: string) =>
   str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim().replace(/\s+/g, ' ');
 
+// Datas no PocketBase são UTC. Ancorar no meio-dia UTC (12:00:00.000Z)
+// evita o salto de +3h no painel e nunca troca o dia em nenhum fuso.
+const toPbDate = (value?: string): string => {
+  if (!value) return '';
+  const v = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(v)) return `${v.slice(0, 10)} 12:00:00.000Z`;
+  const parts = v.split('/');
+  if (parts.length === 3) {
+    let [d, m, y] = parts;
+    if (y.length === 2) y = '20' + y;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')} 12:00:00.000Z`;
+  }
+  return v;
+};
+
 interface Acompanhamento {
   id: string;
   created: string;
@@ -586,17 +601,8 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
 
     setIsSaving(true);
 
-    let dataBuscaIso = '';
-    if (createDate && createDate.includes('/')) {
-      const [d, m, y] = createDate.split('/');
-      dataBuscaIso = `${y}-${m}-${d}`;
-    }
-
-    let dataAgendamentoIso = '';
-    if (createDataAgendamento && createDataAgendamento.includes('/')) {
-      const [d, m, y] = createDataAgendamento.split('/');
-      dataAgendamentoIso = `${y}-${m}-${d}`;
-    }
+    const dataBuscaIso = toPbDate(createDate);
+    const dataAgendamentoIso = toPbDate(createDataAgendamento);
 
     const data = {
       paciente: createSelectedPaciente.id,
@@ -652,20 +658,12 @@ export const FollowUpsScreen: React.FC<FollowUpsScreenProps> = ({ activeTab, set
     setIsSaving(true);
     
     const rawDate = selectedAcompanhamento.data_busca_formatada;
-    let dataBuscaIso = '';
-    if (rawDate && rawDate.includes('/')) {
-      const [d, m, y] = rawDate.split('/');
-      dataBuscaIso = `${y}-${m}-${d}`;
-    }
+    const dataBuscaIso = toPbDate(rawDate);
 
     const rawTipoContato = selectedAcompanhamento.tipo_contato || '';
 
     const rawDataAgendamento = selectedAcompanhamento.data_do_agendamento || '';
-    let dataAgendamentoIso = '';
-    if (rawDataAgendamento && rawDataAgendamento.includes('/')) {
-      const [d, m, y] = rawDataAgendamento.split('/');
-      dataAgendamentoIso = `${y}-${m}-${d}`;
-    }
+    const dataAgendamentoIso = toPbDate(rawDataAgendamento);
 
     const data = {
       tipo_busca: getSelectLabel(selectedAcompanhamento.tipo_busca, TIPO_BUSCA_OPTIONS),

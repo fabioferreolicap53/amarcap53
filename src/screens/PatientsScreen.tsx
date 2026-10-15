@@ -623,21 +623,15 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
 
     setIsSaving(true);
     
-    let dataBuscaIso = '';
-    if (selectedDate && selectedDate.includes('/')) {
-      const [d, m, y] = selectedDate.split('/');
-      dataBuscaIso = `${y}-${m}-${d}`;
-    }
-
     const data = {
       paciente: selectedPaciente.id,
       profissional: user.id,
       cns: (selectedPaciente as any).cns || '',
-      data_busca: dataBuscaIso || selectedDate,
+      data_busca: convertDateToISO(selectedDate),
       tipo_busca: getSelectLabel(modalTipoBusca, TIPO_BUSCA_OPTIONS),
       tipo_contato: getSelectLabel(modalTipoContato, TIPO_CONTATO_OPTIONS),
       situacao_pos_busca: getSelectLabel(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS),
-      data_do_agendamento: getSelectLabel(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' ? (modalDataAgendamento.includes('/') ? (() => { const [d,m,y] = modalDataAgendamento.split('/'); return `${y}-${m}-${d}`; })() : modalDataAgendamento) : '',
+      data_do_agendamento: getSelectLabel(modalSituacao, SITUACAO_POS_BUSCA_OPTIONS) === 'AGENDAMENTO APÓS CONTATO DIRETO' ? convertDateToISO(modalDataAgendamento) : '',
       entraves_identificados: JSON.stringify(
         Array.isArray(modalEntraves)
           ? modalEntraves.filter(v => v)
@@ -744,10 +738,12 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
     if (displayDate === '' || displayDate === '--' || displayDate.length === 10) {
       try {
         let valueToSave = displayDate === '--' ? '' : displayDate;
-        // Converter DD/MM/YYYY → YYYY-MM-DD para PocketBase type=date
+        // Converter para YYYY-MM-DD 12:00:00.000Z (UTC, meio-dia) para PocketBase type=date
         if (/^\d{2}\/\d{2}\/\d{4}$/.test(valueToSave)) {
           const [d, m, y] = valueToSave.split('/');
-          valueToSave = `${y}-${m}-${d}`;
+          valueToSave = `${y}-${m}-${d} 12:00:00.000Z`;
+        } else if (/^\d{4}-\d{2}-\d{2}$/.test(valueToSave)) {
+          valueToSave = `${valueToSave} 12:00:00.000Z`;
         }
         await pb.collection('amarcap53_pacientes').update(patientId, { dna_hpv_pep: valueToSave });
       } catch (err) {
@@ -1115,16 +1111,19 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({ activeTab, setAc
   useEffect(() => { setCurrentPage(1); }, [sortField, sortDir]);
 
   // CSV Import handlers
+  // Âncora 12:00 UTC: PocketBase grava em UTC; meia-noite local viraria 03:00 (+3h) no painel.
   const convertDateToISO = (value: string): string => {
     if (!value || value === '--' || value.trim() === '') return '';
-    if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value;
-    const parts = value.split('/');
+    const v = value.trim();
+    const ANCHOR = ' 12:00:00.000Z';
+    if (/^\d{4}-\d{2}-\d{2}/.test(v)) return `${v.slice(0, 10)}${ANCHOR}`;
+    const parts = v.split('/');
     if (parts.length === 3) {
       let [d, m, y] = parts;
       if (y.length === 2) y = '20' + y;
-      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}${ANCHOR}`;
     }
-    return value;
+    return v;
   };
 
   const handleCsvFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {

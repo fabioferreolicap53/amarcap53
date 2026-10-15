@@ -404,7 +404,7 @@ routerAdd('POST', '/api/amar/import-pacientes', function(c) {
     }
 
     var imported = 0;
-    var now = new Date().toISOString().replace('T', ' ').split('.')[0];
+    var now = new Date().toISOString().replace('T', ' ');
 
     // INSERT multi-linha: 1 única sentença SQL = 1 transação atômica.
     // Muito mais rápido que 1 INSERT por registro e libera o lock de escrita
